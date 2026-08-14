@@ -1,0 +1,63 @@
+.bossCard {
+  background: rgba(80, 55, 104, 0.86) !important;
+  color: #fff5ff !important;
+  border-color: rgba(255, 255, 255, 0.72) !important;
+}
+
+.runClear {
+  position: absolute;
+  left: 50%;
+  top: 36%;
+  z-index: 8;
+  transform: translate(-50%, -50%) rotate(-2deg);
+  padding: 12px 22px;
+  border: 3px solid rgba(255, 255, 255, 0.92);
+  border-radius: 18px;
+  background: rgba(91, 190, 153, 0.92);
+  color: white;
+  font-size: clamp(24px, 5vw, 46px);
+  font-weight: 1000;
+  letter-spacing: 0.06em;
+  text-shadow: 0 3px 0 rgba(31, 95, 83, 0.35);
+  box-shadow: 0 14px 34px rgba(48, 90, 87, 0.2);
+  pointer-events: none;
+}
+
+.bossMeter {
+  position: absolute;
+  left: 50%;
+  top: calc(58px + env(safe-area-inset-top));
+  z-index: 5;
+  width: min(44vw, 390px);
+  transform: translateX(-50%);
+  padding: 5px 9px 7px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  background: rgba(74, 49, 92, 0.78);
+  color: white;
+  pointer-events: none;
+}
+
+.bossMeterHead {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  font-weight: 1000;
+  letter-spacing: 0.12em;
+}
+
+.bossMeterTrack {
+  height: 7px;
+  margin-top: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.bossMeterTrack i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f37aa2, #b982ed);
+  transition: width 0.12s linear;
+}

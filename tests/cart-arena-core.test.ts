@@ -4,6 +4,7 @@ import { RallyTrack } from "../src/rally/RallyTrack";
 import { CART_ARENA_TRACK } from "../src/cart/CartArenaTrack";
 import { CART_TURBO_RECHARGE_SECONDS, CartArenaSession, cartSteeringInput } from "../src/cart/CartArenaSession";
 import { applyTurboRam, createInitialCartEnemies } from "../src/cart/CartCombat";
+import { cartResourceContact, createInitialCartResources } from "../src/cart/CartResources";
 import {
   CART_WORLD_GRAPH,
   cartWorldNodeById,
@@ -198,6 +199,80 @@ test("Arena 02 is a real elite encounter with its own gate and clear reward", ()
     state = session.snapshot();
     assert.equal(state.arena2GateLocked, false);
     assert.match(state.lastReward ?? "", /ELITE CLEAR/);
+  } finally {
+    session.dispose();
+  }
+});
+
+test("corridors author GAS and Turbo cells with node-local collision", () => {
+  const resources = createInitialCartResources();
+  assert.equal(resources.length, 4);
+  assert.deepEqual(resources.map((pickup) => pickup.nodeId), ["corridor-01", "corridor-01", "corridor-02", "corridor-02"]);
+  const gas = resources[0];
+  assert.equal(cartResourceContact(gas, "corridor-01", gas.x, gas.z), true);
+  assert.equal(cartResourceContact(gas, "arena-01", gas.x, gas.z), false);
+  gas.collected = true;
+  assert.equal(cartResourceContact(gas, "corridor-01", gas.x, gas.z), false);
+});
+
+test("corridor Turbo cells restore one stock from the current rewarded state and disappear after collection", () => {
+  const session = new CartArenaSession();
+  try {
+    for (const enemy of session.enemies.filter((candidate) => candidate.nodeId === "arena-01")) enemy.alive = false;
+    session.step({ ...DRIVE, boost: true });
+    session.step(IDLE);
+    const before = session.snapshot().boostCharges;
+    assert.ok(before < session.snapshot().maxBoostCharges);
+    const turbo = session.resources.find((pickup) => pickup.id === "turbo-01")!;
+    session.car.position.set(turbo.x, session.car.position.y, turbo.z);
+    session.car.forwardVelocity = 0;
+    session.step(IDLE);
+    const state = session.snapshot();
+    assert.equal(state.nodeId, "corridor-01");
+    assert.equal(state.boostCharges, before + 1);
+    assert.equal(state.resources.find((pickup) => pickup.id === "turbo-01")?.collected, true);
+    assert.match(state.lastReward ?? "", /TURBO CELL/);
+  } finally {
+    session.dispose();
+  }
+});
+
+test("Boss is a multi-hit Turbo RAM target and reaches zero HP deterministically", () => {
+  const boss = createInitialCartEnemies().find((enemy) => enemy.kind === "boss")!;
+  assert.equal(boss.maxHp, 520);
+  let hits = 0;
+  while (boss.alive && hits < 8) {
+    const result = applyTurboRam(boss, true, 20);
+    hits += 1;
+    assert.ok(result.damage > 0);
+  }
+  assert.equal(boss.alive, false);
+  assert.ok(hits >= 4, `boss should require repeated RAM attacks, got ${hits}`);
+  assert.ok(hits <= 6, `boss should remain reasonably quick to defeat, got ${hits}`);
+});
+
+test("Boss arena exposes boss HP and run completion after the boss is destroyed", () => {
+  const session = new CartArenaSession();
+  try {
+    for (const enemy of session.enemies.filter((candidate) => candidate.nodeId !== "boss-01")) enemy.alive = false;
+    session.car.position.set(0, session.car.position.y, 205);
+    session.car.forwardVelocity = 0;
+    session.step(IDLE);
+    let state = session.snapshot();
+    assert.equal(state.nodeId, "boss-01");
+    assert.equal(state.encounter, "boss");
+    assert.equal(state.enemiesTotal, 1);
+    assert.equal(state.bossHp, 520);
+    assert.equal(state.runComplete, false);
+
+    const boss = session.enemies.find((enemy) => enemy.kind === "boss")!;
+    boss.alive = false;
+    boss.hp = 0;
+    session.step(IDLE);
+    state = session.snapshot();
+    assert.equal(state.runComplete, true);
+    assert.equal(state.bossHp, 0);
+    assert.match(state.lastReward ?? "", /BOSS DOWN/);
   } finally {
     session.dispose();
   }

@@ -13,6 +13,11 @@ import {
   type CartEnemyState,
 } from "./CartCombat";
 import {
+  cartResourceContact,
+  createInitialCartResources,
+  type CartResourcePickupState,
+} from "./CartResources";
+import {
   CART_WORLD_GRAPH,
   cartWorldNodeById,
   locateCartWorldNode,
@@ -23,7 +28,7 @@ import {
 export interface CartEnemySnapshot {
   id: string;
   nodeId: string;
-  kind: "blocker" | "heavy" | "chaser";
+  kind: "blocker" | "heavy" | "chaser" | "boss";
   x: number;
   z: number;
   radius: number;
@@ -31,6 +36,16 @@ export interface CartEnemySnapshot {
   maxHp: number;
   alive: boolean;
   heading: number;
+}
+
+export interface CartResourceSnapshot {
+  id: string;
+  nodeId: string;
+  kind: "gas" | "turbo";
+  x: number;
+  z: number;
+  radius: number;
+  collected: boolean;
 }
 
 export interface CartArenaSessionSnapshot {
@@ -57,7 +72,11 @@ export interface CartArenaSessionSnapshot {
   lastRamDamage: number;
   lastReward: string | null;
   wallSliding: boolean;
+  bossHp: number;
+  bossMaxHp: number;
+  runComplete: boolean;
   enemies: readonly CartEnemySnapshot[];
+  resources: readonly CartResourceSnapshot[];
 }
 
 const GAS_DRAIN_PER_SECOND = 0.0032;
@@ -72,13 +91,14 @@ export function cartSteeringInput(value: number): number {
 /**
  * Cart Rogue driving/combat runtime. RallyCar remains the proven low-level
  * vehicle implementation, while arena progression, renewable Turbo stocks,
- * enemy encounters and forgiving wall-slide behavior live here.
+ * pickups, encounters and forgiving wall-slide behavior live here.
  */
 export class CartArenaSession {
   readonly track: RallyTrack;
   readonly car: RallyCar;
   readonly clock = new RallyFixedStepClock();
   readonly enemies: CartEnemyState[] = createInitialCartEnemies();
+  readonly resources: CartResourcePickupState[] = createInitialCartResources();
   private location: CartWorldLocation;
   private gas = 1;
   private ramCombo = 0;
@@ -147,7 +167,9 @@ export class CartArenaSession {
     }
 
     this.location = nextLocation;
-    if (this.location.node.kind === "arena") {
+    this.collectNearbyResources();
+
+    if (this.location.node.kind === "arena" || this.location.node.kind === "boss") {
       updateCartEnemyMovement(
         this.enemies,
         this.location.node.id,
@@ -163,16 +185,17 @@ export class CartArenaSession {
     if (contact && !this.enemyHitCooldowns.has(contact.id)) {
       const result = applyTurboRam(contact, this.car.boostActive, this.car.forwardVelocity);
       if (result.damage > 0) {
-        this.enemyHitCooldowns.set(contact.id, 0.34);
+        this.enemyHitCooldowns.set(contact.id, contact.kind === "boss" ? 0.42 : 0.34);
         this.lastRamEnemyId = result.enemyId;
         this.lastRamDamage = result.damage;
         this.car.collisionImpact = Math.max(this.car.collisionImpact, result.destroyed ? 1 : 0.78);
-        this.car.forwardVelocity *= result.destroyed ? 0.94 : 0.78;
-        contact.x += Math.sin(this.car.heading) * (result.destroyed ? 0.5 : 1.4);
-        contact.z += Math.cos(this.car.heading) * (result.destroyed ? 0.5 : 1.4);
+        this.car.forwardVelocity *= result.destroyed ? 0.94 : contact.kind === "boss" ? 0.72 : 0.78;
+        contact.x += Math.sin(this.car.heading) * (result.destroyed ? 0.5 : contact.kind === "boss" ? 0.8 : 1.4);
+        contact.z += Math.cos(this.car.heading) * (result.destroyed ? 0.5 : contact.kind === "boss" ? 0.8 : 1.4);
         if (result.destroyed) {
           this.car.ramCount += 1;
-          this.gas = Math.min(1, this.gas + (contact.kind === "heavy" ? 0.055 : 0.035));
+          const gasReward = contact.kind === "boss" ? 0.1 : contact.kind === "heavy" ? 0.055 : 0.035;
+          this.gas = Math.min(1, this.gas + gasReward);
           this.ramCombo = this.ramComboTimer > 0 ? Math.min(9, this.ramCombo + 1) : 1;
           this.ramComboTimer = RAM_COMBO_WINDOW;
         }
@@ -197,11 +220,13 @@ export class CartArenaSession {
       alive: enemy.alive,
       heading: enemy.heading,
     }));
+    const resources = this.resources.map((pickup) => ({ ...pickup }));
     const localEnemies = this.enemies.filter((enemy) => enemy.nodeId === this.location.node.id);
     const localAlive = localEnemies.filter((enemy) => enemy.alive).length;
     const rechargeProgress = this.car.boostCharges >= this.car.maxBoostCharges
       ? 1
       : Math.min(1, this.turboRechargeTimer / CART_TURBO_RECHARGE_SECONDS);
+    const boss = this.enemies.find((enemy) => enemy.kind === "boss");
     return {
       nodeId: this.location.node.id,
       nodeKind: this.location.node.kind,
@@ -228,7 +253,11 @@ export class CartArenaSession {
       lastRamDamage: this.lastRamDamage,
       lastReward: this.lastReward,
       wallSliding: this.wallSlideTimer > 0,
+      bossHp: boss?.hp ?? 0,
+      bossMaxHp: boss?.maxHp ?? 0,
+      runComplete: Boolean(boss && !boss.alive),
       enemies,
+      resources,
     };
   }
 
@@ -243,6 +272,25 @@ export class CartArenaSession {
       this.car.addBoostCharge(1);
     }
     if (this.car.boostCharges >= this.car.maxBoostCharges) this.turboRechargeTimer = 0;
+  }
+
+  private collectNearbyResources(): void {
+    for (const pickup of this.resources) {
+      if (!cartResourceContact(pickup, this.location.node.id, this.car.position.x, this.car.position.z)) continue;
+      if (pickup.kind === "gas") {
+        if (this.gas >= 0.995) continue;
+        pickup.collected = true;
+        this.gas = Math.min(1, this.gas + 0.12);
+        this.lastReward = "GAS CELL · +12%";
+        this.rewardTimer = 1.6;
+        continue;
+      }
+      if (this.car.boostCharges >= this.car.maxBoostCharges) continue;
+      pickup.collected = true;
+      this.car.addBoostCharge(1);
+      this.lastReward = "TURBO CELL · +1 STOCK";
+      this.rewardTimer = 1.6;
+    }
   }
 
   private isNodeGateLocked(nodeId: string): boolean {
@@ -260,6 +308,12 @@ export class CartArenaSession {
     const authored = this.enemies.filter((enemy) => enemy.nodeId === nodeId);
     if (authored.length === 0 || authored.some((enemy) => enemy.alive)) return;
     this.rewardedNodes.add(nodeId);
+    if (nodeId === "boss-01") {
+      this.gas = Math.min(1, this.gas + 0.1);
+      this.lastReward = "BOSS DOWN · RUN CLEAR";
+      this.rewardTimer = 4;
+      return;
+    }
     const elite = nodeId === "arena-02";
     this.gas = Math.min(1, this.gas + (elite ? 0.18 : 0.1));
     this.car.addBoostCharge(elite ? 2 : 1);
@@ -331,9 +385,9 @@ export class CartArenaSession {
     const tangentA = Math.atan2(dz, -dx);
     const tangentB = normalizeAngle(tangentA + Math.PI);
     this.car.heading = rotateToward(this.car.heading, this.closestHeading([tangentA, tangentB]), 0.3);
-    this.car.forwardVelocity *= 0.86;
+    this.car.forwardVelocity *= enemy.kind === "boss" ? 0.78 : 0.86;
     this.car.lateralVelocity *= 0.3;
-    this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.5);
+    this.car.collisionImpact = Math.max(this.car.collisionImpact, enemy.kind === "boss" ? 0.7 : 0.5);
   }
 
   private closestHeading(candidates: readonly number[]): number {

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { RallyChaseCamera } from "../rally/RallyChaseCamera";
 import { CartArenaSession } from "./CartArenaSession";
-import type { CartEnemySnapshot } from "./CartArenaSession";
+import type { CartEnemySnapshot, CartResourceSnapshot } from "./CartArenaSession";
 import type { CartRogueDemoHandle, CartRogueSnapshotHandler } from "./CartRogueDemo";
 import { CART_WORLD_GRAPH } from "./CartWorldGraph";
 
@@ -23,12 +23,16 @@ const PALETTE = {
   enemy: 0xef7f9f,
   enemyChaser: 0x9e78d8,
   enemyHeavy: 0xd65d88,
+  enemyBoss: 0x65457f,
+  enemyBossAccent: 0xf37aa2,
   enemyCabin: 0xf6bdd0,
   tire: 0x4d5764,
   hpBack: 0x514c59,
   hp: 0x8fd784,
   gateLocked: 0xe96570,
   gateOpen: 0x71cba8,
+  gasCell: 0x79d99a,
+  turboCell: 0x61dbe8,
 };
 
 export class CartRogueWebGLDemo implements CartRogueDemoHandle {
@@ -39,6 +43,7 @@ export class CartRogueWebGLDemo implements CartRogueDemoHandle {
   private readonly session = new CartArenaSession();
   private readonly enemyGroups = new Map<string, THREE.Group>();
   private readonly enemyAlive = new Map<string, boolean>();
+  private readonly resourceGroups = new Map<string, THREE.Group>();
   private readonly debris: DebrisPiece[] = [];
   private readonly gateBars = new Map<string, THREE.Mesh>();
   private readonly turboTrails = new THREE.Group();
@@ -80,7 +85,9 @@ export class CartRogueWebGLDemo implements CartRogueDemoHandle {
     this.scene.add(this.session.car.group);
     this.buildTurboTrails();
     this.session.car.group.add(this.turboTrails);
-    this.buildEnemies(this.session.snapshot().enemies);
+    const initial = this.session.snapshot();
+    this.buildEnemies(initial.enemies);
+    this.buildResources(initial.resources);
     this.buildGate("arena-01", 52);
     this.buildGate("arena-02", 140);
 
@@ -187,37 +194,76 @@ export class CartRogueWebGLDemo implements CartRogueDemoHandle {
   private buildEnemies(enemies: readonly CartEnemySnapshot[]): void {
     for (const enemy of enemies) {
       const group = new THREE.Group();
-      const bodyColor = enemy.kind === "heavy" ? PALETTE.enemyHeavy : enemy.kind === "chaser" ? PALETTE.enemyChaser : PALETTE.enemy;
+      const bodyColor = enemy.kind === "boss"
+        ? PALETTE.enemyBoss
+        : enemy.kind === "heavy"
+          ? PALETTE.enemyHeavy
+          : enemy.kind === "chaser"
+            ? PALETTE.enemyChaser
+            : PALETTE.enemy;
       const body = new THREE.Mesh(
-        new THREE.BoxGeometry(enemy.radius * 1.65, 1.1, enemy.radius * 2.05),
+        new THREE.BoxGeometry(enemy.radius * 1.65, enemy.kind === "boss" ? 1.7 : 1.1, enemy.radius * 2.05),
         new THREE.MeshLambertMaterial({ color: bodyColor, flatShading: true }),
       );
-      body.position.y = 0.72;
+      body.position.y = enemy.kind === "boss" ? 1.05 : 0.72;
       const cabin = new THREE.Mesh(
-        new THREE.BoxGeometry(enemy.radius * 1.15, 0.78, enemy.radius * 1.0),
-        new THREE.MeshLambertMaterial({ color: PALETTE.enemyCabin, flatShading: true }),
+        new THREE.BoxGeometry(enemy.radius * 1.15, enemy.kind === "boss" ? 1.15 : 0.78, enemy.radius * 1.0),
+        new THREE.MeshLambertMaterial({ color: enemy.kind === "boss" ? PALETTE.enemyBossAccent : PALETTE.enemyCabin, flatShading: true }),
       );
-      cabin.position.set(0, 1.45, -0.08);
+      cabin.position.set(0, enemy.kind === "boss" ? 2.15 : 1.45, -0.08);
       group.add(body, cabin);
+      if (enemy.kind === "boss") {
+        const ramMaterial = new THREE.MeshLambertMaterial({ color: PALETTE.enemyBossAccent, flatShading: true });
+        for (const x of [-enemy.radius * 0.58, enemy.radius * 0.58]) {
+          const ram = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.58, 2.15), ramMaterial);
+          ram.position.set(x, 0.8, enemy.radius * 1.15);
+          ram.rotation.x = -0.18;
+          group.add(ram);
+        }
+      }
       const tireMaterial = new THREE.MeshLambertMaterial({ color: PALETTE.tire, flatShading: true });
       for (const x of [-enemy.radius * 0.95, enemy.radius * 0.95]) {
         for (const z of [-enemy.radius * 0.65, enemy.radius * 0.65]) {
-          const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.36, 8), tireMaterial);
+          const tire = new THREE.Mesh(new THREE.CylinderGeometry(enemy.kind === "boss" ? 0.65 : 0.42, enemy.kind === "boss" ? 0.65 : 0.42, enemy.kind === "boss" ? 0.52 : 0.36, 8), tireMaterial);
           tire.rotation.z = Math.PI / 2;
-          tire.position.set(x, 0.45, z);
+          tire.position.set(x, enemy.kind === "boss" ? 0.62 : 0.45, z);
           group.add(tire);
         }
       }
+      const hpY = enemy.kind === "boss" ? 3.55 : 2.55;
       const hpBack = new THREE.Mesh(new THREE.BoxGeometry(enemy.radius * 1.8, 0.18, 0.18), new THREE.MeshBasicMaterial({ color: PALETTE.hpBack }));
-      hpBack.position.set(0, 2.55, 0);
-      const hp = new THREE.Mesh(new THREE.BoxGeometry(enemy.radius * 1.68, 0.11, 0.2), new THREE.MeshBasicMaterial({ color: PALETTE.hp }));
+      hpBack.position.set(0, hpY, 0);
+      const hp = new THREE.Mesh(new THREE.BoxGeometry(enemy.radius * 1.68, 0.11, 0.2), new THREE.MeshBasicMaterial({ color: enemy.kind === "boss" ? PALETTE.enemyBossAccent : PALETTE.hp }));
       hp.name = "hp-fill";
-      hp.position.set(0, 2.56, -0.02);
+      hp.position.set(0, hpY + 0.01, -0.02);
       group.add(hpBack, hp);
       group.position.set(enemy.x, 0, enemy.z);
       group.rotation.y = enemy.heading;
       this.enemyGroups.set(enemy.id, group);
       this.enemyAlive.set(enemy.id, true);
+      this.scene.add(group);
+    }
+  }
+
+  private buildResources(resources: readonly CartResourceSnapshot[]): void {
+    for (const pickup of resources) {
+      const group = new THREE.Group();
+      const color = pickup.kind === "gas" ? PALETTE.gasCell : PALETTE.turboCell;
+      const core = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.85, 0),
+        new THREE.MeshLambertMaterial({ color, flatShading: true, emissive: color, emissiveIntensity: 0.16 }),
+      );
+      core.position.y = 1.05;
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(1.2, 0.13, 6, 16),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.78 }),
+      );
+      ring.position.y = 1.05;
+      ring.rotation.x = Math.PI / 2;
+      group.add(core, ring);
+      group.position.set(pickup.x, 0, pickup.z);
+      group.userData.baseY = 0;
+      this.resourceGroups.set(pickup.id, group);
       this.scene.add(group);
     }
   }
@@ -257,8 +303,14 @@ export class CartRogueWebGLDemo implements CartRogueDemoHandle {
       const group = this.enemyGroups.get(enemy.id);
       if (!group) continue;
       const wasAlive = this.enemyAlive.get(enemy.id) ?? true;
-      const debrisColor = enemy.kind === "heavy" ? PALETTE.enemyHeavy : enemy.kind === "chaser" ? PALETTE.enemyChaser : PALETTE.enemy;
-      if (wasAlive && !enemy.alive) this.spawnDebris(group.position, debrisColor);
+      const debrisColor = enemy.kind === "boss"
+        ? PALETTE.enemyBossAccent
+        : enemy.kind === "heavy"
+          ? PALETTE.enemyHeavy
+          : enemy.kind === "chaser"
+            ? PALETTE.enemyChaser
+            : PALETTE.enemy;
+      if (wasAlive && !enemy.alive) this.spawnDebris(group.position, debrisColor, enemy.kind === "boss" ? 24 : 14);
       this.enemyAlive.set(enemy.id, enemy.alive);
       group.visible = enemy.alive;
       if (enemy.alive) {
@@ -271,6 +323,16 @@ export class CartRogueWebGLDemo implements CartRogueDemoHandle {
           hp.scale.x = ratio;
           hp.position.x = -(1 - ratio) * enemy.radius * 0.84;
         }
+      }
+    }
+
+    for (const pickup of snapshot.resources) {
+      const group = this.resourceGroups.get(pickup.id);
+      if (!group) continue;
+      group.visible = !pickup.collected;
+      if (!pickup.collected) {
+        group.rotation.y += delta * 1.9;
+        group.position.y = Math.sin(performance.now() * 0.004 + pickup.x) * 0.18;
       }
     }
 
@@ -300,13 +362,13 @@ export class CartRogueWebGLDemo implements CartRogueDemoHandle {
     (bar.material as THREE.MeshLambertMaterial).color.setHex(locked ? PALETTE.gateLocked : PALETTE.gateOpen);
   }
 
-  private spawnDebris(position: THREE.Vector3, color: number): void {
-    for (let index = 0; index < 14; index += 1) {
+  private spawnDebris(position: THREE.Vector3, color: number, count: number): void {
+    for (let index = 0; index < count; index += 1) {
       const mesh = new THREE.Mesh(
         new THREE.BoxGeometry(0.35 + (index % 3) * 0.1, 0.35, 0.35),
         new THREE.MeshLambertMaterial({ color, flatShading: true }),
       );
-      mesh.position.copy(position).add(new THREE.Vector3((index % 4 - 1.5) * 0.28, 0.9 + (index % 2) * 0.35, (Math.floor(index / 4) - 1.5) * 0.3));
+      mesh.position.copy(position).add(new THREE.Vector3((index % 5 - 2) * 0.28, 0.9 + (index % 3) * 0.35, (Math.floor(index / 5) - 1.5) * 0.3));
       this.scene.add(mesh);
       this.debris.push({
         mesh,

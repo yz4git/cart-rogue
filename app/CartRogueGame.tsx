@@ -8,6 +8,7 @@ import type { CartRogueDemoHandle } from "../src/cart/CartRogueDemo";
 import { CartRogueWebGLDemo } from "../src/cart/CartRogueWebGLDemo";
 import styles from "./CartRogueGame.module.css";
 import phaseStyles from "./CartRoguePhase3.module.css";
+import phase4Styles from "./CartRoguePhase4.module.css";
 
 const INITIAL: CartArenaSessionSnapshot = {
   nodeId: "arena-01",
@@ -33,17 +34,22 @@ const INITIAL: CartArenaSessionSnapshot = {
   lastRamDamage: 0,
   lastReward: null,
   wallSliding: false,
+  bossHp: 520,
+  bossMaxHp: 520,
+  runComplete: false,
   enemies: [],
+  resources: [],
 };
 
 function objective(snapshot: CartArenaSessionSnapshot): string {
+  if (snapshot.runComplete) return "RUN CLEAR · BOSS DESTROYED";
   if (snapshot.nodeId === "arena-01" && snapshot.gateLocked) return `TURBO RAM ENEMIES · ${snapshot.enemiesAlive} LEFT`;
   if (snapshot.nodeId === "arena-01") return "GATE OPEN · ENTER CORRIDOR";
-  if (snapshot.nodeId === "corridor-01") return "CORRIDOR · REACH ELITE ARENA";
+  if (snapshot.nodeId === "corridor-01") return "CORRIDOR · COLLECT CELLS · REACH ELITE";
   if (snapshot.nodeId === "arena-02" && snapshot.gateLocked) return `ELITE ARENA · ${snapshot.enemiesAlive} LEFT`;
   if (snapshot.nodeId === "arena-02") return "ELITE CLEAR · NEXT CORRIDOR OPEN";
-  if (snapshot.nodeId === "corridor-02") return "BOSS CORRIDOR · KEEP MOVING";
-  if (snapshot.nodeKind === "boss") return "BOSS ARENA · PHASE 4 TARGET";
+  if (snapshot.nodeId === "corridor-02") return "BOSS CORRIDOR · STOCK TURBO";
+  if (snapshot.nodeKind === "boss") return `TURBO RAM BOSS · ${Math.ceil(snapshot.bossHp)} HP`;
   return "KEEP MOVING";
 }
 
@@ -187,6 +193,7 @@ export default function CartRogueGame() {
   const gasPercent = Math.round(snapshot.gas * 100);
   const enemyDefeated = Math.max(0, snapshot.enemiesTotal - snapshot.enemiesAlive);
   const rechargePercent = Math.round(snapshot.turboRechargeProgress * 100);
+  const bossPercent = snapshot.bossMaxHp > 0 ? Math.round(snapshot.bossHp / snapshot.bossMaxHp * 100) : 0;
 
   return (
     <main className={styles.shell} onContextMenu={(event) => event.preventDefault()}>
@@ -196,11 +203,23 @@ export default function CartRogueGame() {
         <div className={styles.topHud}>
           <div className={styles.runCard}><small>RUN 01</small><strong>{snapshot.nodeId.toUpperCase()}</strong></div>
           <div className={styles.objective}>{objective(snapshot)}</div>
-          <div className={styles.enemyCard}><small>ENEMIES</small><strong>{enemyDefeated}<span> / {snapshot.enemiesTotal}</span></strong></div>
+          <div className={`${styles.enemyCard}${snapshot.nodeKind === "boss" ? ` ${phase4Styles.bossCard}` : ""}`}>
+            <small>{snapshot.nodeKind === "boss" ? "BOSS" : "ENEMIES"}</small>
+            {snapshot.nodeKind === "boss"
+              ? <strong>{bossPercent}<span>%</span></strong>
+              : <strong>{enemyDefeated}<span> / {snapshot.enemiesTotal}</span></strong>}
+          </div>
         </div>
 
+        {snapshot.nodeKind === "boss" && !snapshot.runComplete && (
+          <div className={phase4Styles.bossMeter}>
+            <div className={phase4Styles.bossMeterHead}><span>RAM TITAN</span><strong>{Math.ceil(snapshot.bossHp)} / {snapshot.bossMaxHp}</strong></div>
+            <div className={phase4Styles.bossMeterTrack}><i style={{ width: `${bossPercent}%` }} /></div>
+          </div>
+        )}
+        {snapshot.runComplete && <div className={phase4Styles.runClear}>RUN CLEAR!</div>}
         {snapshot.ramCombo > 1 && <div className={styles.combo}>RAM COMBO! <strong>×{snapshot.ramCombo}</strong></div>}
-        {snapshot.enemiesTotal > 0 && !snapshot.gateLocked && <div className={styles.gateOpen}>GATE OPEN!</div>}
+        {snapshot.nodeKind !== "boss" && snapshot.enemiesTotal > 0 && !snapshot.gateLocked && <div className={styles.gateOpen}>GATE OPEN!</div>}
         {snapshot.boostActive && <div className={styles.ramBanner}>TURBO RAM</div>}
         {snapshot.wallSliding && <div className={phaseStyles.wallRide}>WALL RIDE</div>}
         {snapshot.lastReward && <div className={phaseStyles.rewardBanner}>{snapshot.lastReward}</div>}
@@ -211,7 +230,7 @@ export default function CartRogueGame() {
             <div className={styles.meterTrack}><i style={{ width: `${gasPercent}%` }} /></div>
           </div>
           <div className={styles.itemStrip}>
-            <span>RAM</span><span>REGEN</span><span>ELITE</span>
+            <span>RAM</span><span>REGEN</span><span>CELLS</span>
           </div>
           <div className={`${styles.meterCard} ${styles.turboCard}`}>
             <div className={styles.meterHead}><span>TURBO</span><strong>×{snapshot.boostCharges}</strong></div>
