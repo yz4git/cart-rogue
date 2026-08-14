@@ -1,5 +1,5 @@
-import RallyGame from "./RallyGame";
+import CartRogueGame from "./CartRogueGame";
 
 export default function Page() {
-  return <RallyGame />;
+  return <CartRogueGame />;
 }
