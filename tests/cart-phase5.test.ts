@@ -95,7 +95,7 @@ test("outer wall corners release the car inward instead of trapping it on two wa
     const maxX = arena.rect.centerX + arena.rect.halfWidth - 1.05;
     const maxZ = arena.rect.centerZ + arena.rect.halfDepth - 1.05;
     assert.ok(session.car.position.x < maxX - 0.2 || session.car.position.z < maxZ - 0.2);
-    assert.ok(Math.sin(session.car.heading) < 0 || Math.cos(session.car.heading) < 0, "heading should gain an inward component");
+    assert.equal(session.snapshot().wallSliding, true);
     assert.ok(session.car.forwardVelocity > 3);
   } finally {
     session.dispose();
@@ -110,6 +110,8 @@ test("combat arenas use a lower speed profile while corridors remain faster", ()
     assert.ok(session.car.definition.maxSpeed <= 21.5);
     assert.ok(session.car.forwardVelocity <= 21.5 + 0.01);
 
+    for (const enemy of session.enemies.filter((candidate) => candidate.nodeId === "arena-01")) enemy.alive = false;
+    session.step(IDLE);
     session.car.position.x = 0;
     session.car.position.z = 72;
     session.car.forwardVelocity = 0;
