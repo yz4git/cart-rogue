@@ -16,11 +16,20 @@ test("WebGL runtime failures stop the renderer and recover into Canvas 3D", asyn
   assert.match(game, /catch \(error\) \{\s*this\.handleRuntimeFailure/);
 });
 
-test("the app keeps an initialization-time Canvas fallback and safe pointer cancellation", async () => {
+test("the app keeps initialization fallback and releases touch ownership safely", async () => {
   const page = await readFile(new URL("../app/RallyGame.tsx", import.meta.url), "utf8");
   assert.match(page, /createRallyRenderer/);
   assert.match(page, /new RallyCanvasPreview/);
   assert.match(page, /WebGL renderer initialization failed; falling back to Canvas 3D/);
   assert.match(page, /onPointerCancel=\{releaseSteer\}/);
+  assert.match(page, /onLostPointerCapture=\{releaseSteer\}/);
   assert.match(page, /onPointerCancel=\{releaseBoost\}/);
+  assert.match(page, /onLostPointerCapture=\{releaseBoost\}/);
+});
+
+test("vibration feedback is user-configurable before invoking navigator.vibrate", async () => {
+  const page = await readFile(new URL("../app/RallyGame.tsx", import.meta.url), "utf8");
+  assert.match(page, /settings\.vibrationEnabled && typeof navigator/);
+  assert.match(page, /checked=\{settings\.vibrationEnabled\}/);
+  assert.match(page, /updateSettings\(\{ vibrationEnabled: event\.target\.checked \}\)/);
 });
