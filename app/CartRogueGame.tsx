@@ -28,9 +28,9 @@ const INITIAL: CartArenaSessionSnapshot = {
 };
 
 function objective(snapshot: CartArenaSessionSnapshot): string {
-  if (snapshot.nodeId === "arena-01" && snapshot.gateLocked) return `TURBO RAMで敵を撃破 · 残り ${snapshot.enemiesAlive}`;
-  if (snapshot.nodeId === "arena-01") return "GATE OPEN · 北の通路へ進め";
-  if (snapshot.nodeId === "corridor-01") return "CORRIDOR · 次の広場へ";
+  if (snapshot.nodeId === "arena-01" && snapshot.gateLocked) return `TURBO RAM ENEMIES · ${snapshot.enemiesAlive} LEFT`;
+  if (snapshot.nodeId === "arena-01") return "GATE OPEN · ENTER CORRIDOR";
+  if (snapshot.nodeId === "corridor-01") return "CORRIDOR · REACH NEXT ARENA";
   if (snapshot.nodeId === "arena-02") return "ARENA 02 · ELITE AREA";
   if (snapshot.nodeKind === "boss") return "BOSS ARENA";
   return "KEEP MOVING";
