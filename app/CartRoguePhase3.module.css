@@ -1,0 +1,54 @@
+.wallRide,
+.rewardBanner {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+  font-weight: 1000;
+  letter-spacing: 0.08em;
+  text-shadow: 0 3px 0 rgba(255, 255, 255, 0.55);
+}
+
+.wallRide {
+  top: 44%;
+  color: #6d72c8;
+  font-size: clamp(16px, 3.2vw, 26px);
+}
+
+.rewardBanner {
+  top: 19%;
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: rgba(255, 247, 220, 0.88);
+  color: #5aa17f;
+  font-size: clamp(11px, 2.2vw, 17px);
+  box-shadow: 0 7px 22px rgba(80, 94, 100, 0.12);
+}
+
+.rechargeHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  opacity: 0.68;
+}
+
+.rechargeTrack {
+  height: 4px;
+  margin-top: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(67, 78, 87, 0.12);
+}
+
+.rechargeTrack i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8b75d6, #62cadb);
+  transition: width 0.1s linear;
+}

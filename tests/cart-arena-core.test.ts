@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { RallyTrack } from "../src/rally/RallyTrack";
 import { CART_ARENA_TRACK } from "../src/cart/CartArenaTrack";
-import { CartArenaSession } from "../src/cart/CartArenaSession";
+import { CART_TURBO_RECHARGE_SECONDS, CartArenaSession, cartSteeringInput } from "../src/cart/CartArenaSession";
 import { applyTurboRam, createInitialCartEnemies } from "../src/cart/CartCombat";
 import {
   CART_WORLD_GRAPH,
@@ -12,6 +12,7 @@ import {
 } from "../src/cart/CartWorldGraph";
 
 const DRIVE = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
+const IDLE = { throttle: 0, brake: 0, steer: 0, boost: false } as const;
 
 test("Cart world graph is a reachable arena -> corridor -> arena -> corridor -> boss run", () => {
   assert.deepEqual(validateCartWorldGraph(), []);
@@ -25,34 +26,33 @@ test("Cart world graph is a reachable arena -> corridor -> arena -> corridor -> 
 });
 
 test("authored playable bounds distinguish broad battle plazas from narrow passages", () => {
-  const first = locateCartWorldNode(22, 28);
-  const passage = locateCartWorldNode(5.5, 72);
-  const second = locateCartWorldNode(-24, 116);
-  const boss = locateCartWorldNode(30, 210);
-  assert.equal(first?.node.id, "arena-01");
-  assert.equal(passage?.node.id, "corridor-01");
-  assert.equal(second?.node.id, "arena-02");
-  assert.equal(boss?.node.id, "boss-01");
+  assert.equal(locateCartWorldNode(22, 28)?.node.id, "arena-01");
+  assert.equal(locateCartWorldNode(5.5, 72)?.node.id, "corridor-01");
+  assert.equal(locateCartWorldNode(-24, 116)?.node.id, "arena-02");
+  assert.equal(locateCartWorldNode(30, 210)?.node.id, "boss-01");
   assert.equal(locateCartWorldNode(18, 72), null, "corridor should not behave like another wide race track");
 });
 
 test("legacy RallyTrack adapter exposes wide arena surfaces and a narrow central corridor", () => {
   const track = new RallyTrack(CART_ARENA_TRACK);
   try {
-    const arenaA = track.queryAt(0, 28);
-    const corridor = track.queryAt(0, 72);
-    const arenaB = track.queryAt(0, 116);
-    const boss = track.queryAt(0, 210);
-    assert.ok(arenaA.roadHalfWidth > 20);
-    assert.ok(corridor.roadHalfWidth < 10);
-    assert.ok(arenaB.roadHalfWidth > 20);
-    assert.ok(boss.roadHalfWidth > 20);
+    assert.ok(track.queryAt(0, 28).roadHalfWidth > 20);
+    assert.ok(track.queryAt(0, 72).roadHalfWidth < 10);
+    assert.ok(track.queryAt(0, 116).roadHalfWidth > 20);
+    assert.ok(track.queryAt(0, 210).roadHalfWidth > 20);
   } finally {
     track.dispose();
   }
 });
 
-test("CartArenaSession starts in the first combat arena with gas, enemies, a locked gate, and charge-based turbo", () => {
+test("Cart steering deliberately reverses the inherited steering direction", () => {
+  assert.equal(cartSteeringInput(-1), 1);
+  assert.equal(cartSteeringInput(1), -1);
+  assert.equal(cartSteeringInput(0.4), -0.4);
+  assert.equal(cartSteeringInput(3), -1);
+});
+
+test("CartArenaSession starts in the first combat arena with renewable turbo stocks", () => {
   const session = new CartArenaSession();
   try {
     const state = session.snapshot();
@@ -60,8 +60,10 @@ test("CartArenaSession starts in the first combat arena with gas, enemies, a loc
     assert.equal(state.encounter, "combat");
     assert.equal(state.gas, 1);
     assert.equal(state.enemiesAlive, 4);
+    assert.equal(state.enemiesTotal, 4);
     assert.equal(state.gateLocked, true);
     assert.equal(state.boostCharges, 2);
+    assert.equal(state.maxBoostCharges, 4);
     session.step({ ...DRIVE, boost: true });
     assert.equal(session.snapshot().boostCharges, 1);
     assert.equal(session.snapshot().boostActive, true);
@@ -70,27 +72,49 @@ test("CartArenaSession starts in the first combat arena with gas, enemies, a loc
   }
 });
 
-test("Turbo RAM destroys an enemy while ordinary contact does not", () => {
+test("Turbo stocks regenerate on a fixed cooldown until the four-stock cap", () => {
+  const session = new CartArenaSession();
+  try {
+    session.step({ ...DRIVE, boost: true });
+    session.step(DRIVE);
+    assert.equal(session.snapshot().boostCharges, 1);
+    for (let i = 0; i < Math.ceil(CART_TURBO_RECHARGE_SECONDS * 60) + 2; i += 1) session.step(IDLE);
+    assert.equal(session.snapshot().boostCharges, 2);
+    for (let i = 0; i < Math.ceil(CART_TURBO_RECHARGE_SECONDS * 60 * 3) + 4; i += 1) session.step(IDLE);
+    assert.equal(session.snapshot().boostCharges, 4);
+    assert.equal(session.snapshot().turboRechargeSeconds, 0);
+  } finally {
+    session.dispose();
+  }
+});
+
+test("Turbo RAM damages enemies, destroys light enemies, and makes heavy enemies take repeated hits", () => {
   const normalEnemy = createInitialCartEnemies()[0];
   const normal = applyTurboRam(normalEnemy, false, 20);
   assert.equal(normal.hit, true);
   assert.equal(normal.destroyed, false);
-  assert.equal(normalEnemy.alive, true);
+  assert.equal(normal.damage, 0);
 
-  const turboEnemy = createInitialCartEnemies()[0];
-  const turbo = applyTurboRam(turboEnemy, true, 20);
-  assert.equal(turbo.hit, true);
-  assert.equal(turbo.destroyed, true);
-  assert.equal(turboEnemy.alive, false);
-  assert.equal(turboEnemy.hp, 0);
+  const lightEnemy = createInitialCartEnemies()[0];
+  const light = applyTurboRam(lightEnemy, true, 20);
+  assert.equal(light.destroyed, true);
+  assert.equal(lightEnemy.alive, false);
+
+  const heavyEnemy = createInitialCartEnemies().find((enemy) => enemy.kind === "heavy")!;
+  const heavyFirst = applyTurboRam(heavyEnemy, true, 12);
+  assert.equal(heavyFirst.hit, true);
+  assert.equal(heavyFirst.destroyed, false);
+  assert.ok(heavyEnemy.hp > 0 && heavyEnemy.hp < heavyEnemy.maxHp);
+  const heavySecond = applyTurboRam(heavyEnemy, true, 20);
+  assert.equal(heavySecond.destroyed, true);
 });
 
 test("the first arena gate remains locked until every local enemy is defeated", () => {
   const session = new CartArenaSession();
   try {
-    assert.equal(session.snapshot().gateLocked, true);
-    for (const enemy of session.enemies) enemy.alive = false;
-    assert.equal(session.snapshot().gateLocked, false);
+    assert.equal(session.snapshot().arena1GateLocked, true);
+    for (const enemy of session.enemies.filter((candidate) => candidate.nodeId === "arena-01")) enemy.alive = false;
+    assert.equal(session.snapshot().arena1GateLocked, false);
   } finally {
     session.dispose();
   }
@@ -104,18 +128,35 @@ test("an actual boosted car can ram an arena enemy through the shared vehicle ru
     session.car.heading = 0;
     session.car.forwardVelocity = 19;
     session.step({ ...DRIVE, boost: true });
-    for (let step = 0; step < 28 && session.enemies[0].alive; step += 1) {
-      session.step({ ...DRIVE, boost: false });
-    }
+    for (let step = 0; step < 28 && session.enemies[0].alive; step += 1) session.step(DRIVE);
     assert.equal(session.enemies[0].alive, false);
     assert.equal(session.car.ramCount, 1);
     assert.equal(session.snapshot().lastRamEnemyId, "enemy-a");
+    assert.ok(session.snapshot().lastRamDamage > 0);
   } finally {
     session.dispose();
   }
 });
 
-test("clearing the encounter allows the car to transition into the narrow corridor", () => {
+test("outer-wall impact becomes a wall slide instead of a stop-and-rewind collision", () => {
+  const session = new CartArenaSession();
+  try {
+    session.car.position.set(26.6, session.car.position.y, 28);
+    session.car.heading = Math.PI / 2;
+    session.car.forwardVelocity = 18;
+    for (let step = 0; step < 12; step += 1) session.step(DRIVE);
+    const state = session.snapshot();
+    const arena = cartWorldNodeById("arena-01")!;
+    assert.ok(state.x < arena.rect.centerX + arena.rect.halfWidth, `wall slide should remain inside the authored arena, got ${state.x}`);
+    assert.ok(Math.abs(session.car.forwardVelocity) > 4, "wall slide should preserve useful forward momentum");
+    assert.equal(state.wallSliding, true);
+    assert.ok(Math.abs(Math.cos(state.heading)) > 0.35, "heading should rotate toward the wall tangent");
+  } finally {
+    session.dispose();
+  }
+});
+
+test("clearing the first encounter rewards resources and allows corridor transition", () => {
   const session = new CartArenaSession();
   try {
     session.car.position.x = 0;
@@ -125,11 +166,38 @@ test("clearing the encounter allows the car to transition into the narrow corrid
     for (let step = 0; step < 12; step += 1) session.step(DRIVE);
     assert.equal(session.snapshot().nodeId, "arena-01", "locked gate should block corridor transition");
 
-    for (const enemy of session.enemies) enemy.alive = false;
+    for (const enemy of session.enemies.filter((candidate) => candidate.nodeId === "arena-01")) enemy.alive = false;
+    session.step(IDLE);
+    assert.match(session.snapshot().lastReward ?? "", /ARENA CLEAR/);
     session.car.position.z = 51.4;
+    session.car.heading = 0;
     session.car.forwardVelocity = 18;
     for (let step = 0; step < 12 && session.snapshot().nodeId !== "corridor-01"; step += 1) session.step(DRIVE);
     assert.equal(session.snapshot().nodeId, "corridor-01");
+  } finally {
+    session.dispose();
+  }
+});
+
+test("Arena 02 is a real elite encounter with its own gate and clear reward", () => {
+  const session = new CartArenaSession();
+  try {
+    for (const enemy of session.enemies.filter((candidate) => candidate.nodeId === "arena-01")) enemy.alive = false;
+    session.car.position.x = 0;
+    session.car.position.z = 116;
+    session.car.forwardVelocity = 0;
+    session.step(IDLE);
+    let state = session.snapshot();
+    assert.equal(state.nodeId, "arena-02");
+    assert.equal(state.encounter, "elite");
+    assert.equal(state.enemiesTotal, 4);
+    assert.equal(state.arena2GateLocked, true);
+
+    for (const enemy of session.enemies.filter((candidate) => candidate.nodeId === "arena-02")) enemy.alive = false;
+    session.step(IDLE);
+    state = session.snapshot();
+    assert.equal(state.arena2GateLocked, false);
+    assert.match(state.lastReward ?? "", /ELITE CLEAR/);
   } finally {
     session.dispose();
   }
@@ -141,7 +209,7 @@ test("arena driving keeps inherited fixed-step behavior stable across render cad
     try {
       for (let frame = 0; frame < fps * 2; frame += 1) session.advance(1 / fps, DRIVE);
       const state = session.snapshot();
-      return { x: state.x, z: state.z, speed: state.speed, gas: state.gas, nodeId: state.nodeId };
+      return { x: state.x, z: state.z, speed: state.speed, gas: state.gas, nodeId: state.nodeId, charges: state.boostCharges };
     } finally {
       session.dispose();
     }
@@ -159,4 +227,6 @@ test("arena driving keeps inherited fixed-step behavior stable across render cad
   assert.ok(Math.abs(at120.gas - at60.gas) < 1e-9);
   assert.equal(at30.nodeId, at60.nodeId);
   assert.equal(at120.nodeId, at60.nodeId);
+  assert.equal(at30.charges, at60.charges);
+  assert.equal(at120.charges, at60.charges);
 });

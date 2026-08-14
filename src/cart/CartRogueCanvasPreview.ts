@@ -108,15 +108,21 @@ export class CartRogueCanvasPreview implements CartRogueDemoHandle {
     for (const enemy of snapshot.enemies) {
       if (!enemy.alive) continue;
       const p = worldToScreen(enemy.x, enemy.z);
-      ctx.fillStyle = enemy.kind === "heavy" ? "#d85f87" : "#ef7f9f";
-      ctx.fillRect(p.x - enemy.radius * scale, p.y - enemy.radius * scale, enemy.radius * 2 * scale, enemy.radius * 2 * scale);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(enemy.heading);
+      ctx.fillStyle = enemy.kind === "heavy" ? "#d85f87" : enemy.kind === "chaser" ? "#9e78d8" : "#ef7f9f";
+      ctx.fillRect(-enemy.radius * scale, -enemy.radius * scale, enemy.radius * 2 * scale, enemy.radius * 2 * scale);
+      ctx.restore();
+      const ratio = Math.max(0, Math.min(1, enemy.hp / Math.max(1, enemy.maxHp)));
+      ctx.fillStyle = "#514c59";
+      ctx.fillRect(p.x - enemy.radius * scale, p.y - enemy.radius * 1.45 * scale, enemy.radius * 2 * scale, 0.18 * scale);
+      ctx.fillStyle = "#8fd784";
+      ctx.fillRect(p.x - enemy.radius * scale, p.y - enemy.radius * 1.45 * scale, enemy.radius * 2 * scale * ratio, 0.18 * scale);
     }
 
-    if (snapshot.gateLocked) {
-      const gate = worldToScreen(0, 52);
-      ctx.fillStyle = "#e8666e";
-      ctx.fillRect(gate.x - 6.5 * scale, gate.y - 0.45 * scale, 13 * scale, 0.9 * scale);
-    }
+    this.drawGate(worldToScreen, 52, snapshot.arena1GateLocked, scale);
+    this.drawGate(worldToScreen, 140, snapshot.arena2GateLocked, scale);
 
     ctx.save();
     ctx.translate(centerX, centerZ);
@@ -126,5 +132,16 @@ export class CartRogueCanvasPreview implements CartRogueDemoHandle {
     ctx.fillStyle = "#eff8e8";
     ctx.fillRect(-0.9 * scale, -0.5 * scale, 1.8 * scale, 1.4 * scale);
     ctx.restore();
+  }
+
+  private drawGate(
+    worldToScreen: (x: number, z: number) => { x: number; y: number },
+    z: number,
+    locked: boolean,
+    scale: number,
+  ): void {
+    const gate = worldToScreen(0, z);
+    this.context.fillStyle = locked ? "#e8666e" : "#69c3a2";
+    this.context.fillRect(gate.x - 6.5 * scale, gate.y - 0.45 * scale, 13 * scale, 0.9 * scale);
   }
 }
