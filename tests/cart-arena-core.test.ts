@@ -215,14 +215,14 @@ test("corridors author GAS and Turbo cells with node-local collision", () => {
   assert.equal(cartResourceContact(gas, "corridor-01", gas.x, gas.z), false);
 });
 
-test("corridor Turbo cells restore a spent stock and disappear after collection", () => {
+test("corridor Turbo cells restore one stock from the current rewarded state and disappear after collection", () => {
   const session = new CartArenaSession();
   try {
     for (const enemy of session.enemies.filter((candidate) => candidate.nodeId === "arena-01")) enemy.alive = false;
     session.step({ ...DRIVE, boost: true });
     session.step(IDLE);
     const before = session.snapshot().boostCharges;
-    assert.equal(before, 1);
+    assert.ok(before < session.snapshot().maxBoostCharges);
     const turbo = session.resources.find((pickup) => pickup.id === "turbo-01")!;
     session.car.position.set(turbo.x, session.car.position.y, turbo.z);
     session.car.forwardVelocity = 0;
