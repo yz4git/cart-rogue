@@ -146,7 +146,8 @@ test("outer-wall impact becomes a wall slide instead of a stop-and-rewind collis
     session.car.forwardVelocity = 18;
     for (let step = 0; step < 12; step += 1) session.step(DRIVE);
     const state = session.snapshot();
-    assert.ok(state.x <= 27.01, `wall slide should keep x inside the arena, got ${state.x}`);
+    const arena = cartWorldNodeById("arena-01")!;
+    assert.ok(state.x < arena.rect.centerX + arena.rect.halfWidth, `wall slide should remain inside the authored arena, got ${state.x}`);
     assert.ok(Math.abs(session.car.forwardVelocity) > 4, "wall slide should preserve useful forward momentum");
     assert.equal(state.wallSliding, true);
     assert.ok(Math.abs(Math.cos(state.heading)) > 0.35, "heading should rotate toward the wall tangent");
