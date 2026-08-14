@@ -278,7 +278,7 @@ export default function Home() {
     const pointers = boostPointersRef.current;
     if (pointers.size === 0) {
       demoRef.current?.setBoost(true);
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(8);
+      if (settings.vibrationEnabled && typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(8);
     }
     pointers.add(event.pointerId);
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -430,6 +430,7 @@ export default function Home() {
           onPointerMove={updateSteer}
           onPointerUp={releaseSteer}
           onPointerCancel={releaseSteer}
+          onLostPointerCapture={releaseSteer}
           aria-label="Steering control"
           role="slider"
           aria-valuemin={-1}
@@ -451,6 +452,7 @@ export default function Home() {
             onPointerDown={pressBoost}
             onPointerUp={releaseBoost}
             onPointerCancel={releaseBoost}
+            onLostPointerCapture={releaseBoost}
             aria-label={`Boost ${stats.vehicle.boostCharges} charges`}
             aria-disabled={stats.vehicle.boostCharges <= 0}
           >
@@ -542,6 +544,7 @@ export default function Home() {
                 <label className="settings-toggle"><input type="checkbox" checked={settings.musicEnabled} onChange={(event) => updateSettings({ musicEnabled: event.target.checked })} /> MUSIC</label>
                 <label className="settings-toggle"><input type="checkbox" checked={settings.ghostEnabled} onChange={(event) => updateSettings({ ghostEnabled: event.target.checked })} /> GHOST ON</label>
                 <label className="settings-toggle"><input type="checkbox" checked={settings.cameraShake} onChange={(event) => updateSettings({ cameraShake: event.target.checked })} /> CAMERA SHAKE</label>
+                <label className="settings-toggle"><input type="checkbox" checked={settings.vibrationEnabled} onChange={(event) => updateSettings({ vibrationEnabled: event.target.checked })} /> VIBRATION</label>
                 <label className="settings-toggle"><input type="checkbox" checked={settings.debugTelemetry} onChange={(event) => updateSettings({ debugTelemetry: event.target.checked })} /> DEBUG TELEMETRY</label>
               </div>
               <label className="settings-range">CAMERA SENSITIVITY <input type="range" min="0.5" max="1.6" step="0.1" value={settings.cameraSensitivity} onChange={(event) => updateSettings({ cameraSensitivity: Number(event.target.value) })} /></label>
