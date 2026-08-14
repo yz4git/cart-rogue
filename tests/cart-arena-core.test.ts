@@ -3,6 +3,7 @@ import test from "node:test";
 import { RallyTrack } from "../src/rally/RallyTrack";
 import { CART_ARENA_TRACK } from "../src/cart/CartArenaTrack";
 import { CartArenaSession } from "../src/cart/CartArenaSession";
+import { applyTurboRam, createInitialCartEnemies } from "../src/cart/CartCombat";
 import {
   CART_WORLD_GRAPH,
   cartWorldNodeById,
@@ -51,16 +52,84 @@ test("legacy RallyTrack adapter exposes wide arena surfaces and a narrow central
   }
 });
 
-test("CartArenaSession starts in the first combat arena with charge-based turbo", () => {
+test("CartArenaSession starts in the first combat arena with gas, enemies, a locked gate, and charge-based turbo", () => {
   const session = new CartArenaSession();
   try {
     const state = session.snapshot();
     assert.equal(state.nodeId, "arena-01");
     assert.equal(state.encounter, "combat");
+    assert.equal(state.gas, 1);
+    assert.equal(state.enemiesAlive, 4);
+    assert.equal(state.gateLocked, true);
     assert.equal(state.boostCharges, 2);
     session.step({ ...DRIVE, boost: true });
     assert.equal(session.snapshot().boostCharges, 1);
     assert.equal(session.snapshot().boostActive, true);
+  } finally {
+    session.dispose();
+  }
+});
+
+test("Turbo RAM destroys an enemy while ordinary contact does not", () => {
+  const normalEnemy = createInitialCartEnemies()[0];
+  const normal = applyTurboRam(normalEnemy, false, 20);
+  assert.equal(normal.hit, true);
+  assert.equal(normal.destroyed, false);
+  assert.equal(normalEnemy.alive, true);
+
+  const turboEnemy = createInitialCartEnemies()[0];
+  const turbo = applyTurboRam(turboEnemy, true, 20);
+  assert.equal(turbo.hit, true);
+  assert.equal(turbo.destroyed, true);
+  assert.equal(turboEnemy.alive, false);
+  assert.equal(turboEnemy.hp, 0);
+});
+
+test("the first arena gate remains locked until every local enemy is defeated", () => {
+  const session = new CartArenaSession();
+  try {
+    assert.equal(session.snapshot().gateLocked, true);
+    for (const enemy of session.enemies) enemy.alive = false;
+    assert.equal(session.snapshot().gateLocked, false);
+  } finally {
+    session.dispose();
+  }
+});
+
+test("an actual boosted car can ram an arena enemy through the shared vehicle runtime", () => {
+  const session = new CartArenaSession();
+  try {
+    session.car.position.x = -11;
+    session.car.position.z = 19.5;
+    session.car.heading = 0;
+    session.car.forwardVelocity = 19;
+    session.step({ ...DRIVE, boost: true });
+    for (let step = 0; step < 28 && session.enemies[0].alive; step += 1) {
+      session.step({ ...DRIVE, boost: false });
+    }
+    assert.equal(session.enemies[0].alive, false);
+    assert.equal(session.car.ramCount, 1);
+    assert.equal(session.snapshot().lastRamEnemyId, "enemy-a");
+  } finally {
+    session.dispose();
+  }
+});
+
+test("clearing the encounter allows the car to transition into the narrow corridor", () => {
+  const session = new CartArenaSession();
+  try {
+    session.car.position.x = 0;
+    session.car.position.z = 51.4;
+    session.car.heading = 0;
+    session.car.forwardVelocity = 18;
+    for (let step = 0; step < 12; step += 1) session.step(DRIVE);
+    assert.equal(session.snapshot().nodeId, "arena-01", "locked gate should block corridor transition");
+
+    for (const enemy of session.enemies) enemy.alive = false;
+    session.car.position.z = 51.4;
+    session.car.forwardVelocity = 18;
+    for (let step = 0; step < 12 && session.snapshot().nodeId !== "corridor-01"; step += 1) session.step(DRIVE);
+    assert.equal(session.snapshot().nodeId, "corridor-01");
   } finally {
     session.dispose();
   }
@@ -72,7 +141,7 @@ test("arena driving keeps inherited fixed-step behavior stable across render cad
     try {
       for (let frame = 0; frame < fps * 2; frame += 1) session.advance(1 / fps, DRIVE);
       const state = session.snapshot();
-      return { x: state.x, z: state.z, speed: state.speed, nodeId: state.nodeId };
+      return { x: state.x, z: state.z, speed: state.speed, gas: state.gas, nodeId: state.nodeId };
     } finally {
       session.dispose();
     }
@@ -83,9 +152,11 @@ test("arena driving keeps inherited fixed-step behavior stable across render cad
   assert.ok(Math.abs(at30.x - at60.x) < 1e-6);
   assert.ok(Math.abs(at30.z - at60.z) < 1e-6);
   assert.ok(Math.abs(at30.speed - at60.speed) < 1e-6);
+  assert.ok(Math.abs(at30.gas - at60.gas) < 1e-9);
   assert.ok(Math.abs(at120.x - at60.x) < 1e-6);
   assert.ok(Math.abs(at120.z - at60.z) < 1e-6);
   assert.ok(Math.abs(at120.speed - at60.speed) < 1e-6);
+  assert.ok(Math.abs(at120.gas - at60.gas) < 1e-9);
   assert.equal(at30.nodeId, at60.nodeId);
   assert.equal(at120.nodeId, at60.nodeId);
 });
