@@ -21,6 +21,8 @@ import type { AIDriverProfile } from "./ai/AIDriverProfile";
 import { getRallyVisualTheme } from "./RallyVisualTheme";
 import { attachRallySpeedLines, RallySpeedLines } from "./RallySpeedLines";
 
+export type RallyRuntimeFailureHandler = (message: string, error: unknown) => void;
+
 export class RallyWebGLDemo implements RallyDemoHandle {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
@@ -43,15 +45,22 @@ export class RallyWebGLDemo implements RallyDemoHandle {
   private statsTimer = 0;
   private paused = false;
   private mode: RallyMode = "time-attack";
+  private runtimeFailureReported = false;
+  private disposed = false;
 
   constructor(
     private readonly mount: HTMLElement,
     onStats: (stats: RallyStats) => void,
     trackId = "track-01",
     environmentVariant?: RallyEnvironmentVariant,
+    private readonly onRuntimeFailure?: RallyRuntimeFailureHandler,
   ) {
     this.onStats = onStats;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance",
+      failIfMajorPerformanceCaveat: false,
+    });
     this.renderer.domElement.className = "rally-canvas";
     this.renderer.domElement.setAttribute("aria-label", "Voxel Rally 3D race view");
     this.renderer.domElement.addEventListener("webglcontextlost", this.handleContextLost, { passive: false });
@@ -99,6 +108,7 @@ export class RallyWebGLDemo implements RallyDemoHandle {
   }
 
   startRace(): void {
+    if (this.runtimeFailureReported) return;
     this.audio.activate();
     this.ghostRecorder.begin();
     if (this.mode !== "time-attack") this.raceMode.start();
@@ -106,6 +116,7 @@ export class RallyWebGLDemo implements RallyDemoHandle {
   }
 
   resetRace(): void {
+    if (this.runtimeFailureReported) return;
     this.audio.activate();
     this.ghostRecorder.cancel();
     if (this.mode !== "time-attack") this.raceMode.reset();
@@ -158,11 +169,11 @@ export class RallyWebGLDemo implements RallyDemoHandle {
   }
 
   beginRelativeSteering(pointerId: number, originX: number): boolean {
-    return this.input.beginRelativeSteering(pointerId, originX);
+    return !this.runtimeFailureReported && this.input.beginRelativeSteering(pointerId, originX);
   }
 
   updateRelativeSteering(pointerId: number, currentX: number): boolean {
-    return this.input.updateRelativeSteering(pointerId, currentX);
+    return !this.runtimeFailureReported && this.input.updateRelativeSteering(pointerId, currentX);
   }
 
   endRelativeSteering(pointerId: number): boolean {
@@ -187,6 +198,7 @@ export class RallyWebGLDemo implements RallyDemoHandle {
   }
 
   resume(): void {
+    if (this.runtimeFailureReported) return;
     this.paused = false;
     this.clock.getDelta();
   }
@@ -196,6 +208,10 @@ export class RallyWebGLDemo implements RallyDemoHandle {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.runtimeFailureReported = true;
+    this.paused = true;
     window.cancelAnimationFrame(this.frameId);
     window.removeEventListener("resize", this.resize);
     window.removeEventListener("orientationchange", this.resize);
@@ -214,12 +230,23 @@ export class RallyWebGLDemo implements RallyDemoHandle {
     this.renderer.domElement.remove();
   }
 
+  private handleRuntimeFailure(message: string, error: unknown): void {
+    if (this.runtimeFailureReported || this.disposed) return;
+    this.runtimeFailureReported = true;
+    this.paused = true;
+    window.cancelAnimationFrame(this.frameId);
+    this.input.clear();
+    console.error("[Cart Rogue] WebGL runtime failure", error);
+    this.onRuntimeFailure?.(message, error);
+  }
+
   private readonly handleCameraMove = (deltaX: number, deltaY: number): void => {
-    if (this.paused) return;
+    if (this.paused || this.runtimeFailureReported) return;
     this.chaseCamera.drag(deltaX, deltaY);
   };
 
   private readonly resize = (): void => {
+    if (this.runtimeFailureReported || this.disposed) return;
     const width = Math.max(1, this.mount.clientWidth);
     const height = Math.max(1, this.mount.clientHeight);
     this.camera.aspect = width / height;
@@ -229,9 +256,12 @@ export class RallyWebGLDemo implements RallyDemoHandle {
 
   private readonly handleContextLost = (event: Event): void => {
     event.preventDefault();
+    this.handleRuntimeFailure("WebGLコンテキストが失われました。Canvas 3Dへ切り替えて続行できます。", event);
   };
 
   private readonly handleContextRestored = (): void => {
+    if (this.runtimeFailureReported) return;
+    this.clock.getDelta();
     this.resize();
   };
 
@@ -245,29 +275,36 @@ export class RallyWebGLDemo implements RallyDemoHandle {
   };
 
   private animate = (): void => {
-    const delta = Math.min(this.clock.getDelta(), 0.05);
-    if (!this.paused) {
-      const input = this.input.snapshot(delta, this.race.mobileDrivingContext());
-      this.race.setMobileArcadeInput(this.input.isMobileArcadeActive());
-      this.race.setMobileStrafeInput(this.input.isMobileStrafeEnabled() && this.input.isMobileArcadeActive());
-      if (this.mode !== "time-attack") this.raceMode.update(input, delta);
-      else this.race.update(input, delta);
-      this.ghostRecorder.update(this.car, this.race.phase, this.race.lapTime, this.race.bestLap, this.race.progress);
-      this.ghostVisual.update(this.ghostPlayback.sampleAt(this.race.lapTime));
-      this.effects.update(this.car, this.race.nextCheckpoint, delta);
-      this.audio.update(this.car, this.race.phase, delta, this.race.nextCheckpoint);
-      this.updateCamera(delta);
-      this.speedLines.update(this.car.speed, this.car.boostActive, this.car.boostChainCount);
-      this.renderer.render(this.scene, this.camera);
-      this.statsTimer += delta;
-      if (this.statsTimer >= 0.2) {
-        const info = this.renderer.info;
-        this.onStats(this.mode !== "time-attack" ? this.raceMode.stats("webgl") : this.race.stats("webgl"));
-        this.statsTimer = 0;
-        void info;
+    if (this.runtimeFailureReported || this.disposed) return;
+    try {
+      const delta = Math.min(this.clock.getDelta(), 0.05);
+      if (!this.paused) {
+        const input = this.input.snapshot(delta, this.race.mobileDrivingContext());
+        this.race.setMobileArcadeInput(this.input.isMobileArcadeActive());
+        this.race.setMobileStrafeInput(this.input.isMobileStrafeEnabled() && this.input.isMobileArcadeActive());
+        if (this.mode !== "time-attack") this.raceMode.update(input, delta);
+        else this.race.update(input, delta);
+        this.ghostRecorder.update(this.car, this.race.phase, this.race.lapTime, this.race.bestLap, this.race.progress);
+        this.ghostVisual.update(this.ghostPlayback.sampleAt(this.race.lapTime));
+        this.effects.update(this.car, this.race.nextCheckpoint, delta);
+        this.audio.update(this.car, this.race.phase, delta, this.race.nextCheckpoint);
+        this.updateCamera(delta);
+        this.speedLines.update(this.car.speed, this.car.boostActive, this.car.boostChainCount);
+        this.renderer.render(this.scene, this.camera);
+        this.statsTimer += delta;
+        if (this.statsTimer >= 0.2) {
+          const info = this.renderer.info;
+          this.onStats(this.mode !== "time-attack" ? this.raceMode.stats("webgl") : this.race.stats("webgl"));
+          this.statsTimer = 0;
+          void info;
+        }
       }
+      if (!this.runtimeFailureReported && !this.disposed) {
+        this.frameId = window.requestAnimationFrame(this.animate);
+      }
+    } catch (error) {
+      this.handleRuntimeFailure("ゲーム描画中にエラーが発生しました。Canvas 3Dへ切り替えて続行できます。", error);
     }
-    this.frameId = window.requestAnimationFrame(this.animate);
   };
 
   private updateCamera(delta: number): void {
