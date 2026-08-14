@@ -1,0 +1,74 @@
+name: Cart Rogue WebGL Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "src/rally/**"
+      - "public/**"
+      - "scripts/capture-webgl-audit.mjs"
+      - "tests/**"
+      - "package.json"
+      - ".github/workflows/webgl-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build production game
+        run: npm run build
+      - name: Run safety tests
+        run: npm run test:pwa
+      - name: Start production preview
+        run: |
+          PORT=3000 npm start > /tmp/cart-rogue-server.log 2>&1 &
+          echo $! > /tmp/cart-rogue-server.pid
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/cart-rogue-server.log
+          exit 1
+      - name: Capture real WebGL frame
+        run: |
+          DRIVER="$(command -v chromedriver || true)"
+          if [ -z "$DRIVER" ] && [ -n "${CHROMEWEBDRIVER:-}" ] && [ -x "$CHROMEWEBDRIVER/chromedriver" ]; then
+            DRIVER="$CHROMEWEBDRIVER/chromedriver"
+          fi
+          if [ -z "$DRIVER" ]; then
+            echo "ChromeDriver is not available"
+            exit 1
+          fi
+          WEBDRIVER_BIN="$DRIVER" \
+            AUDIT_URL="http://127.0.0.1:3000/" \
+            AUDIT_OUTPUT="artifacts/webgl-audit/cart-rogue-webgl.png" \
+            AUDIT_STATE_OUTPUT="artifacts/webgl-audit/runtime-state.json" \
+            node scripts/capture-webgl-audit.mjs
+          test -s artifacts/webgl-audit/cart-rogue-webgl.png
+          test -s artifacts/webgl-audit/runtime-state.json
+          cp /tmp/cart-rogue-server.log artifacts/webgl-audit/server.log
+      - name: Upload WebGL audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: cart-rogue-webgl-audit
+          path: artifacts/webgl-audit
+          if-no-files-found: error
