@@ -7,6 +7,7 @@ import { CartRogueCanvasPreview } from "../src/cart/CartRogueCanvasPreview";
 import type { CartRogueDemoHandle } from "../src/cart/CartRogueDemo";
 import { CartRogueWebGLDemo } from "../src/cart/CartRogueWebGLDemo";
 import styles from "./CartRogueGame.module.css";
+import phaseStyles from "./CartRoguePhase3.module.css";
 
 const INITIAL: CartArenaSessionSnapshot = {
   nodeId: "arena-01",
@@ -201,8 +202,8 @@ export default function CartRogueGame() {
         {snapshot.ramCombo > 1 && <div className={styles.combo}>RAM COMBO! <strong>×{snapshot.ramCombo}</strong></div>}
         {snapshot.enemiesTotal > 0 && !snapshot.gateLocked && <div className={styles.gateOpen}>GATE OPEN!</div>}
         {snapshot.boostActive && <div className={styles.ramBanner}>TURBO RAM</div>}
-        {snapshot.wallSliding && <div className={styles.wallRide}>WALL RIDE</div>}
-        {snapshot.lastReward && <div className={styles.rewardBanner}>{snapshot.lastReward}</div>}
+        {snapshot.wallSliding && <div className={phaseStyles.wallRide}>WALL RIDE</div>}
+        {snapshot.lastReward && <div className={phaseStyles.rewardBanner}>{snapshot.lastReward}</div>}
 
         <div className={styles.bottomHud}>
           <div className={styles.meterCard}>
@@ -215,8 +216,8 @@ export default function CartRogueGame() {
           <div className={`${styles.meterCard} ${styles.turboCard}`}>
             <div className={styles.meterHead}><span>TURBO</span><strong>×{snapshot.boostCharges}</strong></div>
             <div className={styles.chargeRow}>{Array.from({ length: snapshot.maxBoostCharges }, (_, index) => <i key={index} className={index < snapshot.boostCharges ? styles.chargeOn : ""} />)}</div>
-            <div className={styles.rechargeHead}><span>RECHARGE</span><strong>{snapshot.boostCharges >= snapshot.maxBoostCharges ? "READY" : `${snapshot.turboRechargeSeconds.toFixed(1)}s`}</strong></div>
-            <div className={styles.rechargeTrack}><i style={{ width: `${rechargePercent}%` }} /></div>
+            <div className={phaseStyles.rechargeHead}><span>RECHARGE</span><strong>{snapshot.boostCharges >= snapshot.maxBoostCharges ? "READY" : `${snapshot.turboRechargeSeconds.toFixed(1)}s`}</strong></div>
+            <div className={phaseStyles.rechargeTrack}><i style={{ width: `${rechargePercent}%` }} /></div>
           </div>
         </div>
 
