@@ -9,6 +9,7 @@ export interface RallySettings {
   musicEnabled: boolean;
   cameraSensitivity: number;
   cameraShake: boolean;
+  vibrationEnabled: boolean;
   ghostEnabled: boolean;
   touchSteeringSensitivity: number;
   steeringDirection: RallySteeringDirection;
@@ -19,15 +20,17 @@ export interface RallySettings {
   selectedVehicle: RallyVehicleId;
 }
 
-export const RALLY_SETTINGS_VERSION = 3;
-export const RALLY_SETTINGS_STORAGE_KEY = "voxel-rally.settings.v3";
+export const RALLY_SETTINGS_VERSION = 4;
+export const RALLY_SETTINGS_STORAGE_KEY = "voxel-rally.settings.v4";
 const LEGACY_RALLY_SETTINGS_STORAGE_KEY = "voxel-rally.settings.v1";
 const PREVIOUS_RALLY_SETTINGS_STORAGE_KEY = "voxel-rally.settings.v2";
+const PREVIOUS_RALLY_SETTINGS_STORAGE_KEY_V3 = "voxel-rally.settings.v3";
 export const DEFAULT_RALLY_SETTINGS: RallySettings = {
   soundEnabled: true,
   musicEnabled: true,
   cameraSensitivity: 1,
   cameraShake: true,
+  vibrationEnabled: true,
   ghostEnabled: true,
   touchSteeringSensitivity: 1,
   // Floating relative steering follows the finger direction by default:
@@ -56,12 +59,13 @@ function finite(value: unknown, fallback: number, minimum: number, maximum: numb
 export function parseRallySettings(value: unknown): RallySettings {
   if (!value || typeof value !== "object") return { ...DEFAULT_RALLY_SETTINGS };
   const candidate = value as Partial<RallySettings> & { version?: unknown };
-  if (candidate.version !== 1 && candidate.version !== 2 && candidate.version !== RALLY_SETTINGS_VERSION) return { ...DEFAULT_RALLY_SETTINGS };
+  if (candidate.version !== 1 && candidate.version !== 2 && candidate.version !== 3 && candidate.version !== RALLY_SETTINGS_VERSION) return { ...DEFAULT_RALLY_SETTINGS };
   return {
     soundEnabled: typeof candidate.soundEnabled === "boolean" ? candidate.soundEnabled : DEFAULT_RALLY_SETTINGS.soundEnabled,
     musicEnabled: typeof candidate.musicEnabled === "boolean" ? candidate.musicEnabled : DEFAULT_RALLY_SETTINGS.musicEnabled,
     cameraSensitivity: finite(candidate.cameraSensitivity, 1, 0.5, 1.6),
     cameraShake: typeof candidate.cameraShake === "boolean" ? candidate.cameraShake : DEFAULT_RALLY_SETTINGS.cameraShake,
+    vibrationEnabled: typeof candidate.vibrationEnabled === "boolean" ? candidate.vibrationEnabled : DEFAULT_RALLY_SETTINGS.vibrationEnabled,
     ghostEnabled: typeof candidate.ghostEnabled === "boolean" ? candidate.ghostEnabled : DEFAULT_RALLY_SETTINGS.ghostEnabled,
     touchSteeringSensitivity: finite(candidate.touchSteeringSensitivity, 1, 0.6, 1.5),
     steeringDirection: candidate.steeringDirection === "normal" || candidate.steeringDirection === "inverted" ? candidate.steeringDirection : DEFAULT_RALLY_SETTINGS.steeringDirection,
@@ -76,6 +80,7 @@ export function parseRallySettings(value: unknown): RallySettings {
 export function loadRallySettings(): RallySettings {
   const target = storage();
   const saved = target?.getItem(RALLY_SETTINGS_STORAGE_KEY)
+    ?? target?.getItem(PREVIOUS_RALLY_SETTINGS_STORAGE_KEY_V3)
     ?? target?.getItem(PREVIOUS_RALLY_SETTINGS_STORAGE_KEY)
     ?? target?.getItem(LEGACY_RALLY_SETTINGS_STORAGE_KEY);
   if (!saved) return { ...DEFAULT_RALLY_SETTINGS };
@@ -92,7 +97,7 @@ export function saveRallySettings(settings: RallySettings): void {
   try {
     target.setItem(RALLY_SETTINGS_STORAGE_KEY, JSON.stringify({ version: RALLY_SETTINGS_VERSION, ...parseRallySettings({ version: RALLY_SETTINGS_VERSION, ...settings }) }));
   } catch {
-    // Storage failures must never block a race.
+    // Storage failures must never block gameplay.
   }
 }
 
@@ -101,6 +106,7 @@ export function resetRallySaveData(): void {
   if (!target) return;
   for (const key of [
     RALLY_SETTINGS_STORAGE_KEY,
+    PREVIOUS_RALLY_SETTINGS_STORAGE_KEY_V3,
     PREVIOUS_RALLY_SETTINGS_STORAGE_KEY,
     LEGACY_RALLY_SETTINGS_STORAGE_KEY,
     "voxel-rally.time-attack.v2",
