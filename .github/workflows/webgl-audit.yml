@@ -8,6 +8,7 @@ on:
     branches: [main]
     paths:
       - "app/**"
+      - "src/cart/**"
       - "src/rally/**"
       - "public/**"
       - "scripts/capture-webgl-audit.mjs"
@@ -48,7 +49,7 @@ jobs:
           done
           cat /tmp/cart-rogue-server.log
           exit 1
-      - name: Capture real WebGL frame
+      - name: Capture real Cart Rogue WebGL frame
         run: |
           DRIVER="$(command -v chromedriver || true)"
           if [ -z "$DRIVER" ] && [ -n "${CHROMEWEBDRIVER:-}" ] && [ -x "$CHROMEWEBDRIVER/chromedriver" ]; then
