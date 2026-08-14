@@ -1,4 +1,4 @@
-export type CartEnemyKind = "blocker" | "heavy" | "chaser";
+export type CartEnemyKind = "blocker" | "heavy" | "chaser" | "boss";
 
 export interface CartEnemyState {
   id: string;
@@ -33,6 +33,7 @@ export function createInitialCartEnemies(): CartEnemyState[] {
     { id: "enemy-f", nodeId: "arena-02", kind: "chaser", x: 16, z: 120, radius: 1.72, maxHp: 100, hp: 100, alive: true, heading: -1.0, moveSpeed: 4.2 },
     { id: "enemy-g", nodeId: "arena-02", kind: "blocker", x: -7, z: 130, radius: 1.82, maxHp: 110, hp: 110, alive: true, heading: 2.4, moveSpeed: 0 },
     { id: "elite-a", nodeId: "arena-02", kind: "heavy", x: 9, z: 109, radius: 2.45, maxHp: 220, hp: 220, alive: true, heading: -2.5, moveSpeed: 2.0 },
+    { id: "boss-a", nodeId: "boss-01", kind: "boss", x: 0, z: 218, radius: 3.45, maxHp: 520, hp: 520, alive: true, heading: Math.PI, moveSpeed: 2.8 },
   ];
 }
 
@@ -67,13 +68,15 @@ export function updateCartEnemyMovement(
     const dx = playerX - enemy.x;
     const dz = playerZ - enemy.z;
     const distance = Math.hypot(dx, dz);
-    const activationDistance = enemy.kind === "heavy" ? 18 : 25;
+    const activationDistance = enemy.kind === "boss" ? 38 : enemy.kind === "heavy" ? 18 : 25;
     if (distance < 0.001 || distance > activationDistance) continue;
     const targetHeading = Math.atan2(dx, dz);
     const turn = normalizeAngle(targetHeading - enemy.heading);
-    const maxTurn = (enemy.kind === "heavy" ? 1.25 : 2.35) * delta;
+    const hpPressure = enemy.kind === "boss" ? 1 + (1 - enemy.hp / Math.max(1, enemy.maxHp)) * 0.75 : 1;
+    const baseTurn = enemy.kind === "boss" ? 0.95 : enemy.kind === "heavy" ? 1.25 : 2.35;
+    const maxTurn = baseTurn * hpPressure * delta;
     enemy.heading += Math.max(-maxTurn, Math.min(maxTurn, turn));
-    const speed = enemy.moveSpeed * (distance < 5 ? 0.55 : 1);
+    const speed = enemy.moveSpeed * hpPressure * (distance < (enemy.kind === "boss" ? 7 : 5) ? 0.55 : 1);
     enemy.x += Math.sin(enemy.heading) * speed * delta;
     enemy.z += Math.cos(enemy.heading) * speed * delta;
     const margin = enemy.radius + 0.8;
@@ -92,7 +95,7 @@ export function applyTurboRam(
     return { hit: true, destroyed: false, enemyId: enemy.id, damage: 0 };
   }
   const speedBonus = Math.max(0, Math.min(45, (Math.abs(forwardSpeed) - CART_RAM_MIN_SPEED) * 2.5));
-  const baseDamage = enemy.kind === "heavy" ? 105 : 115;
+  const baseDamage = enemy.kind === "boss" ? 88 : enemy.kind === "heavy" ? 105 : 115;
   const damage = Math.round(baseDamage + speedBonus);
   enemy.hp = Math.max(0, enemy.hp - damage);
   enemy.alive = enemy.hp > 0;
