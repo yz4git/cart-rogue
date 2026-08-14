@@ -14,9 +14,16 @@ test("PWA service worker prefers fresh navigation HTML and retires old Voxel Ral
   assert.match(worker, /self\.clients\.claim\(\)/);
 });
 
-test("client registration bypasses the browser's service-worker script cache and requests an update", async () => {
-  const app = await readFile(new URL("../app/RallyGame.tsx", import.meta.url), "utf8");
+test("Cart Rogue client registration bypasses the service-worker script cache and requests an update", async () => {
+  const app = await readFile(new URL("../app/ServiceWorkerRegistration.tsx", import.meta.url), "utf8");
   assert.match(app, /updateViaCache:\s*["']none["']/);
   assert.match(app, /registration\.update\(\)/);
   assert.match(app, /controllerchange/);
+});
+
+test("Cart Rogue PWA manifest keeps standalone landscape play", async () => {
+  const manifest = JSON.parse(await readFile(new URL("../public/manifest.json", import.meta.url), "utf8"));
+  assert.equal(manifest.name, "Cart Rogue");
+  assert.equal(manifest.display, "standalone");
+  assert.equal(manifest.orientation, "landscape");
 });

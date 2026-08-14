@@ -87,15 +87,21 @@ try {
   let state = null;
   for (let attempt = 0; attempt < 80; attempt += 1) {
     state = await execute(sessionId, `
-      const canvas = document.querySelector('canvas.rally-canvas');
-      const badge = document.querySelector('.renderer-badge')?.textContent?.trim() ?? '';
-      if (!canvas) return { ready: false, badge, href: location.href };
+      const canvas = document.querySelector('canvas.cart-rogue-canvas');
+      const stage = document.querySelector('section[aria-label="Cart Rogue game"]');
+      const text = document.body.innerText || '';
+      const badge = Array.from(document.querySelectorAll('span')).map((el) => el.textContent?.trim()).find((value) => value === 'WEBGL' || value === 'CANVAS') || '';
+      if (!canvas) return { ready: false, badge, stage: Boolean(stage), href: location.href };
       const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
       return {
-        ready: Boolean(gl) && !gl.isContextLost(),
+        ready: Boolean(gl) && !gl.isContextLost() && Boolean(stage),
         badge,
         webgl: Boolean(gl),
         contextLost: gl ? gl.isContextLost() : null,
+        cartStage: Boolean(stage),
+        hasGasHud: text.includes('GAS'),
+        hasTurboHud: text.includes('TURBO'),
+        hasEnemyHud: text.includes('ENEMIES'),
         width: canvas.width,
         height: canvas.height,
         clientWidth: canvas.clientWidth,
@@ -103,12 +109,15 @@ try {
         href: location.href,
       };
     `);
-    if (state?.ready && state?.badge === "WEBGL") break;
+    if (state?.ready && state?.badge === "WEBGL" && state?.hasGasHud && state?.hasTurboHud && state?.hasEnemyHud) break;
     await sleep(250);
   }
 
   if (!state?.ready || state?.badge !== "WEBGL") {
-    throw new Error(`Real WebGL runtime did not become ready: ${JSON.stringify(state)}`);
+    throw new Error(`Real Cart Rogue WebGL runtime did not become ready: ${JSON.stringify(state)}`);
+  }
+  if (!state?.cartStage || !state?.hasGasHud || !state?.hasTurboHud || !state?.hasEnemyHud) {
+    throw new Error(`Cart Rogue HUD/game shell is incomplete: ${JSON.stringify(state)}`);
   }
   if ((state.width ?? 0) <= 0 || (state.height ?? 0) <= 0) {
     throw new Error(`WebGL canvas has invalid backing size: ${JSON.stringify(state)}`);
@@ -125,7 +134,7 @@ try {
   await mkdir(new URL(`../${output.split("/").slice(0, -1).join("/")}/`, import.meta.url), { recursive: true }).catch(() => undefined);
   await writeFile(new URL(`../${output}`, import.meta.url), Buffer.from(pngBase64, "base64"));
   await writeFile(new URL(`../${stateOutput}`, import.meta.url), `${JSON.stringify(state, null, 2)}\n`);
-  console.log(`Real WebGL audit passed: ${JSON.stringify(state)}`);
+  console.log(`Real Cart Rogue WebGL audit passed: ${JSON.stringify(state)}`);
 } catch (error) {
   console.error(error);
   if (driverLog) console.error(driverLog);

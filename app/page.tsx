@@ -1,5 +1,9 @@
-import RallyGame from "./RallyGame";
+import CartRogueGame from "./CartRogueGame";
+import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
 
 export default function Page() {
-  return <RallyGame />;
+  return <>
+    <ServiceWorkerRegistration />
+    <CartRogueGame />
+  </>;
 }

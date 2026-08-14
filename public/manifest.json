@@ -1,11 +1,11 @@
 {
-  "name": "Voxel Rally",
-  "short_name": "Voxel Rally",
+  "name": "Cart Rogue",
+  "short_name": "Cart Rogue",
   "start_url": "./",
   "display": "standalone",
   "orientation": "landscape",
-  "background_color": "#061018",
-  "theme_color": "#061018",
+  "background_color": "#bfe6e9",
+  "theme_color": "#bfe6e9",
   "icons": [
     {
       "src": "./favicon.svg",
