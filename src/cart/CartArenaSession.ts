@@ -7,11 +7,18 @@ import { CART_ARENA_TRACK } from "./CartArenaTrack";
 import {
   aliveCartEnemies,
   applyTurboRam,
+  breakHeavyParallelContact,
   cartEnemyContact,
   createInitialCartEnemies,
   updateCartEnemyMovement,
   type CartEnemyState,
 } from "./CartCombat";
+import {
+  applyTurboRockSmash,
+  cartObstacleSweepContact,
+  createInitialCartObstacles,
+  type CartObstacleState,
+} from "./CartObstacles";
 import {
   cartResourceContact,
   createInitialCartResources,
@@ -23,6 +30,7 @@ import {
   locateCartWorldNode,
   type CartWorldLocation,
   type CartWorldNode,
+  type CartWorldNodeKind,
 } from "./CartWorldGraph";
 
 export interface CartEnemySnapshot {
@@ -46,6 +54,18 @@ export interface CartResourceSnapshot {
   z: number;
   radius: number;
   collected: boolean;
+}
+
+export interface CartObstacleSnapshot {
+  id: string;
+  nodeId: string;
+  kind: "rock";
+  x: number;
+  z: number;
+  radius: number;
+  scale: number;
+  variant: 0 | 1 | 2;
+  destroyed: boolean;
 }
 
 export interface CartArenaSessionSnapshot {
@@ -77,21 +97,33 @@ export interface CartArenaSessionSnapshot {
   runComplete: boolean;
   enemies: readonly CartEnemySnapshot[];
   resources: readonly CartResourceSnapshot[];
+  obstacles: readonly CartObstacleSnapshot[];
 }
 
 const GAS_DRAIN_PER_SECOND = 0.0032;
 const RAM_COMBO_WINDOW = 2.1;
 export const CART_TURBO_RECHARGE_SECONDS = 3.0;
 const WALL_MARGIN = 1.05;
+const CORNER_RELEASE_NUDGE = 0.72;
+const ARENA_MAX_SPEED = 21.5;
+const CORRIDOR_MAX_SPEED = 26;
+const BOSS_MAX_SPEED = 20.5;
 
 export function cartSteeringInput(value: number): number {
   return -Math.max(-1, Math.min(1, value));
 }
 
+export function quickenCartSteering(value: number): number {
+  const clamped = Math.max(-1, Math.min(1, value));
+  const magnitude = Math.abs(clamped);
+  const quicker = Math.min(1, magnitude * 1.18 + magnitude * magnitude * 0.12);
+  return Math.sign(clamped) * quicker;
+}
+
 /**
  * Cart Rogue driving/combat runtime. RallyCar remains the proven low-level
  * vehicle implementation, while arena progression, renewable Turbo stocks,
- * pickups, encounters and forgiving wall-slide behavior live here.
+ * solid/destructible obstacles, encounters and forgiving collision flow live here.
  */
 export class CartArenaSession {
   readonly track: RallyTrack;
@@ -99,6 +131,7 @@ export class CartArenaSession {
   readonly clock = new RallyFixedStepClock();
   readonly enemies: CartEnemyState[] = createInitialCartEnemies();
   readonly resources: CartResourcePickupState[] = createInitialCartResources();
+  readonly obstacles: CartObstacleState[] = createInitialCartObstacles();
   private location: CartWorldLocation;
   private gas = 1;
   private ramCombo = 0;
@@ -111,10 +144,12 @@ export class CartArenaSession {
   private wallSlideTimer = 0;
   private readonly rewardedNodes = new Set<string>();
   private readonly enemyHitCooldowns = new Map<string, number>();
+  private readonly obstacleHitCooldowns = new Map<string, number>();
 
   constructor(vehicleId: RallyVehicleId = "compact") {
     this.track = new RallyTrack(CART_ARENA_TRACK);
-    this.car = new RallyCar(this.track, getRallyVehicleDefinition(vehicleId), "player");
+    const baseDefinition = getRallyVehicleDefinition(vehicleId);
+    this.car = new RallyCar(this.track, { ...baseDefinition }, "player");
     this.car.setHoverMode(false);
     this.car.setBoostChargeMode(true);
     this.car.damageEnabled = true;
@@ -125,6 +160,7 @@ export class CartArenaSession {
         localX: 0,
         localZ: 0,
       };
+    this.applyDriveProfile(this.location.node.kind);
   }
 
   advance(elapsedSeconds: number, input: RallyInputState): number {
@@ -134,9 +170,10 @@ export class CartArenaSession {
   step(input: RallyInputState, fixedDelta = this.clock.step): void {
     const previousX = this.car.position.x;
     const previousZ = this.car.position.z;
+    this.applyDriveProfile(this.location.node.kind);
     const activeInput: RallyInputState = {
       ...input,
-      steer: cartSteeringInput(input.steer),
+      steer: quickenCartSteering(cartSteeringInput(input.steer)),
       throttle: this.gas > 0 ? input.throttle : 0,
       boost: this.gas > 0 ? input.boost : false,
     };
@@ -149,11 +186,8 @@ export class CartArenaSession {
     this.rewardTimer = Math.max(0, this.rewardTimer - fixedDelta);
     if (this.rewardTimer <= 0) this.lastReward = null;
     this.wallSlideTimer = Math.max(0, this.wallSlideTimer - fixedDelta);
-    for (const [id, remaining] of this.enemyHitCooldowns) {
-      const next = remaining - fixedDelta;
-      if (next <= 0) this.enemyHitCooldowns.delete(id);
-      else this.enemyHitCooldowns.set(id, next);
-    }
+    this.tickCooldowns(this.enemyHitCooldowns, fixedDelta);
+    this.tickCooldowns(this.obstacleHitCooldowns, fixedDelta);
 
     let nextLocation = locateCartWorldNode(this.car.position.x, this.car.position.z);
     if (!nextLocation) {
@@ -167,6 +201,8 @@ export class CartArenaSession {
     }
 
     this.location = nextLocation;
+    this.applyDriveProfile(this.location.node.kind);
+    this.resolveObstacleCollisions(previousX, previousZ);
     this.collectNearbyResources();
 
     if (this.location.node.kind === "arena" || this.location.node.kind === "boss") {
@@ -190,8 +226,9 @@ export class CartArenaSession {
         this.lastRamDamage = result.damage;
         this.car.collisionImpact = Math.max(this.car.collisionImpact, result.destroyed ? 1 : 0.78);
         this.car.forwardVelocity *= result.destroyed ? 0.94 : contact.kind === "boss" ? 0.72 : 0.78;
-        contact.x += Math.sin(this.car.heading) * (result.destroyed ? 0.5 : contact.kind === "boss" ? 0.8 : 1.4);
-        contact.z += Math.cos(this.car.heading) * (result.destroyed ? 0.5 : contact.kind === "boss" ? 0.8 : 1.4);
+        contact.x += Math.sin(this.car.heading) * (result.destroyed ? 0.5 : contact.kind === "boss" ? 1.15 : 1.55);
+        contact.z += Math.cos(this.car.heading) * (result.destroyed ? 0.5 : contact.kind === "boss" ? 1.15 : 1.55);
+        breakHeavyParallelContact(contact, this.car.heading);
         if (result.destroyed) {
           this.car.ramCount += 1;
           const gasReward = contact.kind === "boss" ? 0.1 : contact.kind === "heavy" ? 0.055 : 0.035;
@@ -221,6 +258,7 @@ export class CartArenaSession {
       heading: enemy.heading,
     }));
     const resources = this.resources.map((pickup) => ({ ...pickup }));
+    const obstacles = this.obstacles.map((obstacle) => ({ ...obstacle }));
     const localEnemies = this.enemies.filter((enemy) => enemy.nodeId === this.location.node.id);
     const localAlive = localEnemies.filter((enemy) => enemy.alive).length;
     const rechargeProgress = this.car.boostCharges >= this.car.maxBoostCharges
@@ -258,7 +296,24 @@ export class CartArenaSession {
       runComplete: Boolean(boss && !boss.alive),
       enemies,
       resources,
+      obstacles,
     };
+  }
+
+  private applyDriveProfile(kind: CartWorldNodeKind): void {
+    this.car.definition.maxSpeed = kind === "corridor"
+      ? CORRIDOR_MAX_SPEED
+      : kind === "boss"
+        ? BOSS_MAX_SPEED
+        : ARENA_MAX_SPEED;
+  }
+
+  private tickCooldowns(cooldowns: Map<string, number>, delta: number): void {
+    for (const [id, remaining] of cooldowns) {
+      const next = remaining - delta;
+      if (next <= 0) cooldowns.delete(id);
+      else cooldowns.set(id, next);
+    }
   }
 
   private updateTurboRecharge(delta: number): void {
@@ -291,6 +346,37 @@ export class CartArenaSession {
       this.lastReward = "TURBO CELL · +1 STOCK";
       this.rewardTimer = 1.6;
     }
+  }
+
+  private resolveObstacleCollisions(previousX: number, previousZ: number): void {
+    const obstacle = this.obstacles.find((candidate) =>
+      !this.obstacleHitCooldowns.has(candidate.id)
+      && cartObstacleSweepContact(
+        candidate,
+        this.location.node.id,
+        previousX,
+        previousZ,
+        this.car.position.x,
+        this.car.position.z,
+      ));
+    if (!obstacle) return;
+
+    const result = applyTurboRockSmash(obstacle, this.car.boostActive, this.car.forwardVelocity);
+    if (result.destroyed) {
+      this.obstacleHitCooldowns.set(obstacle.id, 0.3);
+      this.car.destructionCount += 1;
+      this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.92);
+      this.car.forwardVelocity *= 0.96;
+      this.gas = Math.min(1, this.gas + 0.02);
+      this.lastReward = "ROCK SMASH · GAS +2%";
+      this.rewardTimer = 1.35;
+      return;
+    }
+
+    this.obstacleHitCooldowns.set(obstacle.id, 0.12);
+    this.slideAroundObstacle(obstacle, previousX, previousZ);
+    this.lastReward = "ROCK BLOCKED · USE TURBO";
+    this.rewardTimer = 0.75;
   }
 
   private isNodeGateLocked(nodeId: string): boolean {
@@ -336,58 +422,135 @@ export class CartArenaSession {
     this.car.position.x = clampedX;
     this.car.position.z = clampedZ;
 
-    if (hitX || hitZ) {
-      const dx = attemptedX - previousX;
-      const dz = attemptedZ - previousZ;
-      const targetHeading = hitX && !hitZ
-        ? this.closestHeading([0, Math.PI])
-        : hitZ && !hitX
-          ? this.closestHeading([Math.PI / 2, -Math.PI / 2])
-          : Math.abs(dx) > Math.abs(dz)
-            ? this.closestHeading([0, Math.PI])
-            : this.closestHeading([Math.PI / 2, -Math.PI / 2]);
-      this.car.heading = rotateToward(this.car.heading, targetHeading, 0.34);
-      this.car.forwardVelocity *= 0.92;
-      this.car.lateralVelocity *= 0.28;
-      const speed = Math.max(3.5, Math.abs(this.car.forwardVelocity));
-      this.car.velocity.x = Math.sin(this.car.heading) * speed;
-      this.car.velocity.z = Math.cos(this.car.heading) * speed;
-      this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.34);
-      this.wallSlideTimer = 0.22;
+    if (!hitX && !hitZ) return;
+
+    const atXEdge = Math.abs(clampedX - minX) < 0.06 || Math.abs(clampedX - maxX) < 0.06;
+    const atZEdge = Math.abs(clampedZ - minZ) < 0.06 || Math.abs(clampedZ - maxZ) < 0.06;
+    if (atXEdge && atZEdge) {
+      const inwardX = Math.abs(clampedX - minX) < Math.abs(clampedX - maxX) ? 1 : -1;
+      const inwardZ = Math.abs(clampedZ - minZ) < Math.abs(clampedZ - maxZ) ? 1 : -1;
+      this.car.position.x = Math.max(minX, Math.min(maxX, clampedX + inwardX * CORNER_RELEASE_NUDGE));
+      this.car.position.z = Math.max(minZ, Math.min(maxZ, clampedZ + inwardZ * CORNER_RELEASE_NUDGE));
+      const targetHeading = Math.atan2(inwardX, inwardZ);
+      this.car.heading = rotateToward(this.car.heading, targetHeading, 0.78);
+      this.car.forwardVelocity = Math.max(4.5, Math.abs(this.car.forwardVelocity) * 0.86);
+      this.car.lateralVelocity *= 0.12;
+      this.syncHorizontalVelocity();
+      this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.44);
+      this.wallSlideTimer = 0.34;
+      return;
     }
+
+    const dx = attemptedX - previousX;
+    const dz = attemptedZ - previousZ;
+    const targetHeading = hitX
+      ? this.closestHeading([0, Math.PI])
+      : hitZ
+        ? this.closestHeading([Math.PI / 2, -Math.PI / 2])
+        : Math.abs(dx) > Math.abs(dz)
+          ? this.closestHeading([0, Math.PI])
+          : this.closestHeading([Math.PI / 2, -Math.PI / 2]);
+    this.car.heading = rotateToward(this.car.heading, targetHeading, 0.42);
+    this.car.forwardVelocity *= 0.92;
+    this.car.lateralVelocity *= 0.24;
+    this.car.forwardVelocity = Math.max(3.8, Math.abs(this.car.forwardVelocity));
+    this.syncHorizontalVelocity();
+    this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.34);
+    this.wallSlideTimer = 0.24;
   }
 
   private slideAlongLockedGate(previousX: number, previousZ: number): void {
     const rect = this.location.node.rect;
+    const minX = rect.centerX - rect.halfWidth + WALL_MARGIN;
+    const maxX = rect.centerX + rect.halfWidth - WALL_MARGIN;
     this.car.position.z = rect.centerZ + rect.halfDepth - WALL_MARGIN;
-    this.car.position.x = Math.max(
-      rect.centerX - rect.halfWidth + WALL_MARGIN,
-      Math.min(rect.centerX + rect.halfWidth - WALL_MARGIN, this.car.position.x),
-    );
-    const dx = this.car.position.x - previousX;
-    const targetHeading = Math.abs(dx) > 0.02
-      ? (dx >= 0 ? Math.PI / 2 : -Math.PI / 2)
-      : this.closestHeading([Math.PI / 2, -Math.PI / 2]);
-    this.car.heading = rotateToward(this.car.heading, targetHeading, 0.38);
-    this.car.forwardVelocity *= 0.9;
-    this.car.lateralVelocity *= 0.24;
+    this.car.position.x = Math.max(minX, Math.min(maxX, this.car.position.x));
+    const nearSide = Math.min(this.car.position.x - minX, maxX - this.car.position.x) < 0.75;
+    if (nearSide) {
+      const inwardX = this.car.position.x < rect.centerX ? 1 : -1;
+      this.car.position.x += inwardX * 0.52;
+      this.car.position.z -= 0.58;
+      const targetHeading = Math.atan2(inwardX * 0.72, -1);
+      this.car.heading = rotateToward(this.car.heading, targetHeading, 0.72);
+    } else {
+      const dx = this.car.position.x - previousX;
+      const targetHeading = Math.abs(dx) > 0.02
+        ? (dx >= 0 ? Math.PI / 2 : -Math.PI / 2)
+        : this.closestHeading([Math.PI / 2, -Math.PI / 2]);
+      this.car.heading = rotateToward(this.car.heading, targetHeading, 0.46);
+    }
+    this.car.forwardVelocity = Math.max(3.8, Math.abs(this.car.forwardVelocity) * 0.88);
+    this.car.lateralVelocity *= 0.2;
+    this.syncHorizontalVelocity();
     this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.42);
-    this.wallSlideTimer = 0.24;
+    this.wallSlideTimer = 0.28;
+  }
+
+  private slideAroundObstacle(obstacle: CartObstacleState, previousX: number, previousZ: number): void {
+    let dx = previousX - obstacle.x;
+    let dz = previousZ - obstacle.z;
+    let distance = Math.hypot(dx, dz);
+    if (distance < 0.001) {
+      dx = -Math.sin(this.car.heading);
+      dz = -Math.cos(this.car.heading);
+      distance = 1;
+    }
+    const normalX = dx / distance;
+    const normalZ = dz / distance;
+    const safeRadius = obstacle.radius + 1.62;
+    this.car.position.x = obstacle.x + normalX * safeRadius;
+    this.car.position.z = obstacle.z + normalZ * safeRadius;
+    const tangentA = Math.atan2(-normalZ, normalX);
+    const tangentB = normalizeAngle(tangentA + Math.PI);
+    this.car.heading = rotateToward(this.car.heading, this.closestHeading([tangentA, tangentB]), 0.5);
+    this.car.forwardVelocity = Math.max(3.2, Math.abs(this.car.forwardVelocity) * 0.66);
+    this.car.lateralVelocity *= 0.18;
+    this.syncHorizontalVelocity();
+    this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.62);
   }
 
   private slideAroundEnemy(enemy: CartEnemyState, previousX: number, previousZ: number): void {
-    const dx = previousX - enemy.x;
-    const dz = previousZ - enemy.z;
-    const distance = Math.max(0.001, Math.hypot(dx, dz));
-    const safeRadius = enemy.radius + 1.52;
-    this.car.position.x = enemy.x + dx / distance * safeRadius;
-    this.car.position.z = enemy.z + dz / distance * safeRadius;
-    const tangentA = Math.atan2(dz, -dx);
-    const tangentB = normalizeAngle(tangentA + Math.PI);
-    this.car.heading = rotateToward(this.car.heading, this.closestHeading([tangentA, tangentB]), 0.3);
-    this.car.forwardVelocity *= enemy.kind === "boss" ? 0.78 : 0.86;
-    this.car.lateralVelocity *= 0.3;
-    this.car.collisionImpact = Math.max(this.car.collisionImpact, enemy.kind === "boss" ? 0.7 : 0.5);
+    let dx = previousX - enemy.x;
+    let dz = previousZ - enemy.z;
+    let distance = Math.hypot(dx, dz);
+    if (distance < 0.001) {
+      dx = -Math.sin(this.car.heading);
+      dz = -Math.cos(this.car.heading);
+      distance = 1;
+    }
+    const normalX = dx / distance;
+    const normalZ = dz / distance;
+    const heavyLike = enemy.kind === "heavy" || enemy.kind === "boss";
+    const safeRadius = enemy.radius + (heavyLike ? 1.78 : 1.52);
+    this.car.position.x = enemy.x + normalX * safeRadius;
+    this.car.position.z = enemy.z + normalZ * safeRadius;
+
+    if (heavyLike) {
+      breakHeavyParallelContact(enemy, this.car.heading);
+      enemy.x -= normalX * (enemy.kind === "boss" ? 0.28 : 0.38);
+      enemy.z -= normalZ * (enemy.kind === "boss" ? 0.28 : 0.38);
+      const awayHeading = Math.atan2(normalX, normalZ);
+      const offsetA = normalizeAngle(awayHeading + 0.38);
+      const offsetB = normalizeAngle(awayHeading - 0.38);
+      this.car.heading = rotateToward(this.car.heading, this.closestHeading([offsetA, offsetB]), 0.68);
+      this.car.forwardVelocity = Math.max(3.1, Math.abs(this.car.forwardVelocity) * (enemy.kind === "boss" ? 0.66 : 0.72));
+      this.car.lateralVelocity *= 0.14;
+    } else {
+      const tangentA = Math.atan2(normalZ, -normalX);
+      const tangentB = normalizeAngle(tangentA + Math.PI);
+      this.car.heading = rotateToward(this.car.heading, this.closestHeading([tangentA, tangentB]), 0.34);
+      this.car.forwardVelocity = Math.max(3.2, Math.abs(this.car.forwardVelocity) * 0.84);
+      this.car.lateralVelocity *= 0.28;
+    }
+    this.syncHorizontalVelocity();
+    this.car.collisionImpact = Math.max(this.car.collisionImpact, enemy.kind === "boss" ? 0.72 : heavyLike ? 0.6 : 0.5);
+  }
+
+  private syncHorizontalVelocity(): void {
+    const speed = Math.abs(this.car.forwardVelocity);
+    this.car.velocity.x = Math.sin(this.car.heading) * speed;
+    this.car.velocity.z = Math.cos(this.car.heading) * speed;
+    this.car.speed = Math.hypot(this.car.velocity.x, this.car.velocity.z);
   }
 
   private closestHeading(candidates: readonly number[]): number {
