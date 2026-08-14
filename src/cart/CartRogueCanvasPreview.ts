@@ -119,6 +119,32 @@ export class CartRogueCanvasPreview implements CartRogueDemoHandle {
       ctx.restore();
     }
 
+    for (const obstacle of snapshot.obstacles) {
+      if (obstacle.destroyed) continue;
+      const p = worldToScreen(obstacle.x, obstacle.z);
+      const color = obstacle.variant === 0 ? "#f1b5c9" : obstacle.variant === 1 ? "#b7a9dd" : "#9fd5c8";
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      for (let index = 0; index < 8; index += 1) {
+        const angle = Math.PI * 2 * index / 8 + 0.18;
+        const radius = obstacle.radius * scale * (index % 2 === 0 ? 1 : 0.82);
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "#65dcea";
+      ctx.lineWidth = Math.max(1, 0.16 * scale);
+      ctx.beginPath();
+      ctx.arc(0, 0, obstacle.radius * 0.72 * scale, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     for (const enemy of snapshot.enemies) {
       if (!enemy.alive) continue;
       const p = worldToScreen(enemy.x, enemy.z);

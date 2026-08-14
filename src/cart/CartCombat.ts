@@ -70,19 +70,43 @@ export function updateCartEnemyMovement(
     const distance = Math.hypot(dx, dz);
     const activationDistance = enemy.kind === "boss" ? 38 : enemy.kind === "heavy" ? 18 : 25;
     if (distance < 0.001 || distance > activationDistance) continue;
-    const targetHeading = Math.atan2(dx, dz);
+
+    const heavyLike = enemy.kind === "heavy" || enemy.kind === "boss";
+    const closeRange = heavyLike && distance < (enemy.kind === "boss" ? 9.5 : 6.8);
+    const side = stableEnemySide(enemy.id);
+    let targetHeading = Math.atan2(dx, dz);
+    if (closeRange) {
+      // Heavy enemies should cross the player's line instead of matching it.
+      // This prevents the two vehicles from settling into a long side-by-side lock.
+      targetHeading = normalizeAngle(targetHeading + side * (enemy.kind === "boss" ? 0.72 : 0.92));
+    }
+
     const turn = normalizeAngle(targetHeading - enemy.heading);
     const hpPressure = enemy.kind === "boss" ? 1 + (1 - enemy.hp / Math.max(1, enemy.maxHp)) * 0.75 : 1;
     const baseTurn = enemy.kind === "boss" ? 0.95 : enemy.kind === "heavy" ? 1.25 : 2.35;
-    const maxTurn = baseTurn * hpPressure * delta;
-    enemy.heading += Math.max(-maxTurn, Math.min(maxTurn, turn));
-    const speed = enemy.moveSpeed * hpPressure * (distance < (enemy.kind === "boss" ? 7 : 5) ? 0.55 : 1);
+    const closeTurnBoost = closeRange ? 1.35 : 1;
+    const maxTurn = baseTurn * hpPressure * closeTurnBoost * delta;
+    enemy.heading = normalizeAngle(enemy.heading + Math.max(-maxTurn, Math.min(maxTurn, turn)));
+
+    const nearScale = closeRange
+      ? (enemy.kind === "boss" ? 0.48 : 0.4)
+      : distance < (enemy.kind === "boss" ? 7 : 5)
+        ? 0.55
+        : 1;
+    const speed = enemy.moveSpeed * hpPressure * nearScale;
     enemy.x += Math.sin(enemy.heading) * speed * delta;
     enemy.z += Math.cos(enemy.heading) * speed * delta;
     const margin = enemy.radius + 0.8;
     enemy.x = Math.max(bounds.centerX - bounds.halfWidth + margin, Math.min(bounds.centerX + bounds.halfWidth - margin, enemy.x));
     enemy.z = Math.max(bounds.centerZ - bounds.halfDepth + margin, Math.min(bounds.centerZ + bounds.halfDepth - margin, enemy.z));
   }
+}
+
+export function breakHeavyParallelContact(enemy: CartEnemyState, playerHeading: number): void {
+  if (enemy.kind !== "heavy" && enemy.kind !== "boss") return;
+  const headingDifference = Math.abs(normalizeAngle(enemy.heading - playerHeading));
+  if (headingDifference > 0.72) return;
+  enemy.heading = normalizeAngle(enemy.heading + stableEnemySide(enemy.id) * (enemy.kind === "boss" ? 0.82 : 0.98));
 }
 
 export function applyTurboRam(
@@ -100,6 +124,12 @@ export function applyTurboRam(
   enemy.hp = Math.max(0, enemy.hp - damage);
   enemy.alive = enemy.hp > 0;
   return { hit: true, destroyed: !enemy.alive, enemyId: enemy.id, damage };
+}
+
+function stableEnemySide(id: string): -1 | 1 {
+  let checksum = 0;
+  for (let index = 0; index < id.length; index += 1) checksum += id.charCodeAt(index);
+  return checksum % 2 === 0 ? 1 : -1;
 }
 
 function normalizeAngle(angle: number): number {

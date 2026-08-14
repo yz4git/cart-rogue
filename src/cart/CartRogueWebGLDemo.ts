@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { RallyChaseCamera } from "../rally/RallyChaseCamera";
 import { CartArenaSession } from "./CartArenaSession";
-import type { CartEnemySnapshot, CartResourceSnapshot } from "./CartArenaSession";
+import type { CartEnemySnapshot, CartObstacleSnapshot, CartResourceSnapshot } from "./CartArenaSession";
 import type { CartRogueDemoHandle, CartRogueSnapshotHandler } from "./CartRogueDemo";
 import { CART_WORLD_GRAPH } from "./CartWorldGraph";
 
@@ -33,6 +33,10 @@ const PALETTE = {
   gateOpen: 0x71cba8,
   gasCell: 0x79d99a,
   turboCell: 0x61dbe8,
+  rockA: 0xf1b5c9,
+  rockB: 0xb7a9dd,
+  rockC: 0x9fd5c8,
+  rockSmashMark: 0x65dcea,
 };
 
 export class CartRogueWebGLDemo implements CartRogueDemoHandle {
@@ -44,6 +48,8 @@ export class CartRogueWebGLDemo implements CartRogueDemoHandle {
   private readonly enemyGroups = new Map<string, THREE.Group>();
   private readonly enemyAlive = new Map<string, boolean>();
   private readonly resourceGroups = new Map<string, THREE.Group>();
+  private readonly obstacleGroups = new Map<string, THREE.Group>();
+  private readonly obstacleAlive = new Map<string, boolean>();
   private readonly debris: DebrisPiece[] = [];
   private readonly gateBars = new Map<string, THREE.Mesh>();
   private readonly turboTrails = new THREE.Group();
@@ -88,6 +94,7 @@ export class CartRogueWebGLDemo implements CartRogueDemoHandle {
     const initial = this.session.snapshot();
     this.buildEnemies(initial.enemies);
     this.buildResources(initial.resources);
+    this.buildObstacles(initial.obstacles);
     this.buildGate("arena-01", 52);
     this.buildGate("arena-02", 140);
 
@@ -134,20 +141,6 @@ export class CartRogueWebGLDemo implements CartRogueDemoHandle {
       floor.position.set(node.rect.centerX, -0.24, node.rect.centerZ);
       this.scene.add(floor);
       this.addBoundaryBlocks(node.rect.centerX, node.rect.centerZ, node.rect.halfWidth, node.rect.halfDepth, node.kind === "corridor");
-    }
-
-    const decorMaterialA = new THREE.MeshLambertMaterial({ color: 0xf1b5c9, flatShading: true });
-    const decorMaterialB = new THREE.MeshLambertMaterial({ color: 0xb7a9dd, flatShading: true });
-    const decorMaterialC = new THREE.MeshLambertMaterial({ color: 0x9fd5c8, flatShading: true });
-    const spots = [
-      [-22, 15, 2.2, decorMaterialA], [22, 18, 2.8, decorMaterialB], [-21, 43, 1.8, decorMaterialC], [21, 41, 2.1, decorMaterialA],
-      [-25, 105, 2.8, decorMaterialB], [24, 126, 2.4, decorMaterialC], [-28, 210, 3.2, decorMaterialA], [27, 218, 2.7, decorMaterialB],
-    ] as const;
-    for (const [x, z, scale, material] of spots) {
-      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(scale, 0), material);
-      rock.position.set(x, scale * 0.65, z);
-      rock.rotation.set(0.2, x * 0.04, 0.12);
-      this.scene.add(rock);
     }
 
     for (let index = 0; index < 28; index += 1) {
@@ -268,6 +261,30 @@ export class CartRogueWebGLDemo implements CartRogueDemoHandle {
     }
   }
 
+  private buildObstacles(obstacles: readonly CartObstacleSnapshot[]): void {
+    for (const obstacle of obstacles) {
+      const group = new THREE.Group();
+      const color = this.rockColor(obstacle.variant);
+      const rock = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(obstacle.scale, 0),
+        new THREE.MeshLambertMaterial({ color, flatShading: true }),
+      );
+      rock.position.y = obstacle.scale * 0.65;
+      rock.rotation.set(0.2, obstacle.x * 0.04, 0.12);
+      const smashBand = new THREE.Mesh(
+        new THREE.TorusGeometry(obstacle.scale * 0.72, 0.09, 5, 12),
+        new THREE.MeshBasicMaterial({ color: PALETTE.rockSmashMark, transparent: true, opacity: 0.72 }),
+      );
+      smashBand.position.y = obstacle.scale * 0.78;
+      smashBand.rotation.x = Math.PI / 2;
+      group.add(rock, smashBand);
+      group.position.set(obstacle.x, 0, obstacle.z);
+      this.obstacleGroups.set(obstacle.id, group);
+      this.obstacleAlive.set(obstacle.id, !obstacle.destroyed);
+      this.scene.add(group);
+    }
+  }
+
   private buildGate(nodeId: string, z: number): void {
     const gate = new THREE.Group();
     const pillarMaterial = new THREE.MeshLambertMaterial({ color: 0xf1d6b5, flatShading: true });
@@ -336,6 +353,18 @@ export class CartRogueWebGLDemo implements CartRogueDemoHandle {
       }
     }
 
+    for (const obstacle of snapshot.obstacles) {
+      const group = this.obstacleGroups.get(obstacle.id);
+      if (!group) continue;
+      const wasAlive = this.obstacleAlive.get(obstacle.id) ?? true;
+      if (wasAlive && obstacle.destroyed) {
+        this.spawnDebris(group.position, this.rockColor(obstacle.variant), 18);
+      }
+      this.obstacleAlive.set(obstacle.id, !obstacle.destroyed);
+      group.visible = !obstacle.destroyed;
+      if (!obstacle.destroyed) group.rotation.y += delta * 0.08;
+    }
+
     for (let index = this.debris.length - 1; index >= 0; index -= 1) {
       const piece = this.debris[index];
       piece.life -= delta;
@@ -360,6 +389,10 @@ export class CartRogueWebGLDemo implements CartRogueDemoHandle {
     const targetY = locked ? 1.45 : 6.2;
     bar.position.y += (targetY - bar.position.y) * Math.min(1, delta * 6);
     (bar.material as THREE.MeshLambertMaterial).color.setHex(locked ? PALETTE.gateLocked : PALETTE.gateOpen);
+  }
+
+  private rockColor(variant: 0 | 1 | 2): number {
+    return variant === 0 ? PALETTE.rockA : variant === 1 ? PALETTE.rockB : PALETTE.rockC;
   }
 
   private spawnDebris(position: THREE.Vector3, color: number, count: number): void {
