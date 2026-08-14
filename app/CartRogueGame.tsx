@@ -39,6 +39,7 @@ const INITIAL: CartArenaSessionSnapshot = {
   runComplete: false,
   enemies: [],
   resources: [],
+  obstacles: [],
 };
 
 function objective(snapshot: CartArenaSessionSnapshot): string {
@@ -230,7 +231,7 @@ export default function CartRogueGame() {
             <div className={styles.meterTrack}><i style={{ width: `${gasPercent}%` }} /></div>
           </div>
           <div className={styles.itemStrip}>
-            <span>RAM</span><span>REGEN</span><span>CELLS</span>
+            <span>RAM</span><span>ROCKS</span><span>CELLS</span>
           </div>
           <div className={`${styles.meterCard} ${styles.turboCard}`}>
             <div className={styles.meterHead}><span>TURBO</span><strong>×{snapshot.boostCharges}</strong></div>
@@ -253,7 +254,7 @@ export default function CartRogueGame() {
           onPointerCancel={releaseSteer}
           onLostPointerCapture={releaseSteer}
         >
-          <span>SLIDE TO STEER · REVERSED</span>
+          <span>QUICK STEER · REVERSED</span>
         </div>
 
         <div className={styles.actions}>
@@ -272,7 +273,7 @@ export default function CartRogueGame() {
             onPointerCancel={releaseBoost}
             onLostPointerCapture={releaseBoost}
           >
-            <strong>TURBO</strong><small>{snapshot.boostCharges > 0 ? "RAM" : "CHARGING"}</small>
+            <strong>TURBO</strong><small>{snapshot.boostCharges > 0 ? "RAM / SMASH" : "CHARGING"}</small>
           </button>
         </div>
 
