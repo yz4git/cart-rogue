@@ -9,6 +9,7 @@ import {
   applyTurboRam,
   cartEnemyContact,
   createInitialCartEnemies,
+  updateCartEnemyMovement,
   type CartEnemyState,
 } from "./CartCombat";
 import {
@@ -16,18 +17,20 @@ import {
   cartWorldNodeById,
   locateCartWorldNode,
   type CartWorldLocation,
+  type CartWorldNode,
 } from "./CartWorldGraph";
 
 export interface CartEnemySnapshot {
   id: string;
   nodeId: string;
-  kind: "blocker" | "heavy";
+  kind: "blocker" | "heavy" | "chaser";
   x: number;
   z: number;
   radius: number;
   hp: number;
   maxHp: number;
   alive: boolean;
+  heading: number;
 }
 
 export interface CartArenaSessionSnapshot {
@@ -40,23 +43,36 @@ export interface CartArenaSessionSnapshot {
   speed: number;
   gas: number;
   boostCharges: number;
+  maxBoostCharges: number;
   boostActive: boolean;
+  turboRechargeProgress: number;
+  turboRechargeSeconds: number;
   enemiesAlive: number;
   enemiesTotal: number;
   gateLocked: boolean;
+  arena1GateLocked: boolean;
+  arena2GateLocked: boolean;
   ramCombo: number;
   lastRamEnemyId: string | null;
+  lastRamDamage: number;
+  lastReward: string | null;
+  wallSliding: boolean;
   enemies: readonly CartEnemySnapshot[];
 }
 
 const GAS_DRAIN_PER_SECOND = 0.0032;
 const RAM_COMBO_WINDOW = 2.1;
+export const CART_TURBO_RECHARGE_SECONDS = 3.0;
+const WALL_MARGIN = 1.05;
+
+export function cartSteeringInput(value: number): number {
+  return -Math.max(-1, Math.min(1, value));
+}
 
 /**
  * Cart Rogue driving/combat runtime. RallyCar remains the proven low-level
- * vehicle implementation, but race/checkpoint progression is absent. Combat
- * arenas own progression: defeat the local enemies with turbo rams, then the
- * narrow transition gate unlocks.
+ * vehicle implementation, while arena progression, renewable Turbo stocks,
+ * enemy encounters and forgiving wall-slide behavior live here.
  */
 export class CartArenaSession {
   readonly track: RallyTrack;
@@ -68,6 +84,13 @@ export class CartArenaSession {
   private ramCombo = 0;
   private ramComboTimer = 0;
   private lastRamEnemyId: string | null = null;
+  private lastRamDamage = 0;
+  private turboRechargeTimer = 0;
+  private rewardTimer = 0;
+  private lastReward: string | null = null;
+  private wallSlideTimer = 0;
+  private readonly rewardedNodes = new Set<string>();
+  private readonly enemyHitCooldowns = new Map<string, number>();
 
   constructor(vehicleId: RallyVehicleId = "compact") {
     this.track = new RallyTrack(CART_ARENA_TRACK);
@@ -93,47 +116,92 @@ export class CartArenaSession {
     const previousZ = this.car.position.z;
     const activeInput: RallyInputState = {
       ...input,
+      steer: cartSteeringInput(input.steer),
       throttle: this.gas > 0 ? input.throttle : 0,
       boost: this.gas > 0 ? input.boost : false,
     };
+
     this.car.update(activeInput, fixedDelta, true);
+    this.updateTurboRecharge(fixedDelta);
     this.gas = Math.max(0, this.gas - Math.max(0, activeInput.throttle) * GAS_DRAIN_PER_SECOND * fixedDelta);
     this.ramComboTimer = Math.max(0, this.ramComboTimer - fixedDelta);
     if (this.ramComboTimer <= 0) this.ramCombo = 0;
+    this.rewardTimer = Math.max(0, this.rewardTimer - fixedDelta);
+    if (this.rewardTimer <= 0) this.lastReward = null;
+    this.wallSlideTimer = Math.max(0, this.wallSlideTimer - fixedDelta);
+    for (const [id, remaining] of this.enemyHitCooldowns) {
+      const next = remaining - fixedDelta;
+      if (next <= 0) this.enemyHitCooldowns.delete(id);
+      else this.enemyHitCooldowns.set(id, next);
+    }
 
-    const nextLocation = locateCartWorldNode(this.car.position.x, this.car.position.z);
+    let nextLocation = locateCartWorldNode(this.car.position.x, this.car.position.z);
     if (!nextLocation) {
-      this.blockMovement(previousX, previousZ, 0.32);
-      return;
+      this.slideAlongBoundary(previousX, previousZ);
+      nextLocation = locateCartWorldNode(this.car.position.x, this.car.position.z) ?? this.location;
     }
 
-    if (this.isGateLocked() && this.location.node.id === "arena-01" && nextLocation.node.id === "corridor-01") {
-      this.blockMovement(previousX, previousZ, 0.52);
-      return;
-    }
-
-    const contact = aliveCartEnemies(this.enemies, nextLocation.node.id)
-      .find((enemy) => cartEnemyContact(enemy, this.car.position.x, this.car.position.z));
-    if (contact) {
-      const result = applyTurboRam(contact, this.car.boostActive, this.car.forwardVelocity);
-      if (result.destroyed) {
-        this.car.ramCount += 1;
-        this.car.forwardVelocity *= 0.94;
-        this.car.collisionImpact = Math.max(this.car.collisionImpact, 1);
-        this.ramCombo = this.ramComboTimer > 0 ? Math.min(9, this.ramCombo + 1) : 1;
-        this.ramComboTimer = RAM_COMBO_WINDOW;
-        this.lastRamEnemyId = result.enemyId;
-      } else {
-        this.blockMovement(previousX, previousZ, 0.62);
-        return;
-      }
+    if (this.isNodeGateLocked(this.location.node.id) && this.isNextNode(this.location.node, nextLocation.node.id)) {
+      this.slideAlongLockedGate(previousX, previousZ);
+      nextLocation = locateCartWorldNode(this.car.position.x, this.car.position.z) ?? this.location;
     }
 
     this.location = nextLocation;
+    if (this.location.node.kind === "arena") {
+      updateCartEnemyMovement(
+        this.enemies,
+        this.location.node.id,
+        this.car.position.x,
+        this.car.position.z,
+        fixedDelta,
+        this.location.node.rect,
+      );
+    }
+
+    const contact = aliveCartEnemies(this.enemies, this.location.node.id)
+      .find((enemy) => cartEnemyContact(enemy, this.car.position.x, this.car.position.z));
+    if (contact && !this.enemyHitCooldowns.has(contact.id)) {
+      const result = applyTurboRam(contact, this.car.boostActive, this.car.forwardVelocity);
+      if (result.damage > 0) {
+        this.enemyHitCooldowns.set(contact.id, 0.34);
+        this.lastRamEnemyId = result.enemyId;
+        this.lastRamDamage = result.damage;
+        this.car.collisionImpact = Math.max(this.car.collisionImpact, result.destroyed ? 1 : 0.78);
+        this.car.forwardVelocity *= result.destroyed ? 0.94 : 0.78;
+        contact.x += Math.sin(this.car.heading) * (result.destroyed ? 0.5 : 1.4);
+        contact.z += Math.cos(this.car.heading) * (result.destroyed ? 0.5 : 1.4);
+        if (result.destroyed) {
+          this.car.ramCount += 1;
+          this.gas = Math.min(1, this.gas + (contact.kind === "heavy" ? 0.055 : 0.035));
+          this.ramCombo = this.ramComboTimer > 0 ? Math.min(9, this.ramCombo + 1) : 1;
+          this.ramComboTimer = RAM_COMBO_WINDOW;
+        }
+      } else {
+        this.slideAroundEnemy(contact, previousX, previousZ);
+      }
+    }
+
+    this.grantClearReward(this.location.node.id);
   }
 
   snapshot(): CartArenaSessionSnapshot {
-    const enemies = this.enemies.map((enemy) => ({ ...enemy }));
+    const enemies = this.enemies.map((enemy) => ({
+      id: enemy.id,
+      nodeId: enemy.nodeId,
+      kind: enemy.kind,
+      x: enemy.x,
+      z: enemy.z,
+      radius: enemy.radius,
+      hp: enemy.hp,
+      maxHp: enemy.maxHp,
+      alive: enemy.alive,
+      heading: enemy.heading,
+    }));
+    const localEnemies = this.enemies.filter((enemy) => enemy.nodeId === this.location.node.id);
+    const localAlive = localEnemies.filter((enemy) => enemy.alive).length;
+    const rechargeProgress = this.car.boostCharges >= this.car.maxBoostCharges
+      ? 1
+      : Math.min(1, this.turboRechargeTimer / CART_TURBO_RECHARGE_SECONDS);
     return {
       nodeId: this.location.node.id,
       nodeKind: this.location.node.kind,
@@ -144,32 +212,157 @@ export class CartArenaSession {
       speed: this.car.speed,
       gas: this.gas,
       boostCharges: this.car.boostCharges,
+      maxBoostCharges: this.car.maxBoostCharges,
       boostActive: this.car.boostActive,
-      enemiesAlive: aliveCartEnemies(this.enemies).length,
-      enemiesTotal: this.enemies.length,
-      gateLocked: this.isGateLocked(),
+      turboRechargeProgress: rechargeProgress,
+      turboRechargeSeconds: this.car.boostCharges >= this.car.maxBoostCharges
+        ? 0
+        : Math.max(0, CART_TURBO_RECHARGE_SECONDS - this.turboRechargeTimer),
+      enemiesAlive: localAlive,
+      enemiesTotal: localEnemies.length,
+      gateLocked: this.isNodeGateLocked(this.location.node.id),
+      arena1GateLocked: this.isNodeGateLocked("arena-01"),
+      arena2GateLocked: this.isNodeGateLocked("arena-02"),
       ramCombo: this.ramCombo,
       lastRamEnemyId: this.lastRamEnemyId,
+      lastRamDamage: this.lastRamDamage,
+      lastReward: this.lastReward,
+      wallSliding: this.wallSlideTimer > 0,
       enemies,
     };
   }
 
-  private isGateLocked(): boolean {
-    return aliveCartEnemies(this.enemies, "arena-01").length > 0;
+  private updateTurboRecharge(delta: number): void {
+    if (this.car.boostCharges >= this.car.maxBoostCharges) {
+      this.turboRechargeTimer = 0;
+      return;
+    }
+    this.turboRechargeTimer += delta;
+    while (this.turboRechargeTimer >= CART_TURBO_RECHARGE_SECONDS && this.car.boostCharges < this.car.maxBoostCharges) {
+      this.turboRechargeTimer -= CART_TURBO_RECHARGE_SECONDS;
+      this.car.addBoostCharge(1);
+    }
+    if (this.car.boostCharges >= this.car.maxBoostCharges) this.turboRechargeTimer = 0;
   }
 
-  private blockMovement(previousX: number, previousZ: number, impact: number): void {
-    this.car.position.x = previousX;
-    this.car.position.z = previousZ;
-    this.car.forwardVelocity *= 0.36;
-    this.car.lateralVelocity *= -0.14;
-    this.car.velocity.x *= 0.3;
-    this.car.velocity.z *= 0.3;
-    this.car.collisionImpact = Math.max(this.car.collisionImpact, impact);
+  private isNodeGateLocked(nodeId: string): boolean {
+    const node = cartWorldNodeById(nodeId);
+    if (!node || !node.next.some((nextId) => cartWorldNodeById(nextId)?.kind === "corridor")) return false;
+    return aliveCartEnemies(this.enemies, nodeId).length > 0;
+  }
+
+  private isNextNode(node: CartWorldNode, candidateId: string): boolean {
+    return node.next.includes(candidateId);
+  }
+
+  private grantClearReward(nodeId: string): void {
+    if (this.rewardedNodes.has(nodeId)) return;
+    const authored = this.enemies.filter((enemy) => enemy.nodeId === nodeId);
+    if (authored.length === 0 || authored.some((enemy) => enemy.alive)) return;
+    this.rewardedNodes.add(nodeId);
+    const elite = nodeId === "arena-02";
+    this.gas = Math.min(1, this.gas + (elite ? 0.18 : 0.1));
+    this.car.addBoostCharge(elite ? 2 : 1);
+    this.lastReward = elite ? "ELITE CLEAR · GAS +18% · TURBO +2" : "ARENA CLEAR · GAS +10% · TURBO +1";
+    this.rewardTimer = 2.8;
+  }
+
+  private slideAlongBoundary(previousX: number, previousZ: number): void {
+    const rect = this.location.node.rect;
+    const attemptedX = this.car.position.x;
+    const attemptedZ = this.car.position.z;
+    const minX = rect.centerX - rect.halfWidth + WALL_MARGIN;
+    const maxX = rect.centerX + rect.halfWidth - WALL_MARGIN;
+    const minZ = rect.centerZ - rect.halfDepth + WALL_MARGIN;
+    const maxZ = rect.centerZ + rect.halfDepth - WALL_MARGIN;
+    const clampedX = Math.max(minX, Math.min(maxX, attemptedX));
+    const clampedZ = Math.max(minZ, Math.min(maxZ, attemptedZ));
+    const hitX = Math.abs(clampedX - attemptedX) > 1e-6;
+    const hitZ = Math.abs(clampedZ - attemptedZ) > 1e-6;
+    this.car.position.x = clampedX;
+    this.car.position.z = clampedZ;
+
+    if (hitX || hitZ) {
+      const dx = attemptedX - previousX;
+      const dz = attemptedZ - previousZ;
+      const targetHeading = hitX && !hitZ
+        ? this.closestHeading([0, Math.PI])
+        : hitZ && !hitX
+          ? this.closestHeading([Math.PI / 2, -Math.PI / 2])
+          : Math.abs(dx) > Math.abs(dz)
+            ? this.closestHeading([0, Math.PI])
+            : this.closestHeading([Math.PI / 2, -Math.PI / 2]);
+      this.car.heading = rotateToward(this.car.heading, targetHeading, 0.34);
+      this.car.forwardVelocity *= 0.92;
+      this.car.lateralVelocity *= 0.28;
+      const speed = Math.max(3.5, Math.abs(this.car.forwardVelocity));
+      this.car.velocity.x = Math.sin(this.car.heading) * speed;
+      this.car.velocity.z = Math.cos(this.car.heading) * speed;
+      this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.34);
+      this.wallSlideTimer = 0.22;
+    }
+  }
+
+  private slideAlongLockedGate(previousX: number, previousZ: number): void {
+    const rect = this.location.node.rect;
+    this.car.position.z = rect.centerZ + rect.halfDepth - WALL_MARGIN;
+    this.car.position.x = Math.max(
+      rect.centerX - rect.halfWidth + WALL_MARGIN,
+      Math.min(rect.centerX + rect.halfWidth - WALL_MARGIN, this.car.position.x),
+    );
+    const dx = this.car.position.x - previousX;
+    const targetHeading = Math.abs(dx) > 0.02
+      ? (dx >= 0 ? Math.PI / 2 : -Math.PI / 2)
+      : this.closestHeading([Math.PI / 2, -Math.PI / 2]);
+    this.car.heading = rotateToward(this.car.heading, targetHeading, 0.38);
+    this.car.forwardVelocity *= 0.9;
+    this.car.lateralVelocity *= 0.24;
+    this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.42);
+    this.wallSlideTimer = 0.24;
+  }
+
+  private slideAroundEnemy(enemy: CartEnemyState, previousX: number, previousZ: number): void {
+    const dx = previousX - enemy.x;
+    const dz = previousZ - enemy.z;
+    const distance = Math.max(0.001, Math.hypot(dx, dz));
+    const safeRadius = enemy.radius + 1.52;
+    this.car.position.x = enemy.x + dx / distance * safeRadius;
+    this.car.position.z = enemy.z + dz / distance * safeRadius;
+    const tangentA = Math.atan2(dz, -dx);
+    const tangentB = normalizeAngle(tangentA + Math.PI);
+    this.car.heading = rotateToward(this.car.heading, this.closestHeading([tangentA, tangentB]), 0.3);
+    this.car.forwardVelocity *= 0.86;
+    this.car.lateralVelocity *= 0.3;
+    this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.5);
+  }
+
+  private closestHeading(candidates: readonly number[]): number {
+    let best = candidates[0] ?? this.car.heading;
+    let bestDifference = Math.abs(normalizeAngle(best - this.car.heading));
+    for (const candidate of candidates.slice(1)) {
+      const difference = Math.abs(normalizeAngle(candidate - this.car.heading));
+      if (difference < bestDifference) {
+        best = candidate;
+        bestDifference = difference;
+      }
+    }
+    return best;
   }
 
   dispose(): void {
     this.car.dispose();
     this.track.dispose();
   }
+}
+
+function normalizeAngle(angle: number): number {
+  let result = angle;
+  while (result > Math.PI) result -= Math.PI * 2;
+  while (result < -Math.PI) result += Math.PI * 2;
+  return result;
+}
+
+function rotateToward(current: number, target: number, maxAmount: number): number {
+  const difference = normalizeAngle(target - current);
+  return normalizeAngle(current + Math.max(-maxAmount, Math.min(maxAmount, difference)));
 }
