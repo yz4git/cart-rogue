@@ -29,6 +29,12 @@ interface Phase16WebGL {
   updateVisuals(delta: number): void;
 }
 
+interface EnemyBeforeStep {
+  hp: number;
+  alive: boolean;
+  touching: boolean;
+}
+
 const reactionsBySession = new WeakMap<object, Map<string, EnemyReaction>>();
 
 const STAGE_CLEAR_NODES = new Map<string, number>([
@@ -63,8 +69,14 @@ function reactionPower(enemy: CartEnemyState, destroyed: boolean, damage: number
   return (destroyed ? 15 : 8.2) + speedBonus + damageBonus;
 }
 
-function beginEnemyReaction(session: Phase16Session, enemy: CartEnemyState, destroyed: boolean, damage: number): void {
-  const power = reactionPower(enemy, destroyed, damage, Math.abs(session.car.forwardVelocity));
+function beginEnemyReaction(
+  session: Phase16Session,
+  enemy: CartEnemyState,
+  destroyed: boolean,
+  damage: number,
+  impactSpeed = Math.abs(session.car.forwardVelocity),
+): void {
+  const power = reactionPower(enemy, destroyed, damage, impactSpeed);
   let dx = enemy.x - session.car.position.x;
   let dz = enemy.z - session.car.position.z;
   const distance = Math.hypot(dx, dz);
@@ -159,13 +171,34 @@ export function installCartRoguePhase16Flow(): void {
   const sessionPrototype = CartArenaSession.prototype as unknown as Phase16Session;
   const originalStep = sessionPrototype.step;
   sessionPrototype.step = function stepPhase16(this: Phase16Session, input: RallyInputState, fixedDelta = 1 / 60): void {
-    const before = new Map(this.enemies.map((enemy) => [enemy.id, { hp: enemy.hp, alive: enemy.alive }] as const));
+    const impactSpeed = Math.abs(this.car.forwardVelocity);
+    const carX = this.car.position.x;
+    const carZ = this.car.position.z;
+    const before = new Map<string, EnemyBeforeStep>();
+    for (const enemy of this.enemies) {
+      const dx = carX - enemy.x;
+      const dz = carZ - enemy.z;
+      const contactRadius = enemy.radius + 1.55;
+      before.set(enemy.id, {
+        hp: enemy.hp,
+        alive: enemy.alive,
+        touching: enemy.alive && dx * dx + dz * dz <= contactRadius * contactRadius,
+      });
+    }
+
     originalStep.call(this, input, fixedDelta);
 
+    const reactions = reactionsFor(this);
     for (const enemy of this.enemies) {
       const previous = before.get(enemy.id);
-      if (!previous || enemy.hp >= previous.hp) continue;
-      beginEnemyReaction(this, enemy, previous.alive && !enemy.alive, previous.hp - enemy.hp);
+      if (!previous) continue;
+      if (enemy.hp < previous.hp) {
+        beginEnemyReaction(this, enemy, previous.alive && !enemy.alive, previous.hp - enemy.hp, impactSpeed);
+      } else if (previous.touching && previous.alive && impactSpeed >= 7.5 && !reactions.has(enemy.id)) {
+        // A non-damaging high-speed impact should still make the target react.
+        // Bosses/heavies barely shift; light cars visibly hop away.
+        beginEnemyReaction(this, enemy, false, 0, impactSpeed * 0.72);
+      }
     }
     advanceEnemyReactions(this, fixedDelta);
   };
