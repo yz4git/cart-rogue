@@ -59,11 +59,11 @@ test("Phase 18 polish reins in the horizon and restores a bounded cinematic came
   assert.doesNotMatch(polish, /enemy\.hp\s*=|enemy\.alive\s*=|applyTurboRam/);
 });
 
-test("Phase 18 remains a presentation-only patch and is installed after combat evolution", () => {
+test("Phase 18 remains archived presentation code while Phase 19 owns the active runtime", () => {
   assert.match(wrapper, /CartRoguePhase17CombatEvolution/);
-  assert.match(wrapper, /CartRoguePhase18VisualOverdrive/);
-  assert.match(wrapper, /CartRoguePhase18VisualPolish/);
-  assert.ok(wrapper.indexOf("CartRoguePhase18VisualOverdrive") > wrapper.indexOf("CartRoguePhase17CombatEvolution"));
-  assert.ok(wrapper.indexOf("CartRoguePhase18VisualPolish") > wrapper.indexOf("CartRoguePhase18VisualOverdrive"));
+  assert.doesNotMatch(wrapper, /CartRoguePhase18VisualOverdrive/);
+  assert.doesNotMatch(wrapper, /CartRoguePhase18VisualPolish/);
+  assert.match(wrapper, /CartRoguePhase19TargetArt/);
+  assert.ok(wrapper.indexOf("CartRoguePhase19TargetArt") > wrapper.indexOf("CartRoguePhase17CombatEvolution"));
   assert.doesNotMatch(source, /applyTurboRam|cartSteeringInput|RAM_COMBO_WINDOW|GAS_DRAIN_PER_SECOND|CART_TURBO_RECHARGE_SECONDS|enemy\.hp\s*=|enemy\.alive\s*=/);
 });

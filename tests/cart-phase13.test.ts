@@ -39,8 +39,9 @@ test("Phase 13 brings the chase camera closer without changing gameplay", () => 
   assert.doesNotMatch(source, /ARENA_MAX_SPEED|RAM_COMBO_WINDOW|applyTurboRam|cartSteeringInput|MAX_BOOST_CHARGES/);
 });
 
-test("Phase 13 is enabled before the client game constructs WebGL", () => {
-  assert.match(wrapper, /import "\.\.\/src\/cart\/CartRoguePhase13Visuals"/);
-  assert.match(wrapper, /CartRogueGame/);
+test("Phase 13 presentation remains available as source but is retired from the Phase 19 runtime", () => {
+  assert.doesNotMatch(wrapper, /import "\.\.\/src\/cart\/CartRoguePhase13Visuals"/);
+  assert.doesNotMatch(wrapper, /CartRoguePhase13Grade/);
+  assert.match(wrapper, /CartRoguePhase19TargetArt/);
   assert.match(page, /CartRogueGamePhase13/);
 });

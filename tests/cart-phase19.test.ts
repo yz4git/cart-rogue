@@ -1,0 +1,78 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+const source = readFileSync(new URL("../src/cart/CartRoguePhase19TargetArt.ts", import.meta.url), "utf8");
+const creature = readFileSync(new URL("../src/cart/CartRoguePhase19CreaturePolish.ts", import.meta.url), "utf8");
+const ground = readFileSync(new URL("../src/cart/CartRoguePhase19GroundCover.ts", import.meta.url), "utf8");
+const polish = readFileSync(new URL("../src/cart/CartRoguePhase19ReferencePolish.ts", import.meta.url), "utf8");
+const cleanup = readFileSync(new URL("../src/cart/CartRoguePhase19ArtifactCleanup.ts", import.meta.url), "utf8");
+const wrapper = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
+
+test("Phase 19 replaces the abstract horizon with a pastel voxel garden world", () => {
+  assert.match(source, /hideAbstractPhase18World/);
+  assert.match(source, /addVoxelGardenWorld/);
+  assert.match(source, /phase19-target-art-world/);
+  assert.match(source, /blossomCubes/);
+  assert.match(source, /terraces/);
+  assert.match(source, /bushes/);
+  assert.match(source, /flowers/);
+  assert.match(source, /InstancedMesh/);
+});
+
+test("Phase 19 moves the render grade toward the bright pastel reference", () => {
+  assert.match(source, /applyReferenceGrade/);
+  assert.match(source, /ACESFilmicToneMapping/);
+  assert.match(source, /toneMappingExposure = 1\.24/);
+  assert.match(source, /0x94ceff/);
+  assert.match(source, /0xf18bbb/);
+  assert.match(source, /0x9ed06f/);
+  assert.match(polish, /brightenPastelWorld/);
+  assert.match(polish, /shadowMap\.enabled = false/);
+});
+
+test("Phase 19 substantially increases hero and enemy reference likeness", () => {
+  assert.match(source, /addReferenceHero/);
+  assert.match(source, /spare/);
+  assert.match(source, /addCubeCreature/);
+  assert.match(source, /phase19-cube-creature/);
+  assert.match(source, /addHeavyFace/);
+  assert.match(source, /enemyPalette/);
+  assert.match(creature, /hideLegacyVehicleShell/);
+  assert.match(creature, /phase19-creature-ui/);
+  assert.match(creature, /hp-fill/);
+});
+
+test("Phase 19 adds large voxel hit debris and reference-style impact rays", () => {
+  assert.match(source, /spawnReferenceParticles/);
+  assert.match(source, /spawnReferenceHit/);
+  assert.match(source, /DynamicDrawUsage/);
+  assert.match(source, /AdditiveBlending/);
+  assert.match(source, /TorusGeometry/);
+});
+
+test("Phase 19 raises the camera and removes dark legacy environment artifacts", () => {
+  assert.match(polish, /cleanupLegacyDarkScenery/);
+  assert.match(polish, /flatGroundArtifact/);
+  assert.match(polish, /distantMonolith/);
+  assert.match(polish, /applyHigherReferenceCamera/);
+  assert.match(polish, /height = snapshot\.boostActive \? 7\.55 : 6\.95/);
+  assert.match(cleanup, /geometrySize/);
+  assert.match(cleanup, /flatGround/);
+  assert.match(cleanup, /scale\.multiplyScalar\(0\.001\)/);
+  assert.match(ground, /floor\.rotation\.x = -Math\.PI \/ 2/);
+  assert.doesNotMatch(source + creature + polish + cleanup, /applyTurboRam|cartSteeringInput|GAS_DRAIN_PER_SECOND|CART_TURBO_RECHARGE_SECONDS|enemy\.hp\s*=|enemy\.alive\s*=/);
+});
+
+test("Phase 19 is the active visual stack after combat evolution and legacy visual phases are retired", () => {
+  assert.match(wrapper, /CartRoguePhase17CombatEvolution/);
+  assert.doesNotMatch(wrapper, /CartRoguePhase13Visuals|CartRoguePhase13Grade/);
+  assert.doesNotMatch(wrapper, /CartRoguePhase18VisualOverdrive|CartRoguePhase18VisualPolish/);
+  assert.match(wrapper, /CartRoguePhase19TargetArt/);
+  assert.match(wrapper, /CartRoguePhase19CreaturePolish/);
+  assert.match(wrapper, /CartRoguePhase19GroundCover/);
+  assert.match(wrapper, /CartRoguePhase19ReferencePolish/);
+  assert.match(wrapper, /CartRoguePhase19ArtifactCleanup/);
+  assert.ok(wrapper.indexOf("CartRoguePhase19TargetArt") > wrapper.indexOf("CartRoguePhase17CombatEvolution"));
+  assert.ok(wrapper.indexOf("CartRoguePhase19ArtifactCleanup") > wrapper.indexOf("CartRoguePhase19ReferencePolish"));
+});
