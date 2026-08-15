@@ -12,6 +12,7 @@ import "../src/cart/CartRoguePhase18VisualPolish";
 import "../src/cart/CartRoguePhase19TargetArt";
 import "../src/cart/CartRoguePhase19GroundCover";
 import "../src/cart/CartRoguePhase19ReferencePolish";
+import "../src/cart/CartRoguePhase19ArtifactCleanup";
 import CartRogueGame from "./CartRogueGame";
 
 export default function CartRogueGamePhase13() {
