@@ -107,8 +107,8 @@ test("combat arenas use a lower speed profile while corridors remain faster", ()
   try {
     session.car.forwardVelocity = 39;
     session.step(DRIVE);
-    assert.ok(session.car.definition.maxSpeed <= 21.5);
-    assert.ok(session.car.forwardVelocity <= 21.5 + 0.01);
+    assert.ok(session.car.definition.maxSpeed <= 20);
+    assert.ok(session.car.forwardVelocity <= 20 + 0.01);
 
     for (const enemy of session.enemies.filter((candidate) => candidate.nodeId === "arena-01")) enemy.alive = false;
     session.step(IDLE);
@@ -117,7 +117,7 @@ test("combat arenas use a lower speed profile while corridors remain faster", ()
     session.car.forwardVelocity = 0;
     session.step(IDLE);
     assert.equal(session.snapshot().nodeId, "corridor-01");
-    assert.equal(session.car.definition.maxSpeed, 26);
+    assert.equal(session.car.definition.maxSpeed, 24);
   } finally {
     session.dispose();
   }
