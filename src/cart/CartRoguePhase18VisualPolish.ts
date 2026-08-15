@@ -22,7 +22,6 @@ function polishFacetedHorizon(demo: Phase18PolishDemo): void {
     const previousMaterial = object.material;
     object.material = new THREE.MeshBasicMaterial({
       color: 0xffffff,
-      vertexColors: true,
       fog: true,
     });
     if (previousMaterial instanceof THREE.Material) previousMaterial.dispose();
