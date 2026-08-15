@@ -105,9 +105,9 @@ const RAM_COMBO_WINDOW = 2.65;
 export const CART_TURBO_RECHARGE_SECONDS = 3.0;
 const WALL_MARGIN = 1.05;
 const CORNER_RELEASE_NUDGE = 0.72;
-const ARENA_MAX_SPEED = 21.5;
-const CORRIDOR_MAX_SPEED = 26;
-const BOSS_MAX_SPEED = 20.5;
+const ARENA_MAX_SPEED = 20;
+const CORRIDOR_MAX_SPEED = 24;
+const BOSS_MAX_SPEED = 19;
 const ARENA_HANDLING_MULTIPLIER = 1.52;
 const CORRIDOR_HANDLING_MULTIPLIER = 1.16;
 const BOSS_HANDLING_MULTIPLIER = 1.46;
@@ -254,9 +254,13 @@ export class CartArenaSession {
     }
 
     const contact = aliveCartEnemies(this.enemies, this.location.node.id)
-      .find((enemy) => cartEnemyContact(enemy, this.car.position.x, this.car.position.z));
-    if (contact && !this.enemyHitCooldowns.has(contact.id)) {
-      const result = applyTurboRam(contact, this.car.boostActive, this.car.forwardVelocity);
+      .find((enemy) => !this.enemyHitCooldowns.has(enemy.id)
+        && cartEnemyContact(enemy, this.car.position.x, this.car.position.z));
+    if (contact) {
+      const ramImpactSpeed = this.car.boostActive
+        ? Math.max(8, Math.abs(this.car.forwardVelocity))
+        : this.car.forwardVelocity;
+      const result = applyTurboRam(contact, this.car.boostActive, ramImpactSpeed);
       if (result.damage > 0) {
         this.enemyHitCooldowns.set(contact.id, contact.kind === "boss" ? 0.42 : 0.34);
         this.lastRamEnemyId = result.enemyId;
