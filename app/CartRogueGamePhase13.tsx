@@ -17,6 +17,7 @@ import "../src/cart/CartRoguePhase20ReferenceMatch";
 import "../src/cart/CartRoguePhase22CameraComfort";
 import "../src/cart/CartRoguePhase21ImpactPolish";
 import "../src/cart/CartRoguePhase21WorldGrade";
+import "../src/cart/CartRoguePhase23GateAndPivot";
 import CartRogueGame from "./CartRogueGame";
 
 export default function CartRogueGamePhase13() {
