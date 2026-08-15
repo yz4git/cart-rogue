@@ -93,13 +93,13 @@ export class RallyChaseCamera {
       0,
       cosHeading * cosOrbit - sinHeading * sinOrbit,
     );
-    // The hover racer needs a little more reaction distance than the old
-    // wheel-steering camera: pickups, voxel walls, and traffic are lateral
-    // decisions, so they must enter the frame before the player reaches them.
-    const boostPullback = car.boostActive ? 4.2 : 0;
-    const distance = 12 + speedFactor * 4 + accelerationPull + boostPullback + (car.drifting ? 0.8 : 0)
+    // Keep more of the arena and incoming traffic visible around the car.
+    // The slightly taller pullback also makes lateral steering easier to read
+    // on a phone held in landscape without weakening Turbo's speed sensation.
+    const boostPullback = car.boostActive ? 4.8 : 0;
+    const distance = 15 + speedFactor * 4.6 + accelerationPull + boostPullback + (car.drifting ? 0.8 : 0)
       + (hoverMode ? 1.2 : 0);
-    const height = 4.35 + speedFactor * 1.35 + (hoverMode ? 0.2 : 0) - (car.boostActive ? 0.18 : 0);
+    const height = 5.05 + speedFactor * 1.45 + (hoverMode ? 0.2 : 0) - (car.boostActive ? 0.18 : 0);
     this.desiredPosition.set(
       car.position.x - this.forward.x * distance,
       car.position.y + height + Math.sin(this.pitch) * 2,
