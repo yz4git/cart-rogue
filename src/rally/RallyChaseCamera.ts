@@ -72,14 +72,17 @@ export class RallyChaseCamera {
     this.elapsed += delta;
     this.returnDelay = Math.max(0, this.returnDelay - delta);
     if (this.returnDelay === 0) {
-      this.orbit = approach(this.orbit, 0, delta * 0.55);
-      this.pitch = approach(this.pitch, 0.28, delta * 0.28);
+      this.orbit = approach(this.orbit, 0, delta * 0.72);
+      this.pitch = approach(this.pitch, 0.28, delta * 0.38);
     }
 
-    const speedFactor = Math.min(1, Math.abs(car.speed) / 56);
+    // Cart Rogue runs in compact combat arenas at a lower absolute speed than
+    // the inherited rally course. Reach the camera's useful speed response
+    // earlier so 18-25 m/s still reads as fast and punchy.
+    const speedFactor = Math.min(1, Math.abs(car.speed) / 28);
     const speedChange = delta > 0 ? (Math.abs(car.speed) - this.previousSpeed) / delta : 0;
     this.previousSpeed = Math.abs(car.speed);
-    const accelerationPull = clamp(speedChange * 0.025, -0.65, 0.9);
+    const accelerationPull = clamp(speedChange * 0.028, -0.7, 1.0);
     const hintStrength = clamp(roadHint?.strength ?? 0, 0, 1);
     const roadHeading = roadHint?.heading ?? car.heading;
     const cameraHeading = car.heading + wrapAngle(roadHeading - car.heading) * (0.12 + hintStrength * 0.22);
@@ -93,47 +96,43 @@ export class RallyChaseCamera {
       0,
       cosHeading * cosOrbit - sinHeading * sinOrbit,
     );
-    // The hover racer needs a little more reaction distance than the old
-    // wheel-steering camera: pickups, voxel walls, and traffic are lateral
-    // decisions, so they must enter the frame before the player reaches them.
-    const boostPullback = car.boostActive ? 4.2 : 0;
-    const distance = 12 + speedFactor * 4 + accelerationPull + boostPullback + (car.drifting ? 0.8 : 0)
+
+    const boostPullback = car.boostActive ? 5.1 : 0;
+    const distance = 11.2 + speedFactor * 3.8 + accelerationPull + boostPullback + (car.drifting ? 0.8 : 0)
       + (hoverMode ? 1.2 : 0);
-    const height = 4.35 + speedFactor * 1.35 + (hoverMode ? 0.2 : 0) - (car.boostActive ? 0.18 : 0);
+    const height = 4.1 + speedFactor * 1.25 + (hoverMode ? 0.2 : 0) - (car.boostActive ? 0.22 : 0);
     this.desiredPosition.set(
       car.position.x - this.forward.x * distance,
       car.position.y + height + Math.sin(this.pitch) * 2,
       car.position.z - this.forward.z * distance,
     );
-    const lookAheadSeconds = car.boostActive ? 0.82 : 0.62;
-    const lookAhead = Math.max(8, Math.abs(car.speed) * lookAheadSeconds)
-      + clamp(speedChange * 0.015, -0.35, 0.8)
+    const lookAheadSeconds = car.boostActive ? 0.86 : 0.6;
+    const lookAhead = Math.max(7.5, Math.abs(car.speed) * lookAheadSeconds)
+      + clamp(speedChange * 0.016, -0.35, 0.9)
       + (hoverMode ? 4.5 : 0);
     const roadCenterX = roadHint?.centerX ?? car.position.x;
     const roadCenterZ = roadHint?.centerZ ?? car.position.z;
     const aheadX = roadHint?.aheadX ?? (roadCenterX + sinHeading * lookAhead);
     const aheadZ = roadHint?.aheadZ ?? (roadCenterZ + cosHeading * lookAhead);
-    // Keep the physical road corridor stable in frame while allowing strafe
-    // to visibly move the racer across it.  This avoids the old 100% player
-    // follow that made every lane look like the screen center.
     const anchor = car.isHoverMode
       ? roadCenteredCameraAnchor(roadCenterX, roadCenterZ, car.position.x, car.position.z)
       : { x: car.position.x, z: car.position.z };
     const anchorX = anchor.x;
     const anchorZ = anchor.z;
     this.desiredTarget.set(
-      aheadX + car.velocity.x * (car.drifting ? 0.11 : 0.035),
+      aheadX + car.velocity.x * (car.drifting ? 0.11 : 0.04),
       car.position.y + 1.1 + Math.sin(this.pitch) * 1.8,
-      aheadZ + car.velocity.z * (car.drifting ? 0.11 : 0.035),
+      aheadZ + car.velocity.z * (car.drifting ? 0.11 : 0.04),
     );
     if (car.isHoverMode) {
       this.desiredPosition.x += anchorX - car.position.x;
       this.desiredPosition.z += anchorZ - car.position.z;
     }
     const shake = this.shakeEnabled ? Math.min(1, car.landingImpact + car.collisionImpact) : 0;
-    this.desiredPosition.x += Math.sin(this.elapsed * 67) * shake * 0.12;
-    this.desiredPosition.y += Math.cos(this.elapsed * 53) * shake * 0.07;
-    const blend = 1 - Math.exp(-8 * delta);
+    this.desiredPosition.x += Math.sin(this.elapsed * 71) * shake * 0.17;
+    this.desiredPosition.y += Math.cos(this.elapsed * 59) * shake * 0.1;
+    this.desiredTarget.x += Math.cos(this.elapsed * 47) * shake * 0.05;
+    const blend = 1 - Math.exp(-10.5 * delta);
     if (!this.initialized) {
       this.position.copy(this.desiredPosition);
       this.target.copy(this.desiredTarget);
@@ -143,10 +142,10 @@ export class RallyChaseCamera {
       this.target.lerp(this.desiredTarget, blend);
     }
     this.fov = clamp(
-      (car.boostActive ? 72 : 58) + speedFactor * (car.boostActive ? 10 : 11)
-        + clamp(speedChange * 0.02, -1.2, 2.2),
-      55,
-      car.boostActive ? 82 : 70,
+      (car.boostActive ? 70 : 56.5) + speedFactor * (car.boostActive ? 11 : 10)
+        + clamp(speedChange * 0.022, -1.2, 2.5),
+      54,
+      car.boostActive ? 83 : 69,
     );
   }
 }
