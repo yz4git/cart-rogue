@@ -21,19 +21,19 @@ export function createInitialCartResources(): CartResourcePickupState[] {
   ];
 
   for (const node of CART_WORLD_GRAPH.nodes) {
-    if (node.encounter === "service" || node.encounter === "reward") {
+    if (node.routeType === "service") {
       addPickup(pickups, `${node.id}-gas-a`, node.id, "gas", node.rect.centerX - 7, node.rect.centerZ - 6);
       addPickup(pickups, `${node.id}-gas-b`, node.id, "gas", node.rect.centerX + 6, node.rect.centerZ + 6);
       addPickup(pickups, `${node.id}-gas-c`, node.id, "gas", node.rect.centerX, node.rect.centerZ + 1);
       addPickup(pickups, `${node.id}-turbo-a`, node.id, "turbo", node.rect.centerX - 5, node.rect.centerZ + 8);
       addPickup(pickups, `${node.id}-turbo-b`, node.id, "turbo", node.rect.centerX + 5, node.rect.centerZ - 8);
-    } else if (node.encounter === "event") {
+    } else if (node.routeType === "event") {
       // TURBO STORM: a high-energy slalom with enough stocks to encourage smashing.
       addPickup(pickups, `${node.id}-storm-gas`, node.id, "gas", node.rect.centerX, node.rect.centerZ);
       addPickup(pickups, `${node.id}-storm-turbo-a`, node.id, "turbo", node.rect.centerX - 8, node.rect.centerZ - 8);
       addPickup(pickups, `${node.id}-storm-turbo-b`, node.id, "turbo", node.rect.centerX + 8, node.rect.centerZ);
       addPickup(pickups, `${node.id}-storm-turbo-c`, node.id, "turbo", node.rect.centerX - 5, node.rect.centerZ + 9);
-    } else if (node.encounter === "scrap") {
+    } else if (node.routeType === "scrap") {
       addPickup(pickups, `${node.id}-salvage-turbo-a`, node.id, "turbo", node.rect.centerX - 7, node.rect.centerZ - 8);
       addPickup(pickups, `${node.id}-salvage-turbo-b`, node.id, "turbo", node.rect.centerX + 7, node.rect.centerZ + 8);
     }
