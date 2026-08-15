@@ -80,10 +80,10 @@ function applyTurboDriftHold(session: Phase15Session, input: RallyInputState, de
     // Phase 15 originally stacked a large manual yaw on top of Cart's already
     // quick steering. Keep the drift responsive, but make the nose rotate in
     // a controlled arc instead of snapping around the player.
-    const yawRate = (0.38 + charge * 0.48) * steerMagnitude;
+    const yawRate = (0.3 + charge * 0.36) * steerMagnitude;
     car.heading = normalizeAngle(car.heading + Math.sign(steer) * direction * yawRate * delta);
-    const targetSlip = -steer * Math.max(6, speed) * (0.16 + charge * 0.1);
-    const slipBlend = Math.min(1, delta * (4.4 + charge * 1.4));
+    const targetSlip = -steer * Math.max(6, speed) * (0.15 + charge * 0.085);
+    const slipBlend = Math.min(1, delta * (4.1 + charge * 1.2));
     car.lateralVelocity += (targetSlip - car.lateralVelocity) * slipBlend;
   } else {
     car.lateralVelocity *= Math.pow(0.965, delta * 60);
@@ -160,6 +160,10 @@ export function installCartRoguePhase15Turbo(): void {
       boost: releasedThisStep,
       throttle: heldNow ? Math.min(input.throttle, 0.24) : input.throttle,
       brake: input.brake,
+      // Cart's normal steering is deliberately very quick. During the Turbo
+      // hold only, reduce the base steering sent into that path; the extra
+      // slip/yaw layer below provides the drift aim without an abrupt snap.
+      steer: heldNow ? input.steer * 0.68 : input.steer,
     };
 
     originalStep.call(this, transformed, fixedDelta);
