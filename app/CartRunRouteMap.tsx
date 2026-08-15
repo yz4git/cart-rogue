@@ -1,6 +1,11 @@
 "use client";
 
-import { cartUpcomingRouteChoices, type CartRouteChoice, type CartRouteType } from "../src/cart/CartWorldGraph";
+import {
+  cartUpcomingRouteChoices,
+  cartWorldNodeById,
+  type CartRouteChoice,
+  type CartRouteType,
+} from "../src/cart/CartWorldGraph";
 import styles from "./CartRunRouteMap.module.css";
 
 interface Props {
@@ -25,6 +30,9 @@ function routeSide(choice: CartRouteChoice): string {
 }
 
 export default function CartRunRouteMap({ nodeId, gateLocked }: Props) {
+  const currentNode = cartWorldNodeById(nodeId);
+  if (!currentNode || currentNode.next.length < 2) return null;
+
   const choices = cartUpcomingRouteChoices(nodeId);
   if (choices.length < 2) return null;
   return (
