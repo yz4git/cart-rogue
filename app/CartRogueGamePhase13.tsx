@@ -11,6 +11,8 @@ import "../src/cart/CartRoguePhase19GroundCover";
 import "../src/cart/CartRoguePhase19GardenPolish";
 import "../src/cart/CartRoguePhase19ReferencePolish";
 import "../src/cart/CartRoguePhase19ArtifactCleanup";
+import "../src/cart/CartRoguePhase20DioramaQuality";
+import "../src/cart/CartRoguePhase20ReferenceMatch";
 import CartRogueGame from "./CartRogueGame";
 
 export default function CartRogueGamePhase13() {
