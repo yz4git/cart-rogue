@@ -5,7 +5,7 @@ import test from "node:test";
 test("PWA service worker prefers fresh navigation HTML and retires old Voxel Rally caches", async () => {
   const worker = await readFile(new URL("../public/sw.js", import.meta.url), "utf8");
   assert.match(worker, /const CACHE_PREFIX = ["']voxel-rally-["'];/);
-  assert.match(worker, /const CACHE_VERSION = ["']v3["'];/);
+  assert.match(worker, /const CACHE_VERSION = ["']v4["'];/);
   assert.doesNotMatch(worker, /voxel-rally-v1/);
   assert.match(worker, /event\.request\.mode === ["']navigate["']/);
   assert.match(worker, /fetch\(event\.request, \{ cache: ["']no-store["'] \}\)/);
@@ -27,4 +27,12 @@ test("Cart Rogue PWA manifest requests fullscreen landscape play with a standalo
   assert.equal(manifest.display, "fullscreen");
   assert.deepEqual(manifest.display_override, ["fullscreen", "standalone"]);
   assert.equal(manifest.orientation, "landscape");
+});
+
+test("iPhone web-app metadata uses edge-to-edge layout and Apple standalone capability", async () => {
+  const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+  assert.match(layout, /viewportFit:\s*["']cover["']/);
+  assert.match(layout, /appleWebApp:\s*\{/);
+  assert.match(layout, /capable:\s*true/);
+  assert.match(layout, /statusBarStyle:\s*["']black-translucent["']/);
 });
