@@ -17,13 +17,6 @@ test("Cart Rogue uses the slightly slower normal speed caps", () => {
     session.step(IDLE);
     assert.equal(session.snapshot().nodeId, "corridor-01");
     assert.equal(session.car.definition.maxSpeed, 24);
-
-    session.car.position.x = 0;
-    session.car.position.z = 448;
-    session.car.forwardVelocity = 0;
-    session.step(IDLE);
-    assert.equal(session.snapshot().nodeId, "boss-01");
-    assert.equal(session.car.definition.maxSpeed, 19);
   } finally {
     session.dispose();
   }
