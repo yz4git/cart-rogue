@@ -3,6 +3,7 @@ import type { CartArenaSessionSnapshot } from "./CartArenaSession";
 import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
 
 interface Phase19PolishDemo {
+  renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   steer: number;
@@ -23,7 +24,7 @@ function cleanupLegacyDarkScenery(demo: Phase19PolishDemo): void {
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     const dark = materials.some((material) => {
       const l = materialLightness(material);
-      return l !== null && l < 0.105;
+      return l !== null && l < 0.22;
     });
     if (!dark) return;
 
@@ -37,9 +38,9 @@ function cleanupLegacyDarkScenery(demo: Phase19PolishDemo): void {
     const world = new THREE.Vector3();
     object.getWorldPosition(world);
 
-    const flatGroundArtifact = world.y < 0.5 && size.y < 0.5 && horizontalArea > 0.18;
-    const distantMonolith = (Math.abs(world.x) > 35 || Math.abs(world.z) > 55) && (size.y > 2.2 || horizontalArea > 5);
-    const oversizedDarkShape = size.y > 7 || horizontalArea > 28;
+    const flatGroundArtifact = world.y < 0.58 && size.y < 0.62 && horizontalArea > 0.14;
+    const distantMonolith = (Math.abs(world.x) > 32 || Math.abs(world.z) > 48) && (size.y > 1.8 || horizontalArea > 3.5);
+    const oversizedDarkShape = size.y > 5.5 || horizontalArea > 20;
     if (flatGroundArtifact || distantMonolith || oversizedDarkShape) object.visible = false;
   });
 }
@@ -63,6 +64,14 @@ function brightenPastelWorld(demo: Phase19PolishDemo): void {
       material.metalness = Math.min(material.metalness, 0.04);
       material.roughness = Math.max(material.roughness, 0.72);
     }
+  });
+}
+
+function softenReferenceLighting(demo: Phase19PolishDemo): void {
+  demo.renderer.shadowMap.enabled = false;
+  demo.scene.traverse((object) => {
+    if (object instanceof THREE.HemisphereLight) object.intensity = Math.max(object.intensity, 2.0);
+    if (object instanceof THREE.DirectionalLight) object.intensity *= 0.78;
   });
 }
 
@@ -95,6 +104,7 @@ export function installCartRoguePhase19ReferencePolish(): void {
     originalBuildWorld.call(this);
     cleanupLegacyDarkScenery(this);
     brightenPastelWorld(this);
+    softenReferenceLighting(this);
   };
 
   prototype.applyCameraPresentation = function cameraPhase19Polish(this: Phase19PolishDemo, snapshot: CartArenaSessionSnapshot): void {
