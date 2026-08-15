@@ -108,6 +108,9 @@ const CORNER_RELEASE_NUDGE = 0.72;
 const ARENA_MAX_SPEED = 21.5;
 const CORRIDOR_MAX_SPEED = 26;
 const BOSS_MAX_SPEED = 20.5;
+const ARENA_HANDLING_MULTIPLIER = 1.32;
+const CORRIDOR_HANDLING_MULTIPLIER = 1.12;
+const BOSS_HANDLING_MULTIPLIER = 1.28;
 
 export function cartSteeringInput(value: number): number {
   return -Math.max(-1, Math.min(1, value));
@@ -116,8 +119,16 @@ export function cartSteeringInput(value: number): number {
 export function quickenCartSteering(value: number): number {
   const clamped = Math.max(-1, Math.min(1, value));
   const magnitude = Math.abs(clamped);
-  const quicker = Math.min(1, magnitude * 1.18 + magnitude * magnitude * 0.12);
+  const quicker = Math.min(1, magnitude * 1.28 + magnitude * magnitude * 0.16);
   return Math.sign(clamped) * quicker;
+}
+
+export function cartHandlingMultiplier(kind: CartWorldNodeKind): number {
+  return kind === "corridor"
+    ? CORRIDOR_HANDLING_MULTIPLIER
+    : kind === "boss"
+      ? BOSS_HANDLING_MULTIPLIER
+      : ARENA_HANDLING_MULTIPLIER;
 }
 
 /**
@@ -132,6 +143,7 @@ export class CartArenaSession {
   readonly enemies: CartEnemyState[] = createInitialCartEnemies();
   readonly resources: CartResourcePickupState[] = createInitialCartResources();
   readonly obstacles: CartObstacleState[] = createInitialCartObstacles();
+  private readonly baseHandling: number;
   private location: CartWorldLocation;
   private gas = 1;
   private ramCombo = 0;
@@ -149,6 +161,7 @@ export class CartArenaSession {
   constructor(vehicleId: RallyVehicleId = "compact") {
     this.track = new RallyTrack(CART_ARENA_TRACK);
     const baseDefinition = getRallyVehicleDefinition(vehicleId);
+    this.baseHandling = baseDefinition.handling;
     this.car = new RallyCar(this.track, { ...baseDefinition }, "player");
     this.car.setHoverMode(false);
     this.car.setBoostChargeMode(true);
@@ -306,6 +319,7 @@ export class CartArenaSession {
       : kind === "boss"
         ? BOSS_MAX_SPEED
         : ARENA_MAX_SPEED;
+    this.car.definition.handling = this.baseHandling * cartHandlingMultiplier(kind);
   }
 
   private tickCooldowns(cooldowns: Map<string, number>, delta: number): void {
