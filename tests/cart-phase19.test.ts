@@ -4,6 +4,7 @@ import test from "node:test";
 
 const source = readFileSync(new URL("../src/cart/CartRoguePhase19TargetArt.ts", import.meta.url), "utf8");
 const polish = readFileSync(new URL("../src/cart/CartRoguePhase19ReferencePolish.ts", import.meta.url), "utf8");
+const cleanup = readFileSync(new URL("../src/cart/CartRoguePhase19ArtifactCleanup.ts", import.meta.url), "utf8");
 const wrapper = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
 
 test("Phase 19 replaces the abstract horizon with a pastel voxel garden world", () => {
@@ -50,14 +51,20 @@ test("Phase 19 raises the camera and removes dark legacy environment artifacts",
   assert.match(polish, /distantMonolith/);
   assert.match(polish, /applyHigherReferenceCamera/);
   assert.match(polish, /height = snapshot\.boostActive \? 8\.65 : 8\.1/);
-  assert.doesNotMatch(source + polish, /applyTurboRam|cartSteeringInput|GAS_DRAIN_PER_SECOND|CART_TURBO_RECHARGE_SECONDS|enemy\.hp\s*=|enemy\.alive\s*=/);
+  assert.match(cleanup, /geometrySize/);
+  assert.match(cleanup, /flatGround/);
+  assert.match(cleanup, /scale\.multiplyScalar\(0\.001\)/);
+  assert.doesNotMatch(source + polish + cleanup, /applyTurboRam|cartSteeringInput|GAS_DRAIN_PER_SECOND|CART_TURBO_RECHARGE_SECONDS|enemy\.hp\s*=|enemy\.alive\s*=/);
 });
 
-test("Phase 19 loads after Phase 18 and applies the final polish last", () => {
-  assert.match(wrapper, /CartRoguePhase18VisualOverdrive/);
-  assert.match(wrapper, /CartRoguePhase18VisualPolish/);
+test("Phase 19 is the active visual stack after combat evolution and legacy visual phases are retired", () => {
+  assert.match(wrapper, /CartRoguePhase17CombatEvolution/);
+  assert.doesNotMatch(wrapper, /CartRoguePhase13Visuals|CartRoguePhase13Grade/);
+  assert.doesNotMatch(wrapper, /CartRoguePhase18VisualOverdrive|CartRoguePhase18VisualPolish/);
   assert.match(wrapper, /CartRoguePhase19TargetArt/);
+  assert.match(wrapper, /CartRoguePhase19GroundCover/);
   assert.match(wrapper, /CartRoguePhase19ReferencePolish/);
-  assert.ok(wrapper.indexOf("CartRoguePhase19TargetArt") > wrapper.indexOf("CartRoguePhase18VisualPolish"));
-  assert.ok(wrapper.indexOf("CartRoguePhase19ReferencePolish") > wrapper.indexOf("CartRoguePhase19TargetArt"));
+  assert.match(wrapper, /CartRoguePhase19ArtifactCleanup/);
+  assert.ok(wrapper.indexOf("CartRoguePhase19TargetArt") > wrapper.indexOf("CartRoguePhase17CombatEvolution"));
+  assert.ok(wrapper.indexOf("CartRoguePhase19ArtifactCleanup") > wrapper.indexOf("CartRoguePhase19ReferencePolish"));
 });
