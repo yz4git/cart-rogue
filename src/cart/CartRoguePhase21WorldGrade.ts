@@ -14,9 +14,9 @@ function lightness(color: THREE.Color): number {
 }
 
 function recolorDarkEnvironment(demo: Phase21WorldDemo): void {
-  const trunk = new THREE.Color(0x8b6148);
-  const stone = new THREE.Color(0xe5dfd5);
-  const shrub = new THREE.Color(0x79b45a);
+  const trunk = new THREE.Color(0x91674d);
+  const stone = new THREE.Color(0xe9e3d9);
+  const shrub = new THREE.Color(0x80ba60);
   const matrix = new THREE.Matrix4();
   const position = new THREE.Vector3();
   const quaternion = new THREE.Quaternion();
@@ -33,7 +33,7 @@ function recolorDarkEnvironment(demo: Phase21WorldDemo): void {
       let changed = false;
       for (let index = 0; index < object.count; index += 1) {
         object.getColorAt(index, instanceColor);
-        if (lightness(instanceColor) >= 0.19) continue;
+        if (lightness(instanceColor) >= 0.32) continue;
         object.getMatrixAt(index, matrix);
         matrix.decompose(position, quaternion, scale);
         const sx = Math.abs(base.x * scale.x);
@@ -57,11 +57,11 @@ function recolorDarkEnvironment(demo: Phase21WorldDemo): void {
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     for (const material of materials) {
       if (!(material instanceof THREE.MeshStandardMaterial) && !(material instanceof THREE.MeshBasicMaterial)) continue;
-      if (lightness(material.color) >= 0.19) continue;
+      if (lightness(material.color) >= 0.32) continue;
       material.color.copy(tall ? trunk : rail ? stone : shrub);
       if (material instanceof THREE.MeshStandardMaterial) {
         material.metalness = 0;
-        material.roughness = Math.max(0.8, material.roughness);
+        material.roughness = Math.max(0.82, material.roughness);
       }
       material.needsUpdate = true;
     }
@@ -91,21 +91,23 @@ function enrichPastelPalette(demo: Phase21WorldDemo): void {
 function softenLighting(demo: Phase21WorldDemo): void {
   const existing = demo.scene.getObjectByName("phase21-soft-ambient");
   if (!existing) {
-    const ambient = new THREE.AmbientLight(0xfff8ee, 0.62);
+    const ambient = new THREE.AmbientLight(0xfff8ee, 1.12);
     ambient.name = "phase21-soft-ambient";
     demo.scene.add(ambient);
+  } else if (existing instanceof THREE.AmbientLight) {
+    existing.intensity = 1.12;
   }
   demo.scene.traverse((object) => {
     if (object instanceof THREE.HemisphereLight) {
-      object.intensity = Math.max(2.2, object.intensity);
-      object.groundColor.setHex(0xb7c895);
+      object.intensity = Math.max(2.35, object.intensity);
+      object.groundColor.setHex(0xc0cf9f);
     }
-    if (object instanceof THREE.DirectionalLight) object.intensity = Math.min(object.intensity, 1.9);
+    if (object instanceof THREE.DirectionalLight) object.intensity = Math.min(object.intensity, 1.5);
   });
 }
 
 function gradeWorld(demo: Phase21WorldDemo): void {
-  demo.renderer.toneMappingExposure = 1.12;
+  demo.renderer.toneMappingExposure = 1.15;
   demo.scene.background = new THREE.Color(0x82c9ff);
   if (demo.scene.fog instanceof THREE.Fog) {
     demo.scene.fog.color.setHex(0xbfe2ff);
