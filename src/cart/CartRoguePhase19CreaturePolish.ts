@@ -3,8 +3,10 @@ import type { CartEnemySnapshot } from "./CartArenaSession";
 import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
 
 interface CreaturePolishDemo {
+  camera: THREE.PerspectiveCamera;
   enemyGroups: Map<string, THREE.Group>;
   buildEnemies(enemies: readonly CartEnemySnapshot[]): void;
+  updateVisuals(delta: number): void;
 }
 
 function standard(color: number, roughness = 0.78): THREE.MeshStandardMaterial {
@@ -50,34 +52,52 @@ function addCreaturePresentation(group: THREE.Group, enemy: CartEnemySnapshot): 
   contact.position.y = 0.028;
   ui.add(contact);
 
+  const hpBillboard = new THREE.Group();
+  hpBillboard.name = "phase19-creature-hp";
+  hpBillboard.position.y = 2.82;
+
   const hpBack = new THREE.Mesh(
-    new THREE.BoxGeometry(radius * 1.92, 0.2, 0.16),
+    new THREE.BoxGeometry(radius * 1.92, 0.2, 0.08),
     new THREE.MeshBasicMaterial({ color: 0x293038 }),
   );
-  hpBack.position.set(0, 2.82, 0);
-  ui.add(hpBack);
+  hpBillboard.add(hpBack);
 
   const hpFill = new THREE.Mesh(
-    new THREE.BoxGeometry(radius * 1.78, 0.13, 0.18),
+    new THREE.BoxGeometry(radius * 1.78, 0.13, 0.09),
     new THREE.MeshBasicMaterial({ color: 0xf25768 }),
   );
   hpFill.name = "hp-fill";
-  hpFill.position.set(0, 2.83, -0.015);
-  ui.add(hpFill);
+  hpFill.position.set(0, 0.01, -0.055);
+  hpBillboard.add(hpFill);
+  ui.add(hpBillboard);
 
   const cheekMaterial = standard(0xffb1c8, 0.7);
   for (const x of [-radius * 0.46, radius * 0.46]) {
     const cheek = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.13, 0.06), cheekMaterial);
     cheek.position.set(x, 0.99, radius * 0.76);
-    ui.add(cheek);
+    cubeShell.add(cheek);
   }
 
   group.add(ui);
 }
 
+function billboardCreatureHp(demo: CreaturePolishDemo): void {
+  const cameraWorld = new THREE.Quaternion();
+  const parentWorldInverse = new THREE.Quaternion();
+  demo.camera.getWorldQuaternion(cameraWorld);
+  for (const group of demo.enemyGroups.values()) {
+    const hp = group.getObjectByName("phase19-creature-hp");
+    if (!hp) continue;
+    group.getWorldQuaternion(parentWorldInverse);
+    parentWorldInverse.invert();
+    hp.quaternion.copy(parentWorldInverse.multiply(cameraWorld));
+  }
+}
+
 export function installCartRoguePhase19CreaturePolish(): void {
   const prototype = CartRogueWebGLDemo.prototype as unknown as CreaturePolishDemo;
   const originalBuildEnemies = prototype.buildEnemies;
+  const originalUpdateVisuals = prototype.updateVisuals;
 
   prototype.buildEnemies = function buildEnemiesPhase19CreaturePolish(
     this: CreaturePolishDemo,
@@ -88,6 +108,11 @@ export function installCartRoguePhase19CreaturePolish(): void {
       const group = this.enemyGroups.get(enemy.id);
       if (group) addCreaturePresentation(group, enemy);
     }
+  };
+
+  prototype.updateVisuals = function updateVisualsPhase19CreaturePolish(this: CreaturePolishDemo, delta: number): void {
+    originalUpdateVisuals.call(this, delta);
+    billboardCreatureHp(this);
   };
 }
 
