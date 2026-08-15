@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 const isGitHubPagesBuild = process.env.VOXEL_RALLY_PAGES === "1";
@@ -21,6 +21,15 @@ export const metadata: Metadata = {
     icon: `${githubPagesBasePath}/favicon.svg`,
     shortcut: `${githubPagesBasePath}/favicon.svg`,
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#bfe6e9",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
