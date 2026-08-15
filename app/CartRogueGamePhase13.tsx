@@ -2,6 +2,7 @@
 
 import "../src/cart/CartRoguePhase13Visuals";
 import "../src/cart/CartRoguePhase13Grade";
+import "../src/cart/CartRoguePhase14Arenas";
 import CartRogueGame from "./CartRogueGame";
 
 export default function CartRogueGamePhase13() {
