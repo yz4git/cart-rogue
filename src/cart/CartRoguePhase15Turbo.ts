@@ -2,12 +2,16 @@ import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession, cartSteeringInput, quickenCartSteering } from "./CartArenaSession";
 import { CartRogueCanvasPreview } from "./CartRogueCanvasPreview";
 import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
+import { getCartRunModifiers } from "./CartRunProgression";
 
 interface TurboHoldState {
   held: boolean;
   holdSeconds: number;
   lastCharge: number;
   recoverySeconds: number;
+  perfectWindowSeconds: number;
+  releaseCharge: number;
+  releaseSerial: number;
 }
 
 interface Phase15Session {
@@ -20,16 +24,34 @@ interface DemoWithSession {
   pause(): void;
 }
 
+export interface CartTurboCombatState {
+  held: boolean;
+  charge: number;
+  perfectReady: boolean;
+  perfectWindowSeconds: number;
+  releaseCharge: number;
+  releaseSerial: number;
+}
+
 const stateBySession = new WeakMap<object, TurboHoldState>();
 
 export const CART_TURBO_DRIFT_FULL_CHARGE_SECONDS = 0.78;
 export const CART_TURBO_DRIFT_MIN_SPEED = 4.4;
+export const CART_PERFECT_RELEASE_CHARGE = 0.88;
 
 function getState(session: Phase15Session): TurboHoldState {
   const key = session as unknown as object;
   const current = stateBySession.get(key);
   if (current) return current;
-  const created: TurboHoldState = { held: false, holdSeconds: 0, lastCharge: 0, recoverySeconds: 0 };
+  const created: TurboHoldState = {
+    held: false,
+    holdSeconds: 0,
+    lastCharge: 0,
+    recoverySeconds: 0,
+    perfectWindowSeconds: 0,
+    releaseCharge: 0,
+    releaseSerial: 0,
+  };
   stateBySession.set(key, created);
   return created;
 }
@@ -66,8 +88,6 @@ function applyTurboDriftHold(session: Phase15Session, input: RallyInputState, de
   const speed = Math.abs(car.forwardVelocity);
   const direction = Math.sign(car.forwardVelocity || 1);
 
-  // Holding Turbo is a setup state, not a second brake button. Speed bleeds
-  // progressively while steering creates a readable lateral slide.
   if (speed > CART_TURBO_DRIFT_MIN_SPEED) {
     const damping = Math.pow(0.995 - charge * 0.001, delta * 60);
     car.forwardVelocity *= damping;
@@ -77,9 +97,6 @@ function applyTurboDriftHold(session: Phase15Session, input: RallyInputState, de
   }
 
   if (steerMagnitude > 0.035) {
-    // Phase 15 originally stacked a large manual yaw on top of Cart's already
-    // quick steering. Keep the drift responsive, but make the nose rotate in
-    // a controlled arc instead of snapping around the player.
     const yawRate = (0.3 + charge * 0.36) * steerMagnitude;
     car.heading = normalizeAngle(car.heading + Math.sign(steer) * direction * yawRate * delta);
     const targetSlip = -steer * Math.max(6, speed) * (0.15 + charge * 0.085);
@@ -97,8 +114,6 @@ function applyReleaseDash(session: Phase15Session, charge: number): boolean {
   const car = session.car;
   clearDriftBrakeState(session);
 
-  // Even with an empty Turbo rack, releasing the button must immediately exit
-  // the deceleration/drift state and hand control back to normal acceleration.
   if (!car.boostActive) {
     car.lateralVelocity *= 0.72;
     syncHorizontalVelocity(session);
@@ -118,9 +133,6 @@ function applyReleaseDash(session: Phase15Session, charge: number): boolean {
 function applyReleaseRecovery(session: Phase15Session, state: TurboHoldState, delta: number): void {
   if (state.recoverySeconds <= 0) return;
   clearDriftBrakeState(session);
-  // Kill only the leftover sideways drift. Forward velocity is left to the
-  // normal RallyCar throttle/boost path so the car never remains in a hidden
-  // braking state after the finger comes off Turbo.
   session.car.lateralVelocity *= Math.pow(0.9, delta * 60);
   syncHorizontalVelocity(session);
   state.recoverySeconds = Math.max(0, state.recoverySeconds - delta);
@@ -130,12 +142,35 @@ export function cartTurboDriftCharge(seconds: number): number {
   return Math.max(0, Math.min(1, seconds / CART_TURBO_DRIFT_FULL_CHARGE_SECONDS));
 }
 
+export function getCartTurboCombatState(session: CartArenaSession): CartTurboCombatState {
+  const state = getState(session as unknown as Phase15Session);
+  const charge = state.held ? cartTurboDriftCharge(state.holdSeconds) : state.lastCharge;
+  return {
+    held: state.held,
+    charge,
+    perfectReady: state.held && charge >= CART_PERFECT_RELEASE_CHARGE,
+    perfectWindowSeconds: state.perfectWindowSeconds,
+    releaseCharge: state.releaseCharge,
+    releaseSerial: state.releaseSerial,
+  };
+}
+
+export function consumeCartPerfectRamWindow(session: CartArenaSession): { charge: number; serial: number } | null {
+  const state = getState(session as unknown as Phase15Session);
+  if (state.perfectWindowSeconds <= 0 || state.releaseCharge < CART_PERFECT_RELEASE_CHARGE) return null;
+  const result = { charge: state.releaseCharge, serial: state.releaseSerial };
+  state.perfectWindowSeconds = 0;
+  return result;
+}
+
 export function cancelCartTurboHold(session: CartArenaSession): void {
   const state = getState(session as unknown as Phase15Session);
   state.held = false;
   state.holdSeconds = 0;
   state.lastCharge = 0;
   state.recoverySeconds = 0;
+  state.perfectWindowSeconds = 0;
+  state.releaseCharge = 0;
   clearDriftBrakeState(session as unknown as Phase15Session);
 }
 
@@ -148,21 +183,22 @@ export function installCartRoguePhase15Turbo(): void {
     const heldNow = Boolean(input.boost);
     const releasedThisStep = state.held && !heldNow;
 
-    if (heldNow) state.holdSeconds = Math.min(1.35, state.holdSeconds + fixedDelta);
+    if (state.perfectWindowSeconds > 0 && !state.held) {
+      state.perfectWindowSeconds = Math.max(0, state.perfectWindowSeconds - fixedDelta);
+    }
+    if (heldNow) {
+      state.perfectWindowSeconds = 0;
+      state.releaseCharge = 0;
+      state.holdSeconds = Math.min(1.35, state.holdSeconds + fixedDelta);
+    }
     const charge = cartTurboDriftCharge(state.holdSeconds);
     if (heldNow) state.lastCharge = charge;
 
     const transformed: RallyInputState = {
       ...input,
-      // Never activate the existing Turbo while the button is held. Fire
-      // exactly once on release. Do not inject RallyCar braking here: Phase 16
-      // uses its own gentle speed bleed so the brake/drift latch cannot linger.
       boost: releasedThisStep,
       throttle: heldNow ? Math.min(input.throttle, 0.24) : input.throttle,
       brake: input.brake,
-      // Cart's normal steering is deliberately very quick. During the Turbo
-      // hold only, reduce the base steering sent into that path; the extra
-      // slip/yaw layer below provides the drift aim without an abrupt snap.
       steer: heldNow ? input.steer * 0.68 : input.steer,
     };
 
@@ -172,7 +208,16 @@ export function installCartRoguePhase15Turbo(): void {
       state.recoverySeconds = 0;
       applyTurboDriftHold(this, input, fixedDelta, charge);
     } else if (releasedThisStep) {
-      applyReleaseDash(this, state.lastCharge);
+      const releaseCharge = state.lastCharge;
+      const fired = applyReleaseDash(this, releaseCharge);
+      if (fired && releaseCharge >= CART_PERFECT_RELEASE_CHARGE) {
+        state.releaseCharge = releaseCharge;
+        state.releaseSerial += 1;
+        state.perfectWindowSeconds = getCartRunModifiers().perfectWindowSeconds;
+      } else {
+        state.releaseCharge = 0;
+        state.perfectWindowSeconds = 0;
+      }
       state.recoverySeconds = 0.22;
       state.holdSeconds = 0;
       state.lastCharge = 0;
@@ -183,8 +228,6 @@ export function installCartRoguePhase15Turbo(): void {
     state.held = heldNow;
   };
 
-  // Pausing a run must cancel a held button rather than producing a surprise
-  // release dash on the first frame after a perk/result overlay closes.
   const webglPrototype = CartRogueWebGLDemo.prototype as unknown as DemoWithSession;
   const originalWebglPause = webglPrototype.pause;
   webglPrototype.pause = function phase15WebglPause(this: DemoWithSession): void {

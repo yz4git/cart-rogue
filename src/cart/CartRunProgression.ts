@@ -14,7 +14,15 @@ export type CartRunUpgradeId =
   | "launch-control"
   | "overcharge-coil"
   | "signal-scrambler"
-  | "salvage-bond";
+  | "salvage-bond"
+  | "kinetic-relay"
+  | "wrecking-ball"
+  | "perfect-ignition"
+  | "wide-window"
+  | "afterburn-loop"
+  | "blast-link"
+  | "armor-piercer"
+  | "chain-siphon";
 
 export type CartUpgradeRarity = "COMMON" | "RARE" | "EPIC";
 
@@ -45,6 +53,14 @@ export interface CartRunModifiers {
   enemySpeedMultiplier: number;
   scrapMultiplier: number;
   scrapFlatBonus: number;
+  chainDamageMultiplier: number;
+  launchForceMultiplier: number;
+  perfectRamDamageMultiplier: number;
+  perfectWindowSeconds: number;
+  perfectRechargeSeconds: number;
+  explosionDamageMultiplier: number;
+  armorPierce: number;
+  gasOnChainKill: number;
 }
 
 export const CART_RUN_UPGRADES: readonly CartRunUpgradeDefinition[] = [
@@ -116,7 +132,7 @@ export const CART_RUN_UPGRADES: readonly CartRunUpgradeDefinition[] = [
     id: "hunter-array",
     name: "HUNTER ARRAY",
     shortName: "HUNTER",
-    description: "+24% RAM damage to Chaser, Striker and Orbiter targets per rank.",
+    description: "+24% RAM damage to mobile targets per rank.",
     rarity: "RARE",
     maxRank: 3,
   },
@@ -157,6 +173,70 @@ export const CART_RUN_UPGRADES: readonly CartRunUpgradeDefinition[] = [
     name: "SALVAGE BOND",
     shortName: "BONUS¥",
     description: "+2 flat SCRAP for every scored destroy per rank.",
+    rarity: "COMMON",
+    maxRank: 3,
+  },
+  {
+    id: "kinetic-relay",
+    name: "KINETIC RELAY",
+    shortName: "CHAIN+",
+    description: "+35% damage when a launched enemy crashes into another enemy.",
+    rarity: "RARE",
+    maxRank: 3,
+  },
+  {
+    id: "wrecking-ball",
+    name: "WRECKING BALL",
+    shortName: "LAUNCH+",
+    description: "+28% enemy launch force from RAM and chain impacts.",
+    rarity: "COMMON",
+    maxRank: 3,
+  },
+  {
+    id: "perfect-ignition",
+    name: "PERFECT IGNITION",
+    shortName: "PERFECT+",
+    description: "+45% bonus damage on a fully charged Perfect RAM.",
+    rarity: "EPIC",
+    maxRank: 2,
+  },
+  {
+    id: "wide-window",
+    name: "WIDE WINDOW",
+    shortName: "WINDOW+",
+    description: "Perfect RAM timing window +0.10s per rank.",
+    rarity: "COMMON",
+    maxRank: 2,
+  },
+  {
+    id: "afterburn-loop",
+    name: "AFTERBURN LOOP",
+    shortName: "REFUND",
+    description: "Perfect RAM advances renewable Turbo recharge by +0.55s per rank.",
+    rarity: "RARE",
+    maxRank: 3,
+  },
+  {
+    id: "blast-link",
+    name: "BLAST LINK",
+    shortName: "BLAST+",
+    description: "+40% Bomber and chain-explosion damage per rank.",
+    rarity: "RARE",
+    maxRank: 3,
+  },
+  {
+    id: "armor-piercer",
+    name: "ARMOR PIERCER",
+    shortName: "PIERCE",
+    description: "Ignore 25% more Tank/Boss frontal armor per rank.",
+    rarity: "EPIC",
+    maxRank: 3,
+  },
+  {
+    id: "chain-siphon",
+    name: "CHAIN SIPHON",
+    shortName: "SIPHON",
+    description: "Chain destroys restore +1.2% GAS per rank.",
     rarity: "COMMON",
     maxRank: 3,
   },
@@ -210,6 +290,14 @@ export function getCartRunModifiers(): CartRunModifiers {
   const overcharge = cartRunUpgradeRank("overcharge-coil");
   const scrambler = cartRunUpgradeRank("signal-scrambler");
   const salvageBond = cartRunUpgradeRank("salvage-bond");
+  const kinetic = cartRunUpgradeRank("kinetic-relay");
+  const wrecking = cartRunUpgradeRank("wrecking-ball");
+  const perfect = cartRunUpgradeRank("perfect-ignition");
+  const wide = cartRunUpgradeRank("wide-window");
+  const afterburn = cartRunUpgradeRank("afterburn-loop");
+  const blast = cartRunUpgradeRank("blast-link");
+  const pierce = cartRunUpgradeRank("armor-piercer");
+  const siphon = cartRunUpgradeRank("chain-siphon");
   return {
     ramDamageMultiplier: 1 + ram * 0.22,
     heavyDamageMultiplier: 1 + titan * 0.28,
@@ -224,6 +312,14 @@ export function getCartRunModifiers(): CartRunModifiers {
     enemySpeedMultiplier: Math.max(0.48, 1 - jammer * 0.12 - scrambler * 0.08),
     scrapMultiplier: 1 + scrap * 0.4,
     scrapFlatBonus: salvageBond * 2,
+    chainDamageMultiplier: 1 + kinetic * 0.35,
+    launchForceMultiplier: 1 + wrecking * 0.28,
+    perfectRamDamageMultiplier: 1 + perfect * 0.45,
+    perfectWindowSeconds: 0.42 + wide * 0.1,
+    perfectRechargeSeconds: 0.55 + afterburn * 0.55,
+    explosionDamageMultiplier: 1 + blast * 0.4,
+    armorPierce: Math.min(0.75, pierce * 0.25),
+    gasOnChainKill: siphon * 0.012,
   };
 }
 
