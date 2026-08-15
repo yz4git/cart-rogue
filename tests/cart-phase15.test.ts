@@ -33,7 +33,7 @@ test("Phase 15 Turbo drift charge clamps at the authored full-charge time", () =
   assert.equal(cartTurboDriftCharge(99), 1);
 });
 
-test("holding Turbo does not spend stock and creates a slower, tight drift", () => {
+test("holding Turbo does not spend stock and creates a slower, controlled drift", () => {
   const session = new CartArenaSession();
   try {
     prepareRoom(session);
@@ -42,18 +42,20 @@ test("holding Turbo does not spend stock and creates a slower, tight drift", () 
     const initialSpeed = Math.abs(session.car.forwardVelocity);
     for (let frame = 0; frame < 30; frame += 1) session.step(HOLD);
 
+    const turn = angleDistance(initialHeading, session.car.heading);
     assert.equal(session.car.boostCharges, initialCharges, "holding must not consume a Turbo stock");
     assert.equal(session.car.boostActive, false, "Turbo must stay inactive until release");
     assert.ok(Math.abs(session.car.forwardVelocity) < initialSpeed, "hold state should shed speed for drift setup");
-    assert.ok(Math.abs(session.car.forwardVelocity) > 3.8, "drift setup should not park the car");
-    assert.ok(angleDistance(initialHeading, session.car.heading) > 0.65, "steering while held should rotate the car aggressively");
-    assert.ok(Math.abs(session.car.lateralVelocity) > 0.35, "hold steering should create visible lateral slip");
+    assert.ok(Math.abs(session.car.forwardVelocity) > 4.2, "drift setup should not park the car");
+    assert.ok(turn > 0.32, `drift should still rotate usefully, got ${turn.toFixed(3)} rad`);
+    assert.ok(turn < 1.35, `drift steering should no longer snap around, got ${turn.toFixed(3)} rad`);
+    assert.ok(Math.abs(session.car.lateralVelocity) > 0.25, "hold steering should create visible lateral slip");
   } finally {
     session.dispose();
   }
 });
 
-test("releasing Turbo fires exactly once and consumes one stock", () => {
+test("releasing Turbo fires exactly once and immediately exits the deceleration state", () => {
   const session = new CartArenaSession();
   try {
     prepareRoom(session);
@@ -64,12 +66,17 @@ test("releasing Turbo fires exactly once and consumes one stock", () => {
     session.step(RELEASE);
     assert.equal(session.car.boostCharges, initialCharges - 1);
     assert.equal(session.car.boostActive, true);
+    assert.equal(session.car.lastBrake, 0, "release must clear any injected brake state");
+    assert.equal(session.car.drifting, false, "release must leave the hold-drift state immediately");
     assert.ok(Math.abs(session.car.forwardVelocity) > speedBeforeRelease, "release should produce an immediate dash impulse");
 
     const chargesAfterRelease = session.car.boostCharges;
-    session.step(RELEASE);
-    session.step(RELEASE);
+    const speedAfterRelease = Math.abs(session.car.forwardVelocity);
+    for (let frame = 0; frame < 12; frame += 1) session.step(RELEASE);
     assert.equal(session.car.boostCharges, chargesAfterRelease, "remaining released must not repeatedly fire Turbo");
+    assert.equal(session.car.lastBrake, 0);
+    assert.equal(session.car.drifting, false);
+    assert.ok(Math.abs(session.car.forwardVelocity) >= speedAfterRelease * 0.94, "normal/boost acceleration must resume instead of staying in deceleration mode");
   } finally {
     session.dispose();
   }
