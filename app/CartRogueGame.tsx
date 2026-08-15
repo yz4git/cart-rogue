@@ -101,6 +101,22 @@ function bossPhase(snapshot: CartArenaSessionSnapshot): 1 | 2 | 3 {
   return 3;
 }
 
+function updateRunRecords(timeSeconds: number, scrap: number): RunResult {
+  let bestTimeSeconds = timeSeconds;
+  let bestScrap = scrap;
+  try {
+    const storedTime = Number(localStorage.getItem("cart-rogue-best-time"));
+    const storedScrap = Number(localStorage.getItem("cart-rogue-best-scrap"));
+    if (Number.isFinite(storedTime) && storedTime > 0) bestTimeSeconds = Math.min(storedTime, timeSeconds);
+    if (Number.isFinite(storedScrap) && storedScrap >= 0) bestScrap = Math.max(storedScrap, scrap);
+    localStorage.setItem("cart-rogue-best-time", String(bestTimeSeconds));
+    localStorage.setItem("cart-rogue-best-scrap", String(bestScrap));
+  } catch {
+    // Private browsing/storage denial should never block the result screen.
+  }
+  return { timeSeconds, scrap, bestTimeSeconds, bestScrap };
+}
+
 export default function CartRogueGame() {
   const mountRef = useRef<HTMLDivElement>(null);
   const demoRef = useRef<CartRogueDemoHandle | null>(null);
@@ -114,6 +130,7 @@ export default function CartRogueGame() {
   const runSeedRef = useRef(1);
   const scrapRef = useRef(0);
   const runStartRef = useRef(0);
+  const resultShownRef = useRef(false);
   const [snapshot, setSnapshot] = useState(INITIAL);
   const [rendererName, setRendererName] = useState<"WEBGL" | "CANVAS">("WEBGL");
   const [runtimeMessage, setRuntimeMessage] = useState<string | null>(null);
@@ -135,13 +152,8 @@ export default function CartRogueGame() {
     offerCounterRef.current = 0;
     runSeedRef.current = ((Date.now() & 0x7fffffff) ^ ((runSerial + 1) * 0x45d9f3b)) | 0;
     scrapRef.current = 0;
+    resultShownRef.current = false;
     runStartRef.current = performance.now();
-    setSnapshot(INITIAL);
-    setScrap(0);
-    setUpgrades([]);
-    setPerkOffer(null);
-    setResult(null);
-    setRuntimeMessage(null);
 
     const handleSnapshot = (next: CartArenaSessionSnapshot) => {
       const previous = previousSnapshotRef.current;
@@ -158,6 +170,31 @@ export default function CartRogueGame() {
         scrapRef.current += cartScrapReward(earned);
         setScrap(scrapRef.current);
       }
+
+      const clearedArena = next.nodeKind === "arena"
+        && next.enemiesTotal > 0
+        && next.enemiesAlive === 0
+        && !offeredRoomsRef.current.has(next.nodeId);
+      if (clearedArena) {
+        offeredRoomsRef.current.add(next.nodeId);
+        const offerIndex = offerCounterRef.current;
+        offerCounterRef.current += 1;
+        demoRef.current?.pause();
+        setPerkOffer({
+          nodeId: next.nodeId,
+          offerIndex,
+          rerollIndex: 0,
+          choices: rollCartRunUpgradeChoices(runSeedRef.current, offerIndex, 0),
+        });
+      }
+
+      if (next.runComplete && !previous.runComplete && !resultShownRef.current) {
+        resultShownRef.current = true;
+        demoRef.current?.pause();
+        const timeSeconds = Math.max(0, (performance.now() - runStartRef.current) / 1000);
+        setResult(updateRunRecords(timeSeconds, scrapRef.current));
+      }
+
       previousSnapshotRef.current = next;
       setSnapshot(next);
     };
@@ -169,9 +206,10 @@ export default function CartRogueGame() {
       mount.replaceChildren();
       demo = new CartRogueCanvasPreview(mount, handleSnapshot);
       demoRef.current = demo;
-      handleSnapshot(demo.getSnapshot());
-      setRendererName("CANVAS");
-      if (message) setRuntimeMessage(message);
+      queueMicrotask(() => {
+        setRendererName("CANVAS");
+        if (message) setRuntimeMessage(message);
+      });
       switching = false;
     };
 
@@ -186,8 +224,6 @@ export default function CartRogueGame() {
           startCanvas(message);
         });
         demoRef.current = demo;
-        handleSnapshot(demo.getSnapshot());
-        setRendererName("WEBGL");
       }
     } catch (error) {
       console.error("[Cart Rogue] renderer initialization failed", error);
@@ -199,41 +235,6 @@ export default function CartRogueGame() {
       demoRef.current = null;
     };
   }, [runSerial]);
-
-  useEffect(() => {
-    if (snapshot.runComplete || perkOffer || result) return;
-    if (snapshot.nodeKind !== "arena" || snapshot.enemiesTotal <= 0 || snapshot.enemiesAlive > 0) return;
-    if (offeredRoomsRef.current.has(snapshot.nodeId)) return;
-    offeredRoomsRef.current.add(snapshot.nodeId);
-    const offerIndex = offerCounterRef.current;
-    offerCounterRef.current += 1;
-    demoRef.current?.pause();
-    setPerkOffer({
-      nodeId: snapshot.nodeId,
-      offerIndex,
-      rerollIndex: 0,
-      choices: rollCartRunUpgradeChoices(runSeedRef.current, offerIndex, 0),
-    });
-  }, [snapshot.nodeId, snapshot.nodeKind, snapshot.enemiesTotal, snapshot.enemiesAlive, snapshot.runComplete, perkOffer, result]);
-
-  useEffect(() => {
-    if (!snapshot.runComplete || result) return;
-    demoRef.current?.pause();
-    const timeSeconds = Math.max(0, (performance.now() - runStartRef.current) / 1000);
-    let bestTimeSeconds = timeSeconds;
-    let bestScrap = scrapRef.current;
-    try {
-      const storedTime = Number(localStorage.getItem("cart-rogue-best-time"));
-      const storedScrap = Number(localStorage.getItem("cart-rogue-best-scrap"));
-      if (Number.isFinite(storedTime) && storedTime > 0) bestTimeSeconds = Math.min(storedTime, timeSeconds);
-      if (Number.isFinite(storedScrap) && storedScrap >= 0) bestScrap = Math.max(storedScrap, scrapRef.current);
-      localStorage.setItem("cart-rogue-best-time", String(bestTimeSeconds));
-      localStorage.setItem("cart-rogue-best-scrap", String(bestScrap));
-    } catch {
-      // Private browsing/storage denial should never block the result screen.
-    }
-    setResult({ timeSeconds, scrap: scrapRef.current, bestTimeSeconds, bestScrap });
-  }, [snapshot.runComplete, result]);
 
   useEffect(() => {
     const keys = new Set<string>();
@@ -337,6 +338,17 @@ export default function CartRogueGame() {
       rerollIndex,
       choices: rollCartRunUpgradeChoices(runSeedRef.current, perkOffer.offerIndex, rerollIndex),
     });
+  };
+
+  const startNewRun = () => {
+    setSnapshot(INITIAL);
+    setRendererName("WEBGL");
+    setRuntimeMessage(null);
+    setScrap(0);
+    setUpgrades([]);
+    setPerkOffer(null);
+    setResult(null);
+    setRunSerial((value) => value + 1);
   };
 
   const gasPercent = Math.round(snapshot.gas * 100);
@@ -482,7 +494,7 @@ export default function CartRogueGame() {
                 BEST {formatTime(result.bestTimeSeconds)} · BEST SCRAP {result.bestScrap}<br />
                 {upgrades.length > 0 ? upgrades.map((upgrade) => `${upgrade.shortName}×${upgrade.rank}`).join(" · ") : "NO PERKS"}
               </div>
-              <button className={phase8Styles.newRunButton} onClick={() => setRunSerial((value) => value + 1)}>NEW RUN</button>
+              <button className={phase8Styles.newRunButton} onClick={startNewRun}>NEW RUN</button>
             </div>
           </div>
         )}
