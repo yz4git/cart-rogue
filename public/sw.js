@@ -3,7 +3,7 @@ const BASE_PATH = self.location.pathname
   .replace(/\/$/, "");
 const ROOT = `${BASE_PATH}/`;
 const CACHE_PREFIX = "voxel-rally-";
-const CACHE_VERSION = "v4";
+const CACHE_VERSION = "v5";
 const CACHE = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL = [ROOT, `${BASE_PATH}/manifest.json`, `${BASE_PATH}/favicon.svg`];
 
@@ -30,27 +30,26 @@ self.addEventListener("fetch", (event) => {
   const acceptsHtml = event.request.headers.get("accept")?.includes("text/html") ?? false;
   if (event.request.mode === "navigate" || acceptsHtml) {
     event.respondWith(
-      fetch(event.request, { cache: "no-store" })
-        .then((response) => {
-          if (response.ok) void caches.open(CACHE).then((cache) => cache.put(ROOT, response.clone()));
-          return response;
-        })
-        .catch(() => caches.match(ROOT)),
-    );
-    return;
-  }
-  event.respondWith(
-    caches.match(event.request).then((cached) =>
-      cached ??
       fetch(event.request)
         .then((response) => {
-          if (response.ok && new URL(event.request.url).origin === self.location.origin) {
+          if (response.ok) {
             const copy = response.clone();
-            void caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+            caches.open(CACHE).then((cache) => cache.put(event.request, copy));
           }
           return response;
         })
-        .catch(() => caches.match(ROOT)),
-    ),
+        .catch(() => caches.match(event.request).then((cached) => cached ?? caches.match(ROOT))),
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(event.request).then((cached) => cached ?? fetch(event.request).then((response) => {
+      if (response.ok && new URL(event.request.url).origin === self.location.origin) {
+        const copy = response.clone();
+        caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+      }
+      return response;
+    })),
   );
 });
