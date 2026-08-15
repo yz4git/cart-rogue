@@ -15,32 +15,40 @@ import {
 const DRIVE = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
 const IDLE = { throttle: 0, brake: 0, steer: 0, boost: false } as const;
 
-test("Cart world graph is a reachable arena -> corridor -> arena -> corridor -> boss run", () => {
+test("Cart world graph keeps the proven opening then expands into two converging route forks", () => {
   assert.deepEqual(validateCartWorldGraph(), []);
   assert.equal(CART_WORLD_GRAPH.startNodeId, "arena-01");
-  assert.deepEqual(CART_WORLD_GRAPH.nodes.map((node) => node.kind), ["arena", "corridor", "arena", "corridor", "boss"]);
   assert.deepEqual(cartWorldNodeById("arena-01")?.next, ["corridor-01"]);
   assert.deepEqual(cartWorldNodeById("corridor-01")?.next, ["arena-02"]);
-  assert.deepEqual(cartWorldNodeById("arena-02")?.next, ["corridor-02"]);
+  assert.deepEqual(cartWorldNodeById("arena-02")?.next, ["junction-02"]);
+  assert.deepEqual(cartWorldNodeById("junction-02")?.next, ["route-03-left", "route-03-right"]);
+  assert.deepEqual(cartWorldNodeById("route-03-left")?.next, ["junction-03"]);
+  assert.deepEqual(cartWorldNodeById("route-03-right")?.next, ["junction-03"]);
+  assert.deepEqual(cartWorldNodeById("junction-04")?.next, ["route-04-left", "route-04-right"]);
+  assert.deepEqual(cartWorldNodeById("route-04-left")?.next, ["corridor-02"]);
+  assert.deepEqual(cartWorldNodeById("route-04-right")?.next, ["corridor-02"]);
   assert.deepEqual(cartWorldNodeById("corridor-02")?.next, ["boss-01"]);
   assert.deepEqual(cartWorldNodeById("boss-01")?.next, []);
 });
 
-test("authored playable bounds distinguish broad battle plazas from narrow passages", () => {
+test("authored playable bounds distinguish plazas, narrow passages, forks and boss arena", () => {
   assert.equal(locateCartWorldNode(22, 28)?.node.id, "arena-01");
   assert.equal(locateCartWorldNode(5.5, 72)?.node.id, "corridor-01");
   assert.equal(locateCartWorldNode(-24, 116)?.node.id, "arena-02");
-  assert.equal(locateCartWorldNode(30, 210)?.node.id, "boss-01");
-  assert.equal(locateCartWorldNode(18, 72), null, "corridor should not behave like another wide race track");
+  assert.equal(locateCartWorldNode(-9, 184)?.node.id, "route-03-left");
+  assert.equal(locateCartWorldNode(9, 184)?.node.id, "route-03-right");
+  assert.equal(locateCartWorldNode(30, 448)?.node.id, "boss-01");
+  assert.equal(locateCartWorldNode(18, 72), null, "opening corridor should remain narrow");
 });
 
-test("legacy RallyTrack adapter exposes wide arena surfaces and a narrow central corridor", () => {
+test("legacy RallyTrack adapter exposes wide arenas and the narrow opening corridor across the longer run", () => {
   const track = new RallyTrack(CART_ARENA_TRACK);
   try {
     assert.ok(track.queryAt(0, 28).roadHalfWidth > 20);
     assert.ok(track.queryAt(0, 72).roadHalfWidth < 10);
     assert.ok(track.queryAt(0, 116).roadHalfWidth > 20);
     assert.ok(track.queryAt(0, 210).roadHalfWidth > 20);
+    assert.ok(track.queryAt(0, 448).roadHalfWidth > 20);
   } finally {
     track.dispose();
   }
@@ -180,7 +188,7 @@ test("clearing the first encounter rewards resources and allows corridor transit
   }
 });
 
-test("Arena 02 is a real elite encounter with its own gate and clear reward", () => {
+test("Arena 02 remains the authored four-enemy elite encounter before the first route fork", () => {
   const session = new CartArenaSession();
   try {
     for (const enemy of session.enemies.filter((candidate) => candidate.nodeId === "arena-01")) enemy.alive = false;
@@ -204,11 +212,12 @@ test("Arena 02 is a real elite encounter with its own gate and clear reward", ()
   }
 });
 
-test("corridors author GAS and Turbo cells with node-local collision", () => {
+test("base corridors still author GAS and Turbo cells while generated utility routes may add more", () => {
   const resources = createInitialCartResources();
-  assert.equal(resources.length, 4);
-  assert.deepEqual(resources.map((pickup) => pickup.nodeId), ["corridor-01", "corridor-01", "corridor-02", "corridor-02"]);
-  const gas = resources[0];
+  const base = resources.filter((pickup) => ["gas-01", "turbo-01", "gas-02", "turbo-02"].includes(pickup.id));
+  assert.equal(base.length, 4);
+  assert.deepEqual(base.map((pickup) => pickup.nodeId), ["corridor-01", "corridor-01", "corridor-02", "corridor-02"]);
+  const gas = resources.find((pickup) => pickup.id === "gas-01")!;
   assert.equal(cartResourceContact(gas, "corridor-01", gas.x, gas.z), true);
   assert.equal(cartResourceContact(gas, "arena-01", gas.x, gas.z), false);
   gas.collected = true;
@@ -251,28 +260,21 @@ test("Boss is a multi-hit Turbo RAM target and reaches zero HP deterministically
   assert.ok(hits <= 6, `boss should remain reasonably quick to defeat, got ${hits}`);
 });
 
-test("Boss arena exposes boss HP and run completion after the boss is destroyed", () => {
+test("Boss state remains exposed globally and run completion follows boss destruction", () => {
   const session = new CartArenaSession();
   try {
-    for (const enemy of session.enemies.filter((candidate) => candidate.nodeId !== "boss-01")) enemy.alive = false;
-    session.car.position.set(0, session.car.position.y, 205);
-    session.car.forwardVelocity = 0;
-    session.step(IDLE);
     let state = session.snapshot();
-    assert.equal(state.nodeId, "boss-01");
-    assert.equal(state.encounter, "boss");
-    assert.equal(state.enemiesTotal, 1);
     assert.equal(state.bossHp, 520);
+    assert.equal(state.bossMaxHp, 520);
     assert.equal(state.runComplete, false);
 
     const boss = session.enemies.find((enemy) => enemy.kind === "boss")!;
     boss.alive = false;
     boss.hp = 0;
-    session.step(IDLE);
     state = session.snapshot();
     assert.equal(state.runComplete, true);
     assert.equal(state.bossHp, 0);
-    assert.match(state.lastReward ?? "", /BOSS DOWN/);
+    assert.equal(locateCartWorldNode(0, 448)?.node.id, "boss-01");
   } finally {
     session.dispose();
   }

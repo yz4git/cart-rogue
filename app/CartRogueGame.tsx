@@ -17,6 +17,8 @@ import {
   type CartRunUpgradeDefinition,
   type CartRunUpgradeState,
 } from "../src/cart/CartRunProgression";
+import { cartWorldNodeById } from "../src/cart/CartWorldGraph";
+import CartRunRouteMap from "./CartRunRouteMap";
 import styles from "./CartRogueGame.module.css";
 import phaseStyles from "./CartRoguePhase3.module.css";
 import phase4Styles from "./CartRoguePhase4.module.css";
@@ -74,10 +76,20 @@ function objective(snapshot: CartArenaSessionSnapshot): string {
   if (snapshot.nodeId === "arena-01") return "UPGRADE READY · THEN ENTER CORRIDOR";
   if (snapshot.nodeId === "corridor-01") return "CORRIDOR · COLLECT CELLS · REACH ELITE";
   if (snapshot.nodeId === "arena-02" && snapshot.gateLocked) return `ELITE ARENA · ${snapshot.enemiesAlive} LEFT`;
-  if (snapshot.nodeId === "arena-02") return "ELITE CLEAR · BUILD UPGRADE READY";
-  if (snapshot.nodeId === "corridor-02") return "BOSS CORRIDOR · STOCK TURBO";
+  if (snapshot.nodeId === "arena-02") return "ELITE CLEAR · PICK A ROUTE";
+  if (snapshot.nodeId === "corridor-02") return "BOSS APPROACH · STOCK TURBO";
   if (snapshot.nodeKind === "boss") return `TURBO RAM BOSS · ${Math.ceil(snapshot.bossHp)} HP`;
-  return "KEEP MOVING";
+
+  const node = cartWorldNodeById(snapshot.nodeId);
+  if (node?.next.length === 2) return "ROUTE FORK · STEER LEFT OR RIGHT";
+  if (node?.routeType === "service") return "FUEL DEPOT · REFILL GAS AND TURBO";
+  if (node?.routeType === "scrap") return "SALVAGE YARD · TURBO SMASH FOR SCRAP";
+  if (node?.routeType === "event") return "TURBO STORM · CHAIN CELLS AND SMASHES";
+  if ((node?.routeType === "combat" || node?.routeType === "elite") && snapshot.gateLocked) {
+    return `${node.routeType === "elite" ? "ELITE" : "BRAWL"} · ${snapshot.enemiesAlive} LEFT`;
+  }
+  if ((node?.routeType === "combat" || node?.routeType === "elite") && !snapshot.gateLocked) return "ROOM CLEAR · BUILD UPGRADE READY";
+  return node?.label ?? "KEEP MOVING";
 }
 
 function scrapForEnemy(kind: string): number {
@@ -146,11 +158,11 @@ export default function CartRogueGame() {
     let demo: CartRogueDemoHandle | null = null;
     let switching = false;
 
-    resetCartRunProgression();
+    runSeedRef.current = ((Date.now() & 0x7fffffff) ^ ((runSerial + 1) * 0x45d9f3b)) | 0;
+    resetCartRunProgression(runSeedRef.current);
     previousSnapshotRef.current = INITIAL;
     offeredRoomsRef.current.clear();
     offerCounterRef.current = 0;
-    runSeedRef.current = ((Date.now() & 0x7fffffff) ^ ((runSerial + 1) * 0x45d9f3b)) | 0;
     scrapRef.current = 0;
     resultShownRef.current = false;
     runStartRef.current = performance.now();
@@ -375,6 +387,8 @@ export default function CartRogueGame() {
           </div>
         </div>
 
+        {!perkOffer && !result && <CartRunRouteMap nodeId={snapshot.nodeId} gateLocked={snapshot.gateLocked} />}
+
         {upgrades.length > 0 && (
           <div className={phase8Styles.upgradeStrip}>
             {upgrades.slice(0, 6).map((upgrade) => <span key={upgrade.id} className={phase8Styles.upgradeChip}>{upgrade.shortName} {upgrade.rank > 1 ? `×${upgrade.rank}` : ""}</span>)}
@@ -474,7 +488,7 @@ export default function CartRogueGame() {
                 })}
               </div>
               <div className={phase8Styles.perkFooter}>
-                <span>Perks stack for this run only. Build for RAM, control, demolition, or boss damage.</span>
+                <span>Perks stack for this run only. Build for RAM, control, demolition, mobility hunting, or boss damage.</span>
                 <button className={phase8Styles.rerollButton} disabled={scrap < rerollCost} onClick={rerollPerks}>REROLL · {rerollCost} SCRAP</button>
               </div>
             </div>
