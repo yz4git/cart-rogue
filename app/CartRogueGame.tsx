@@ -147,7 +147,7 @@ export default function CartRogueGame() {
   const moveSteer = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (steerPointerRef.current !== event.pointerId) return;
     event.preventDefault();
-    demoRef.current?.setSteering(Math.max(-1, Math.min(1, (event.clientX - steerOriginRef.current) / 56)));
+    demoRef.current?.setSteering(Math.max(-1, Math.min(1, (event.clientX - steerOriginRef.current) / 44)));
   };
 
   const releaseSteer = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -164,7 +164,7 @@ export default function CartRogueGame() {
     if (pointers.size === 0) {
       demoRef.current?.setBoost(true);
       const settings = loadRallySettings();
-      if (settings.vibrationEnabled && "vibrate" in navigator) navigator.vibrate?.(10);
+      if (settings.vibrationEnabled && "vibrate" in navigator) navigator.vibrate?.(12);
     }
     pointers.add(event.pointerId);
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -219,7 +219,7 @@ export default function CartRogueGame() {
           </div>
         )}
         {snapshot.runComplete && <div className={phase4Styles.runClear}>RUN CLEAR!</div>}
-        {snapshot.ramCombo > 1 && <div className={styles.combo}>RAM COMBO! <strong>×{snapshot.ramCombo}</strong></div>}
+        {snapshot.ramCombo > 1 && <div className={styles.combo}>FLOW COMBO! <strong>×{snapshot.ramCombo}</strong></div>}
         {snapshot.nodeKind !== "boss" && snapshot.enemiesTotal > 0 && !snapshot.gateLocked && <div className={styles.gateOpen}>GATE OPEN!</div>}
         {snapshot.boostActive && <div className={styles.ramBanner}>TURBO RAM</div>}
         {snapshot.wallSliding && <div className={phaseStyles.wallRide}>WALL RIDE</div>}
@@ -231,7 +231,7 @@ export default function CartRogueGame() {
             <div className={styles.meterTrack}><i style={{ width: `${gasPercent}%` }} /></div>
           </div>
           <div className={styles.itemStrip}>
-            <span>RAM</span><span>ROCKS</span><span>CELLS</span>
+            <span>RAM</span><span>FLOW</span><span>SMASH</span>
           </div>
           <div className={`${styles.meterCard} ${styles.turboCard}`}>
             <div className={styles.meterHead}><span>TURBO</span><strong>×{snapshot.boostCharges}</strong></div>
@@ -254,7 +254,7 @@ export default function CartRogueGame() {
           onPointerCancel={releaseSteer}
           onLostPointerCapture={releaseSteer}
         >
-          <span>TIGHT STEER · REVERSED</span>
+          <span>ARCADE TURN · REVERSED</span>
         </div>
 
         <div className={styles.actions}>
