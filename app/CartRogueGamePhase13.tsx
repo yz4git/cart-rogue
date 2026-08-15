@@ -8,6 +8,7 @@ import "../src/cart/CartRoguePhase17CombatEvolution";
 import "../src/cart/CartRoguePhase19TargetArt";
 import "../src/cart/CartRoguePhase19CreaturePolish";
 import "../src/cart/CartRoguePhase19GroundCover";
+import "../src/cart/CartRoguePhase19GardenPolish";
 import "../src/cart/CartRoguePhase19ReferencePolish";
 import "../src/cart/CartRoguePhase19ArtifactCleanup";
 import CartRogueGame from "./CartRogueGame";
