@@ -13,6 +13,7 @@ import "../src/cart/CartRoguePhase19ReferencePolish";
 import "../src/cart/CartRoguePhase19ArtifactCleanup";
 import "../src/cart/CartRoguePhase20DioramaQuality";
 import "../src/cart/CartRoguePhase20ReferenceMatch";
+import "../src/cart/CartRoguePhase21ImpactPolish";
 import CartRogueGame from "./CartRogueGame";
 
 export default function CartRogueGamePhase13() {
