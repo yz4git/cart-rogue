@@ -24,8 +24,8 @@ const INITIAL: CartArenaSessionSnapshot = {
   boostActive: false,
   turboRechargeProgress: 0,
   turboRechargeSeconds: 3,
-  enemiesAlive: 4,
-  enemiesTotal: 4,
+  enemiesAlive: 3,
+  enemiesTotal: 3,
   gateLocked: true,
   arena1GateLocked: true,
   arena2GateLocked: true,
@@ -44,7 +44,7 @@ const INITIAL: CartArenaSessionSnapshot = {
 
 function objective(snapshot: CartArenaSessionSnapshot): string {
   if (snapshot.runComplete) return "RUN CLEAR · BOSS DESTROYED";
-  if (snapshot.nodeId === "arena-01" && snapshot.gateLocked) return `TURBO RAM ENEMIES · ${snapshot.enemiesAlive} LEFT`;
+  if (snapshot.nodeId === "arena-01" && snapshot.gateLocked) return `TURBO RAM LIGHT TARGETS · ${snapshot.enemiesAlive} LEFT`;
   if (snapshot.nodeId === "arena-01") return "GATE OPEN · ENTER CORRIDOR";
   if (snapshot.nodeId === "corridor-01") return "CORRIDOR · COLLECT CELLS · REACH ELITE";
   if (snapshot.nodeId === "arena-02" && snapshot.gateLocked) return `ELITE ARENA · ${snapshot.enemiesAlive} LEFT`;
@@ -147,7 +147,7 @@ export default function CartRogueGame() {
   const moveSteer = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (steerPointerRef.current !== event.pointerId) return;
     event.preventDefault();
-    demoRef.current?.setSteering(Math.max(-1, Math.min(1, (event.clientX - steerOriginRef.current) / 72)));
+    demoRef.current?.setSteering(Math.max(-1, Math.min(1, (event.clientX - steerOriginRef.current) / 56)));
   };
 
   const releaseSteer = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -254,7 +254,7 @@ export default function CartRogueGame() {
           onPointerCancel={releaseSteer}
           onLostPointerCapture={releaseSteer}
         >
-          <span>QUICK STEER · REVERSED</span>
+          <span>TIGHT STEER · REVERSED</span>
         </div>
 
         <div className={styles.actions}>

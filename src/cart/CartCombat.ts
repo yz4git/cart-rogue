@@ -25,10 +25,12 @@ export const CART_RAM_MIN_SPEED = 8;
 
 export function createInitialCartEnemies(): CartEnemyState[] {
   return [
-    { id: "enemy-a", nodeId: "arena-01", kind: "blocker", x: -11, z: 25, radius: 1.75, maxHp: 100, hp: 100, alive: true, heading: 0.5, moveSpeed: 0 },
-    { id: "enemy-b", nodeId: "arena-01", kind: "blocker", x: 10, z: 32, radius: 1.75, maxHp: 100, hp: 100, alive: true, heading: -0.8, moveSpeed: 0 },
-    { id: "enemy-c", nodeId: "arena-01", kind: "chaser", x: -4, z: 42, radius: 1.72, maxHp: 100, hp: 100, alive: true, heading: 2.2, moveSpeed: 3.3 },
-    { id: "enemy-d", nodeId: "arena-01", kind: "heavy", x: 13, z: 45, radius: 2.15, maxHp: 160, hp: 160, alive: true, heading: -2.1, moveSpeed: 1.4 },
+    // Arena 01 is deliberately a short onboarding encounter: two readable
+    // stationary targets plus one slower moving target. Heavy enemies start in
+    // Arena 02 so the first room teaches steering + Turbo RAM before attrition.
+    { id: "enemy-a", nodeId: "arena-01", kind: "blocker", x: -10, z: 25, radius: 1.75, maxHp: 100, hp: 100, alive: true, heading: 0.5, moveSpeed: 0 },
+    { id: "enemy-b", nodeId: "arena-01", kind: "blocker", x: 10, z: 34, radius: 1.75, maxHp: 100, hp: 100, alive: true, heading: -0.8, moveSpeed: 0 },
+    { id: "enemy-c", nodeId: "arena-01", kind: "chaser", x: -4, z: 43, radius: 1.72, maxHp: 100, hp: 100, alive: true, heading: 2.2, moveSpeed: 2.8 },
     { id: "enemy-e", nodeId: "arena-02", kind: "chaser", x: -16, z: 108, radius: 1.72, maxHp: 100, hp: 100, alive: true, heading: 0.4, moveSpeed: 4.0 },
     { id: "enemy-f", nodeId: "arena-02", kind: "chaser", x: 16, z: 120, radius: 1.72, maxHp: 100, hp: 100, alive: true, heading: -1.0, moveSpeed: 4.2 },
     { id: "enemy-g", nodeId: "arena-02", kind: "blocker", x: -7, z: 130, radius: 1.82, maxHp: 110, hp: 110, alive: true, heading: 2.4, moveSpeed: 0 },
