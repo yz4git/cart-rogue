@@ -88,6 +88,22 @@ function enrichPastelPalette(demo: Phase21WorldDemo): void {
   });
 }
 
+function softenLighting(demo: Phase21WorldDemo): void {
+  const existing = demo.scene.getObjectByName("phase21-soft-ambient");
+  if (!existing) {
+    const ambient = new THREE.AmbientLight(0xfff8ee, 0.62);
+    ambient.name = "phase21-soft-ambient";
+    demo.scene.add(ambient);
+  }
+  demo.scene.traverse((object) => {
+    if (object instanceof THREE.HemisphereLight) {
+      object.intensity = Math.max(2.2, object.intensity);
+      object.groundColor.setHex(0xb7c895);
+    }
+    if (object instanceof THREE.DirectionalLight) object.intensity = Math.min(object.intensity, 1.9);
+  });
+}
+
 function gradeWorld(demo: Phase21WorldDemo): void {
   demo.renderer.toneMappingExposure = 1.12;
   demo.scene.background = new THREE.Color(0x82c9ff);
@@ -98,6 +114,7 @@ function gradeWorld(demo: Phase21WorldDemo): void {
   }
   recolorDarkEnvironment(demo);
   enrichPastelPalette(demo);
+  softenLighting(demo);
 }
 
 export function installCartRoguePhase21WorldGrade(): void {
