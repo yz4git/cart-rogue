@@ -7,8 +7,6 @@ interface CleanupDemo {
 }
 
 const cleaned = new WeakSet<object>();
-const warmA = new THREE.Color(0xf1cb88);
-const warmB = new THREE.Color(0xf7dca2);
 const green = new THREE.Color(0x9dce70);
 
 function luminance(color: THREE.Color): number {
@@ -50,13 +48,10 @@ function cleanupInstancedMesh(mesh: THREE.InstancedMesh): void {
     const far = Math.abs(position.x) > 28 || Math.abs(position.z) > 45;
     const oversized = scale.y > 2.2 || Math.abs(scale.x * scale.z) > 8;
 
-    if (flatGround) {
-      if (!mesh.instanceColor) {
-        for (let fill = 0; fill < mesh.count; fill += 1) mesh.setColorAt(fill, materialColor);
-      }
-      mesh.setColorAt(index, index % 2 === 0 ? warmA : warmB);
-      colorChanged = true;
-    } else if (far && oversized) {
+    // Phase 13 skid marks and other legacy dark floor stamps fight the bright
+    // reference-art sand surface. Remove the instances entirely instead of
+    // recoloring them so the Phase 19 ground cover remains clean and readable.
+    if (flatGround || (far && oversized)) {
       scale.multiplyScalar(0.001);
       matrix.compose(position, quaternion, scale);
       mesh.setMatrixAt(index, matrix);
