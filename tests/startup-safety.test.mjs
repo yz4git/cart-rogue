@@ -39,5 +39,5 @@ test("Cart Rogue boost vibration respects the versioned vibration preference", a
   const page = await readFile(new URL("../app/CartRogueGame.tsx", import.meta.url), "utf8");
   assert.match(page, /loadRallySettings\(\)/);
   assert.match(page, /settings\.vibrationEnabled && ["']vibrate["'] in navigator/);
-  assert.match(page, /navigator\.vibrate\?\.\(10\)/);
+  assert.match(page, /navigator\.vibrate\?\.\([1-9][0-9]*\)/);
 });

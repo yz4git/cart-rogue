@@ -101,16 +101,17 @@ export interface CartArenaSessionSnapshot {
 }
 
 const GAS_DRAIN_PER_SECOND = 0.0032;
-const RAM_COMBO_WINDOW = 2.1;
+const RAM_COMBO_WINDOW = 2.65;
 export const CART_TURBO_RECHARGE_SECONDS = 3.0;
 const WALL_MARGIN = 1.05;
 const CORNER_RELEASE_NUDGE = 0.72;
 const ARENA_MAX_SPEED = 21.5;
 const CORRIDOR_MAX_SPEED = 26;
 const BOSS_MAX_SPEED = 20.5;
-const ARENA_HANDLING_MULTIPLIER = 1.32;
-const CORRIDOR_HANDLING_MULTIPLIER = 1.12;
-const BOSS_HANDLING_MULTIPLIER = 1.28;
+const ARENA_HANDLING_MULTIPLIER = 1.52;
+const CORRIDOR_HANDLING_MULTIPLIER = 1.16;
+const BOSS_HANDLING_MULTIPLIER = 1.46;
+const MAX_FLOW_RECHARGE_MULTIPLIER = 1.62;
 
 export function cartSteeringInput(value: number): number {
   return -Math.max(-1, Math.min(1, value));
@@ -119,7 +120,7 @@ export function cartSteeringInput(value: number): number {
 export function quickenCartSteering(value: number): number {
   const clamped = Math.max(-1, Math.min(1, value));
   const magnitude = Math.abs(clamped);
-  const quicker = Math.min(1, magnitude * 1.28 + magnitude * magnitude * 0.16);
+  const quicker = Math.min(1, magnitude * 1.42 + magnitude * magnitude * 0.2);
   return Math.sign(clamped) * quicker;
 }
 
@@ -131,10 +132,32 @@ export function cartHandlingMultiplier(kind: CartWorldNodeKind): number {
       : ARENA_HANDLING_MULTIPLIER;
 }
 
+export function cartTurboRechargeMultiplier(ramCombo: number): number {
+  return Math.min(MAX_FLOW_RECHARGE_MULTIPLIER, 1 + Math.max(0, ramCombo - 1) * 0.14);
+}
+
+export function cartArcadeTurnAssistRate(
+  kind: CartWorldNodeKind,
+  speed: number,
+  boostActive: boolean,
+  brake: number,
+  steerMagnitude: number,
+): number {
+  const absoluteSpeed = Math.abs(speed);
+  const referenceSpeed = kind === "corridor" ? CORRIDOR_MAX_SPEED : kind === "boss" ? BOSS_MAX_SPEED : ARENA_MAX_SPEED;
+  const speedRatio = Math.max(0, Math.min(1, absoluteSpeed / Math.max(1, referenceSpeed)));
+  const baseRate = kind === "corridor" ? 0.46 : kind === "boss" ? 0.82 : 0.94;
+  const lowSpeedAssist = 1.28 - speedRatio * 0.42;
+  const turboAssist = boostActive ? 1.13 : 1;
+  const brakePivot = brake > 0.18 ? 1.42 : 1;
+  const steerScale = Math.max(0, Math.min(1, steerMagnitude * 1.18));
+  return baseRate * lowSpeedAssist * turboAssist * brakePivot * steerScale;
+}
+
 /**
  * Cart Rogue driving/combat runtime. RallyCar remains the proven low-level
  * vehicle implementation, while arena progression, renewable Turbo stocks,
- * solid/destructible obstacles, encounters and forgiving collision flow live here.
+ * solid/destructible obstacles, encounters and forgiving arcade handling live here.
  */
 export class CartArenaSession {
   readonly track: RallyTrack;
@@ -192,7 +215,8 @@ export class CartArenaSession {
     };
 
     this.car.update(activeInput, fixedDelta, true);
-    this.updateTurboRecharge(fixedDelta);
+    this.applyArcadeTurnAssist(activeInput.steer, activeInput.brake, fixedDelta);
+    this.updateTurboRecharge(fixedDelta * cartTurboRechargeMultiplier(this.ramCombo));
     this.gas = Math.max(0, this.gas - Math.max(0, activeInput.throttle) * GAS_DRAIN_PER_SECOND * fixedDelta);
     this.ramComboTimer = Math.max(0, this.ramComboTimer - fixedDelta);
     if (this.ramComboTimer <= 0) this.ramCombo = 0;
@@ -237,17 +261,24 @@ export class CartArenaSession {
         this.enemyHitCooldowns.set(contact.id, contact.kind === "boss" ? 0.42 : 0.34);
         this.lastRamEnemyId = result.enemyId;
         this.lastRamDamage = result.damage;
-        this.car.collisionImpact = Math.max(this.car.collisionImpact, result.destroyed ? 1 : 0.78);
-        this.car.forwardVelocity *= result.destroyed ? 0.94 : contact.kind === "boss" ? 0.72 : 0.78;
-        contact.x += Math.sin(this.car.heading) * (result.destroyed ? 0.5 : contact.kind === "boss" ? 1.15 : 1.55);
-        contact.z += Math.cos(this.car.heading) * (result.destroyed ? 0.5 : contact.kind === "boss" ? 1.15 : 1.55);
+        this.car.collisionImpact = Math.max(this.car.collisionImpact, result.destroyed ? 1 : 0.88);
+        if (result.destroyed) {
+          const attackCap = this.car.definition.maxSpeed * 1.4;
+          this.car.forwardVelocity = Math.min(attackCap, Math.max(0, this.car.forwardVelocity) * 0.99 + 0.8);
+        } else {
+          this.car.forwardVelocity *= contact.kind === "boss" ? 0.82 : contact.kind === "heavy" ? 0.86 : 0.9;
+        }
+        contact.x += Math.sin(this.car.heading) * (result.destroyed ? 0.75 : contact.kind === "boss" ? 1.35 : 1.75);
+        contact.z += Math.cos(this.car.heading) * (result.destroyed ? 0.75 : contact.kind === "boss" ? 1.35 : 1.75);
         breakHeavyParallelContact(contact, this.car.heading);
+        if (this.car.boostActive) {
+          this.car.boostTimeRemaining = Math.min(3.2, this.car.boostTimeRemaining + (result.destroyed ? 0.2 : 0.07));
+        }
         if (result.destroyed) {
           this.car.ramCount += 1;
           const gasReward = contact.kind === "boss" ? 0.1 : contact.kind === "heavy" ? 0.055 : 0.035;
           this.gas = Math.min(1, this.gas + gasReward);
-          this.ramCombo = this.ramComboTimer > 0 ? Math.min(9, this.ramCombo + 1) : 1;
-          this.ramComboTimer = RAM_COMBO_WINDOW;
+          this.registerFlowSmash(contact.kind === "boss" ? 0.12 : contact.kind === "heavy" ? 0.1 : 0.08);
         }
       } else {
         this.slideAroundEnemy(contact, previousX, previousZ);
@@ -322,6 +353,32 @@ export class CartArenaSession {
     this.car.definition.handling = this.baseHandling * cartHandlingMultiplier(kind);
   }
 
+  private applyArcadeTurnAssist(steer: number, brake: number, delta: number): void {
+    const steerMagnitude = Math.abs(steer);
+    if (steerMagnitude < 0.05 || Math.abs(this.car.forwardVelocity) < 1.2) return;
+    const rate = cartArcadeTurnAssistRate(
+      this.location.node.kind,
+      this.car.forwardVelocity,
+      this.car.boostActive,
+      brake,
+      steerMagnitude,
+    );
+    const direction = Math.sign(this.car.forwardVelocity || 1);
+    this.car.heading = normalizeAngle(this.car.heading + Math.sign(steer) * direction * rate * delta);
+    const gripBase = brake > 0.18 ? 0.76 : this.car.boostActive ? 0.84 : 0.88;
+    const gripPower = Math.max(0.2, steerMagnitude) * delta * 60;
+    this.car.lateralVelocity *= Math.pow(gripBase, gripPower);
+    this.syncHorizontalVelocity();
+  }
+
+  private registerFlowSmash(extraBoostSeconds = 0): void {
+    this.ramCombo = this.ramComboTimer > 0 ? Math.min(9, this.ramCombo + 1) : 1;
+    this.ramComboTimer = RAM_COMBO_WINDOW;
+    if (extraBoostSeconds > 0 && this.car.boostActive) {
+      this.car.boostTimeRemaining = Math.min(3.2, this.car.boostTimeRemaining + extraBoostSeconds);
+    }
+  }
+
   private tickCooldowns(cooldowns: Map<string, number>, delta: number): void {
     for (const [id, remaining] of cooldowns) {
       const next = remaining - delta;
@@ -379,10 +436,12 @@ export class CartArenaSession {
     if (result.destroyed) {
       this.obstacleHitCooldowns.set(obstacle.id, 0.3);
       this.car.destructionCount += 1;
-      this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.92);
-      this.car.forwardVelocity *= 0.96;
+      this.car.collisionImpact = Math.max(this.car.collisionImpact, 1);
+      const attackCap = this.car.definition.maxSpeed * 1.4;
+      this.car.forwardVelocity = Math.min(attackCap, Math.max(0, this.car.forwardVelocity) * 0.99 + 0.55);
       this.gas = Math.min(1, this.gas + 0.02);
-      this.lastReward = "ROCK SMASH · GAS +2%";
+      this.registerFlowSmash(0.08);
+      this.lastReward = this.ramCombo > 1 ? `ROCK SMASH · FLOW ×${this.ramCombo}` : "ROCK SMASH · GAS +2%";
       this.rewardTimer = 1.35;
       return;
     }
@@ -446,9 +505,9 @@ export class CartArenaSession {
       this.car.position.x = Math.max(minX, Math.min(maxX, clampedX + inwardX * CORNER_RELEASE_NUDGE));
       this.car.position.z = Math.max(minZ, Math.min(maxZ, clampedZ + inwardZ * CORNER_RELEASE_NUDGE));
       const targetHeading = Math.atan2(inwardX, inwardZ);
-      this.car.heading = rotateToward(this.car.heading, targetHeading, 0.78);
-      this.car.forwardVelocity = Math.max(4.5, Math.abs(this.car.forwardVelocity) * 0.86);
-      this.car.lateralVelocity *= 0.12;
+      this.car.heading = rotateToward(this.car.heading, targetHeading, 0.82);
+      this.car.forwardVelocity = Math.max(4.5, Math.abs(this.car.forwardVelocity) * 0.9);
+      this.car.lateralVelocity *= 0.1;
       this.syncHorizontalVelocity();
       this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.44);
       this.wallSlideTimer = 0.34;
@@ -464,9 +523,9 @@ export class CartArenaSession {
         : Math.abs(dx) > Math.abs(dz)
           ? this.closestHeading([0, Math.PI])
           : this.closestHeading([Math.PI / 2, -Math.PI / 2]);
-    this.car.heading = rotateToward(this.car.heading, targetHeading, 0.42);
-    this.car.forwardVelocity *= 0.92;
-    this.car.lateralVelocity *= 0.24;
+    this.car.heading = rotateToward(this.car.heading, targetHeading, 0.48);
+    this.car.forwardVelocity *= 0.94;
+    this.car.lateralVelocity *= 0.2;
     this.car.forwardVelocity = Math.max(3.8, Math.abs(this.car.forwardVelocity));
     this.syncHorizontalVelocity();
     this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.34);
@@ -485,16 +544,16 @@ export class CartArenaSession {
       this.car.position.x += inwardX * 0.52;
       this.car.position.z -= 0.58;
       const targetHeading = Math.atan2(inwardX * 0.72, -1);
-      this.car.heading = rotateToward(this.car.heading, targetHeading, 0.72);
+      this.car.heading = rotateToward(this.car.heading, targetHeading, 0.76);
     } else {
       const dx = this.car.position.x - previousX;
       const targetHeading = Math.abs(dx) > 0.02
         ? (dx >= 0 ? Math.PI / 2 : -Math.PI / 2)
         : this.closestHeading([Math.PI / 2, -Math.PI / 2]);
-      this.car.heading = rotateToward(this.car.heading, targetHeading, 0.46);
+      this.car.heading = rotateToward(this.car.heading, targetHeading, 0.5);
     }
-    this.car.forwardVelocity = Math.max(3.8, Math.abs(this.car.forwardVelocity) * 0.88);
-    this.car.lateralVelocity *= 0.2;
+    this.car.forwardVelocity = Math.max(3.8, Math.abs(this.car.forwardVelocity) * 0.9);
+    this.car.lateralVelocity *= 0.18;
     this.syncHorizontalVelocity();
     this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.42);
     this.wallSlideTimer = 0.28;
@@ -516,9 +575,9 @@ export class CartArenaSession {
     this.car.position.z = obstacle.z + normalZ * safeRadius;
     const tangentA = Math.atan2(-normalZ, normalX);
     const tangentB = normalizeAngle(tangentA + Math.PI);
-    this.car.heading = rotateToward(this.car.heading, this.closestHeading([tangentA, tangentB]), 0.5);
-    this.car.forwardVelocity = Math.max(3.2, Math.abs(this.car.forwardVelocity) * 0.66);
-    this.car.lateralVelocity *= 0.18;
+    this.car.heading = rotateToward(this.car.heading, this.closestHeading([tangentA, tangentB]), 0.56);
+    this.car.forwardVelocity = Math.max(3.2, Math.abs(this.car.forwardVelocity) * 0.72);
+    this.car.lateralVelocity *= 0.14;
     this.syncHorizontalVelocity();
     this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.62);
   }
@@ -544,26 +603,29 @@ export class CartArenaSession {
       enemy.x -= normalX * (enemy.kind === "boss" ? 0.28 : 0.38);
       enemy.z -= normalZ * (enemy.kind === "boss" ? 0.28 : 0.38);
       const awayHeading = Math.atan2(normalX, normalZ);
-      const offsetA = normalizeAngle(awayHeading + 0.38);
-      const offsetB = normalizeAngle(awayHeading - 0.38);
-      this.car.heading = rotateToward(this.car.heading, this.closestHeading([offsetA, offsetB]), 0.68);
-      this.car.forwardVelocity = Math.max(3.1, Math.abs(this.car.forwardVelocity) * (enemy.kind === "boss" ? 0.66 : 0.72));
-      this.car.lateralVelocity *= 0.14;
+      const offsetA = normalizeAngle(awayHeading + 0.42);
+      const offsetB = normalizeAngle(awayHeading - 0.42);
+      this.car.heading = rotateToward(this.car.heading, this.closestHeading([offsetA, offsetB]), 0.72);
+      this.car.forwardVelocity = Math.max(3.1, Math.abs(this.car.forwardVelocity) * (enemy.kind === "boss" ? 0.7 : 0.76));
+      this.car.lateralVelocity *= 0.12;
     } else {
       const tangentA = Math.atan2(normalZ, -normalX);
       const tangentB = normalizeAngle(tangentA + Math.PI);
-      this.car.heading = rotateToward(this.car.heading, this.closestHeading([tangentA, tangentB]), 0.34);
-      this.car.forwardVelocity = Math.max(3.2, Math.abs(this.car.forwardVelocity) * 0.84);
-      this.car.lateralVelocity *= 0.28;
+      this.car.heading = rotateToward(this.car.heading, this.closestHeading([tangentA, tangentB]), 0.42);
+      this.car.forwardVelocity = Math.max(3.2, Math.abs(this.car.forwardVelocity) * 0.9);
+      this.car.lateralVelocity *= 0.2;
     }
     this.syncHorizontalVelocity();
-    this.car.collisionImpact = Math.max(this.car.collisionImpact, enemy.kind === "boss" ? 0.72 : heavyLike ? 0.6 : 0.5);
+    this.car.collisionImpact = Math.max(this.car.collisionImpact, enemy.kind === "boss" ? 0.74 : heavyLike ? 0.64 : 0.52);
   }
 
   private syncHorizontalVelocity(): void {
-    const speed = Math.abs(this.car.forwardVelocity);
-    this.car.velocity.x = Math.sin(this.car.heading) * speed;
-    this.car.velocity.z = Math.cos(this.car.heading) * speed;
+    const forwardX = Math.sin(this.car.heading);
+    const forwardZ = Math.cos(this.car.heading);
+    const rightX = Math.cos(this.car.heading);
+    const rightZ = -Math.sin(this.car.heading);
+    this.car.velocity.x = forwardX * this.car.forwardVelocity + rightX * this.car.lateralVelocity;
+    this.car.velocity.z = forwardZ * this.car.forwardVelocity + rightZ * this.car.lateralVelocity;
     this.car.speed = Math.hypot(this.car.velocity.x, this.car.velocity.z);
   }
 
