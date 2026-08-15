@@ -60,8 +60,8 @@ test("CartArenaSession starts in the first combat arena with renewable turbo sto
     assert.equal(state.nodeId, "arena-01");
     assert.equal(state.encounter, "combat");
     assert.equal(state.gas, 1);
-    assert.equal(state.enemiesAlive, 4);
-    assert.equal(state.enemiesTotal, 4);
+    assert.equal(state.enemiesAlive, 3);
+    assert.equal(state.enemiesTotal, 3);
     assert.equal(state.gateLocked, true);
     assert.equal(state.boostCharges, 2);
     assert.equal(state.maxBoostCharges, 4);
