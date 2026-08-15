@@ -7,6 +7,8 @@ import "../src/cart/CartRoguePhase14SurfacePass";
 import "../src/cart/CartRoguePhase15Turbo";
 import "../src/cart/CartRoguePhase16Flow";
 import "../src/cart/CartRoguePhase17CombatEvolution";
+import "../src/cart/CartRoguePhase18VisualOverdrive";
+import "../src/cart/CartRoguePhase18VisualPolish";
 import CartRogueGame from "./CartRogueGame";
 
 export default function CartRogueGamePhase13() {
