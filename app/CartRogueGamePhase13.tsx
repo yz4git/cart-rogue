@@ -6,6 +6,7 @@ import "../src/cart/CartRoguePhase15Turbo";
 import "../src/cart/CartRoguePhase16Flow";
 import "../src/cart/CartRoguePhase17CombatEvolution";
 import "../src/cart/CartRoguePhase19TargetArt";
+import "../src/cart/CartRoguePhase19CreaturePolish";
 import "../src/cart/CartRoguePhase19GroundCover";
 import "../src/cart/CartRoguePhase19ReferencePolish";
 import "../src/cart/CartRoguePhase19ArtifactCleanup";
