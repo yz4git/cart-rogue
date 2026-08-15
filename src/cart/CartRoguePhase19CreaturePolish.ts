@@ -67,7 +67,7 @@ function addCreaturePresentation(group: THREE.Group, enemy: CartEnemySnapshot): 
     new THREE.MeshBasicMaterial({ color: 0xf25768 }),
   );
   hpFill.name = "hp-fill";
-  hpFill.position.set(0, 0.01, -0.055);
+  hpFill.position.set(0, 0.01, 0.055);
   hpBillboard.add(hpFill);
   ui.add(hpBillboard);
 
