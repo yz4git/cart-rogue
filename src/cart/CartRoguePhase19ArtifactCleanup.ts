@@ -29,6 +29,10 @@ function cleanupInstancedMesh(mesh: THREE.InstancedMesh): void {
   const firstColored = materialList.find((material) => material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshBasicMaterial);
   if (firstColored instanceof THREE.MeshStandardMaterial || firstColored instanceof THREE.MeshBasicMaterial) materialColor.copy(firstColored.color);
 
+  if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+  const geometrySize = new THREE.Vector3(1, 1, 1);
+  mesh.geometry.boundingBox?.getSize(geometrySize);
+
   const matrix = new THREE.Matrix4();
   const position = new THREE.Vector3();
   const quaternion = new THREE.Quaternion();
@@ -44,13 +48,16 @@ function cleanupInstancedMesh(mesh: THREE.InstancedMesh): void {
     const dark = luminance(color) < 0.24;
     if (!dark) continue;
 
-    const flatGround = position.y < 0.72 && scale.y < 0.75 && Math.abs(scale.x * scale.z) > 0.18;
+    const sizeX = Math.abs(geometrySize.x * scale.x);
+    const sizeY = Math.abs(geometrySize.y * scale.y);
+    const sizeZ = Math.abs(geometrySize.z * scale.z);
+    const horizontalArea = sizeX * sizeZ;
+    const flatGround = position.y < 0.72 && sizeY < 0.48 && horizontalArea > 0.14;
     const far = Math.abs(position.x) > 28 || Math.abs(position.z) > 45;
-    const oversized = scale.y > 2.2 || Math.abs(scale.x * scale.z) > 8;
+    const oversized = sizeY > 2.2 || horizontalArea > 8;
 
-    // Phase 13 skid marks and other legacy dark floor stamps fight the bright
-    // reference-art sand surface. Remove the instances entirely instead of
-    // recoloring them so the Phase 19 ground cover remains clean and readable.
+    // Phase 13 skid marks are thin geometry with a unit instance Y-scale.
+    // Classifying by effective geometry dimensions removes them correctly.
     if (flatGround || (far && oversized)) {
       scale.multiplyScalar(0.001);
       matrix.compose(position, quaternion, scale);
