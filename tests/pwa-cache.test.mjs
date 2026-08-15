@@ -21,9 +21,10 @@ test("Cart Rogue client registration bypasses the service-worker script cache an
   assert.match(app, /controllerchange/);
 });
 
-test("Cart Rogue PWA manifest keeps standalone landscape play", async () => {
+test("Cart Rogue PWA manifest requests fullscreen landscape play with a standalone fallback", async () => {
   const manifest = JSON.parse(await readFile(new URL("../public/manifest.json", import.meta.url), "utf8"));
   assert.equal(manifest.name, "Cart Rogue");
-  assert.equal(manifest.display, "standalone");
+  assert.equal(manifest.display, "fullscreen");
+  assert.deepEqual(manifest.display_override, ["fullscreen", "standalone"]);
   assert.equal(manifest.orientation, "landscape");
 });
