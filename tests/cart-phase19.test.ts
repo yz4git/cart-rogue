@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const source = readFileSync(new URL("../src/cart/CartRoguePhase19TargetArt.ts", import.meta.url), "utf8");
+const polish = readFileSync(new URL("../src/cart/CartRoguePhase19ReferencePolish.ts", import.meta.url), "utf8");
 const wrapper = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
 
 test("Phase 19 replaces the abstract horizon with a pastel voxel garden world", () => {
@@ -23,6 +24,7 @@ test("Phase 19 moves the render grade toward the bright pastel reference", () =>
   assert.match(source, /0x94ceff/);
   assert.match(source, /0xf18bbb/);
   assert.match(source, /0x9ed06f/);
+  assert.match(polish, /brightenPastelWorld/);
 });
 
 test("Phase 19 substantially increases hero and enemy reference likeness", () => {
@@ -42,16 +44,20 @@ test("Phase 19 adds large voxel hit debris and reference-style impact rays", () 
   assert.match(source, /TorusGeometry/);
 });
 
-test("Phase 19 uses a closer high three-quarter chase camera without gameplay changes", () => {
-  assert.match(source, /applyReferenceCamera/);
-  assert.match(source, /distance = snapshot\.boostActive \? 10\.7 : 9\.4/);
-  assert.match(source, /height = snapshot\.boostActive \? 6\.9 : 6\.2/);
-  assert.doesNotMatch(source, /applyTurboRam|cartSteeringInput|GAS_DRAIN_PER_SECOND|CART_TURBO_RECHARGE_SECONDS|enemy\.hp\s*=|enemy\.alive\s*=/);
+test("Phase 19 raises the camera and removes dark legacy environment artifacts", () => {
+  assert.match(polish, /cleanupLegacyDarkScenery/);
+  assert.match(polish, /flatGroundArtifact/);
+  assert.match(polish, /distantMonolith/);
+  assert.match(polish, /applyHigherReferenceCamera/);
+  assert.match(polish, /height = snapshot\.boostActive \? 8\.65 : 8\.1/);
+  assert.doesNotMatch(source + polish, /applyTurboRam|cartSteeringInput|GAS_DRAIN_PER_SECOND|CART_TURBO_RECHARGE_SECONDS|enemy\.hp\s*=|enemy\.alive\s*=/);
 });
 
-test("Phase 19 loads after Phase 18 so it can deliberately restyle the final presentation", () => {
+test("Phase 19 loads after Phase 18 and applies the final polish last", () => {
   assert.match(wrapper, /CartRoguePhase18VisualOverdrive/);
   assert.match(wrapper, /CartRoguePhase18VisualPolish/);
   assert.match(wrapper, /CartRoguePhase19TargetArt/);
+  assert.match(wrapper, /CartRoguePhase19ReferencePolish/);
   assert.ok(wrapper.indexOf("CartRoguePhase19TargetArt") > wrapper.indexOf("CartRoguePhase18VisualPolish"));
+  assert.ok(wrapper.indexOf("CartRoguePhase19ReferencePolish") > wrapper.indexOf("CartRoguePhase19TargetArt"));
 });
