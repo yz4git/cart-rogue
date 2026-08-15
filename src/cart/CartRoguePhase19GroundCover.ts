@@ -47,7 +47,10 @@ function addTopSurface(root: THREE.Group): void {
     if (!shape) continue;
     const geometry = new THREE.ShapeGeometry(shape, 1);
     const floor = new THREE.Mesh(geometry, sandMaterials[node.id === "arena-02" ? 1 : node.kind === "boss" ? 2 : 0]);
-    floor.rotation.x = Math.PI / 2;
+    // ShapeGeometry starts in XY with a +Z normal. Rotate -90° around X so
+    // the reference-art arena cover faces upward (+Y) and actually occludes
+    // all legacy floor layers beneath it from the gameplay camera.
+    floor.rotation.x = -Math.PI / 2;
     floor.position.set(node.rect.centerX, 0.145, node.rect.centerZ);
     floor.receiveShadow = false;
     root.add(floor);
