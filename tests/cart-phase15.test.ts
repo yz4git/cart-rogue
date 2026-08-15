@@ -11,8 +11,14 @@ function angleDistance(from: number, to: number): number {
   return Math.abs(Math.atan2(Math.sin(to - from), Math.cos(to - from)));
 }
 
-function clearRoom(session: CartArenaSession): void {
-  for (const enemy of session.enemies) enemy.alive = false;
+function prepareRoom(session: CartArenaSession): void {
+  for (const enemy of session.enemies) {
+    if (enemy.nodeId !== "arena-01") continue;
+    enemy.alive = true;
+    enemy.moveSpeed = 0;
+    enemy.x = enemy.id === "enemy-a" ? -18 : enemy.id === "enemy-b" ? 18 : 17;
+    enemy.z = enemy.id === "enemy-c" ? 42 : 18;
+  }
   for (const obstacle of session.obstacles) obstacle.destroyed = true;
   session.car.position.set(0, session.car.position.y, 28);
   session.car.heading = 0;
@@ -30,7 +36,7 @@ test("Phase 15 Turbo drift charge clamps at the authored full-charge time", () =
 test("holding Turbo does not spend stock and creates a slower, tight drift", () => {
   const session = new CartArenaSession();
   try {
-    clearRoom(session);
+    prepareRoom(session);
     const initialCharges = session.car.boostCharges;
     const initialHeading = session.car.heading;
     const initialSpeed = Math.abs(session.car.forwardVelocity);
@@ -50,7 +56,7 @@ test("holding Turbo does not spend stock and creates a slower, tight drift", () 
 test("releasing Turbo fires exactly once and consumes one stock", () => {
   const session = new CartArenaSession();
   try {
-    clearRoom(session);
+    prepareRoom(session);
     const initialCharges = session.car.boostCharges;
     for (let frame = 0; frame < 18; frame += 1) session.step(HOLD);
     const speedBeforeRelease = Math.abs(session.car.forwardVelocity);
@@ -73,7 +79,7 @@ test("a longer drift hold produces a stronger release dash than a tap", () => {
   const run = (holdFrames: number) => {
     const session = new CartArenaSession();
     try {
-      clearRoom(session);
+      prepareRoom(session);
       for (let frame = 0; frame < holdFrames; frame += 1) session.step({ ...HOLD, steer: 0 });
       const before = Math.abs(session.car.forwardVelocity);
       session.step({ ...RELEASE, steer: 0 });
