@@ -1,6 +1,7 @@
+import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
 
 const root = process.cwd();
 const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
@@ -8,36 +9,36 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 describe("Cart Rogue Phase 20 diorama quality", () => {
   it("loads both phase20 presentation passes after phase19", () => {
     const wrapper = read("app/CartRogueGamePhase13.tsx");
-    expect(wrapper).toContain('CartRoguePhase20DioramaQuality');
-    expect(wrapper).toContain('CartRoguePhase20ReferenceMatch');
-    expect(wrapper.indexOf('CartRoguePhase20DioramaQuality')).toBeGreaterThan(wrapper.indexOf('CartRoguePhase19ArtifactCleanup'));
-    expect(wrapper.indexOf('CartRoguePhase20ReferenceMatch')).toBeGreaterThan(wrapper.indexOf('CartRoguePhase20DioramaQuality'));
+    assert.ok(wrapper.includes("CartRoguePhase20DioramaQuality"));
+    assert.ok(wrapper.includes("CartRoguePhase20ReferenceMatch"));
+    assert.ok(wrapper.indexOf("CartRoguePhase20DioramaQuality") > wrapper.indexOf("CartRoguePhase19ArtifactCleanup"));
+    assert.ok(wrapper.indexOf("CartRoguePhase20ReferenceMatch") > wrapper.indexOf("CartRoguePhase20DioramaQuality"));
   });
 
   it("adds diorama landmarks and ambient petals without changing gameplay systems", () => {
     const source = read("src/cart/CartRoguePhase20DioramaQuality.ts");
-    expect(source).toContain('addCherryTree');
-    expect(source).toContain('addLantern');
-    expect(source).toContain('addBridge');
-    expect(source).toContain('createPetals');
-    expect(source).toContain('upgradeHero');
-    expect(source).toContain('cinematicCamera');
-    expect(source).not.toContain('session.step');
-    expect(source).not.toContain('turboStocks');
-    expect(source).not.toContain('gas =');
+    assert.ok(source.includes("addCherryTree"));
+    assert.ok(source.includes("addLantern"));
+    assert.ok(source.includes("addBridge"));
+    assert.ok(source.includes("createPetals"));
+    assert.ok(source.includes("upgradeHero"));
+    assert.ok(source.includes("cinematicCamera"));
+    assert.ok(!source.includes("session.step"));
+    assert.ok(!source.includes("turboStocks"));
+    assert.ok(!source.includes("gas ="));
   });
 
   it("tightens the generated-reference match with bright world, torii, dense garden, and closer camera", () => {
     const source = read("src/cart/CartRoguePhase20ReferenceMatch.ts");
-    expect(source).toContain('retintLegacyScenery');
-    expect(source).toContain('applyReferenceDaylight');
-    expect(source).toContain('addDenseCherry');
-    expect(source).toContain('addTorii');
-    expect(source).toContain('addNearGardenLayer');
-    expect(source).toContain('polishHero');
-    expect(source).toContain('closerReferenceCamera');
-    expect(source).not.toContain('session.step');
-    expect(source).not.toContain('turboStocks');
+    assert.ok(source.includes("retintLegacyScenery"));
+    assert.ok(source.includes("applyReferenceDaylight"));
+    assert.ok(source.includes("addDenseCherry"));
+    assert.ok(source.includes("addTorii"));
+    assert.ok(source.includes("addNearGardenLayer"));
+    assert.ok(source.includes("polishHero"));
+    assert.ok(source.includes("closerReferenceCamera"));
+    assert.ok(!source.includes("session.step"));
+    assert.ok(!source.includes("turboStocks"));
   });
 
   it("keeps the phase20 passes texture-free and lightweight", () => {
@@ -45,9 +46,9 @@ describe("Cart Rogue Phase 20 diorama quality", () => {
       read("src/cart/CartRoguePhase20DioramaQuality.ts"),
       read("src/cart/CartRoguePhase20ReferenceMatch.ts"),
     ].join("\n");
-    expect(sources).not.toContain('TextureLoader');
-    expect(sources).not.toContain('WebGLRenderTarget');
-    expect(sources).not.toContain('EffectComposer');
-    expect(sources).toContain('flatShading: true');
+    assert.ok(!sources.includes("TextureLoader"));
+    assert.ok(!sources.includes("WebGLRenderTarget"));
+    assert.ok(!sources.includes("EffectComposer"));
+    assert.ok(sources.includes("flatShading: true"));
   });
 });
