@@ -5,6 +5,7 @@ import "../src/cart/CartRoguePhase13Grade";
 import "../src/cart/CartRoguePhase14Arenas";
 import "../src/cart/CartRoguePhase14SurfacePass";
 import "../src/cart/CartRoguePhase15Turbo";
+import "../src/cart/CartRoguePhase16Flow";
 import CartRogueGame from "./CartRogueGame";
 
 export default function CartRogueGamePhase13() {

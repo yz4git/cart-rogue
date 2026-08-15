@@ -17,6 +17,7 @@ import {
   type CartRunUpgradeDefinition,
   type CartRunUpgradeState,
 } from "../src/cart/CartRunProgression";
+import { cartStageClearNumber, isCartPerkStageClear } from "../src/cart/CartRoguePhase16Flow";
 import { cartWorldNodeById } from "../src/cart/CartWorldGraph";
 import CartRunRouteMap from "./CartRunRouteMap";
 import styles from "./CartRogueGame.module.css";
@@ -70,13 +71,20 @@ interface RunResult {
   bestScrap: number;
 }
 
+interface StageClearState {
+  nodeId: string;
+  stage: number;
+  runClear: boolean;
+}
+
 function objective(snapshot: CartArenaSessionSnapshot): string {
   if (snapshot.runComplete) return "RUN CLEAR · BOSS DESTROYED";
   if (snapshot.nodeId === "arena-01" && snapshot.gateLocked) return `TURBO RAM LIGHT TARGETS · ${snapshot.enemiesAlive} LEFT`;
-  if (snapshot.nodeId === "arena-01") return "UPGRADE READY · THEN ENTER CORRIDOR";
+  if (snapshot.nodeId === "arena-01") return "ARENA CLEAR · ENTER SUPPLY LANE";
   if (snapshot.nodeId === "corridor-01") return "CORRIDOR · COLLECT CELLS · REACH ELITE";
   if (snapshot.nodeId === "arena-02" && snapshot.gateLocked) return `ELITE ARENA · ${snapshot.enemiesAlive} LEFT`;
-  if (snapshot.nodeId === "arena-02") return "ELITE CLEAR · PICK A ROUTE";
+  if (snapshot.nodeId === "arena-02") return "STAGE 1 CLEAR · BUILD UPGRADE";
+  if (snapshot.nodeId === "arena-03" && !snapshot.gateLocked) return "STAGE 2 CLEAR · BUILD UPGRADE";
   if (snapshot.nodeId === "corridor-02") return "BOSS APPROACH · STOCK TURBO";
   if (snapshot.nodeKind === "boss") return `TURBO RAM BOSS · ${Math.ceil(snapshot.bossHp)} HP`;
 
@@ -88,7 +96,7 @@ function objective(snapshot: CartArenaSessionSnapshot): string {
   if ((node?.routeType === "combat" || node?.routeType === "elite") && snapshot.gateLocked) {
     return `${node.routeType === "elite" ? "ELITE" : "BRAWL"} · ${snapshot.enemiesAlive} LEFT`;
   }
-  if ((node?.routeType === "combat" || node?.routeType === "elite") && !snapshot.gateLocked) return "ROOM CLEAR · BUILD UPGRADE READY";
+  if ((node?.routeType === "combat" || node?.routeType === "elite") && !snapshot.gateLocked) return "ROOM CLEAR · KEEP MOVING";
   return node?.label ?? "KEEP MOVING";
 }
 
@@ -137,12 +145,13 @@ export default function CartRogueGame() {
   const boostPointersRef = useRef(new Set<number>());
   const brakePointersRef = useRef(new Set<number>());
   const previousSnapshotRef = useRef<CartArenaSessionSnapshot>(INITIAL);
-  const offeredRoomsRef = useRef(new Set<string>());
+  const offeredStagesRef = useRef(new Set<string>());
   const offerCounterRef = useRef(0);
   const runSeedRef = useRef(1);
   const scrapRef = useRef(0);
   const runStartRef = useRef(0);
   const resultShownRef = useRef(false);
+  const clearTimerRef = useRef<number | null>(null);
   const [snapshot, setSnapshot] = useState(INITIAL);
   const [rendererName, setRendererName] = useState<"WEBGL" | "CANVAS">("WEBGL");
   const [runtimeMessage, setRuntimeMessage] = useState<string | null>(null);
@@ -150,6 +159,7 @@ export default function CartRogueGame() {
   const [scrap, setScrap] = useState(0);
   const [upgrades, setUpgrades] = useState<CartRunUpgradeState[]>([]);
   const [perkOffer, setPerkOffer] = useState<PerkOffer | null>(null);
+  const [stageClear, setStageClear] = useState<StageClearState | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
 
   useEffect(() => {
@@ -158,10 +168,14 @@ export default function CartRogueGame() {
     let demo: CartRogueDemoHandle | null = null;
     let switching = false;
 
+    if (clearTimerRef.current !== null) {
+      window.clearTimeout(clearTimerRef.current);
+      clearTimerRef.current = null;
+    }
     runSeedRef.current = ((Date.now() & 0x7fffffff) ^ ((runSerial + 1) * 0x45d9f3b)) | 0;
     resetCartRunProgression(runSeedRef.current);
     previousSnapshotRef.current = INITIAL;
-    offeredRoomsRef.current.clear();
+    offeredStagesRef.current.clear();
     offerCounterRef.current = 0;
     scrapRef.current = 0;
     resultShownRef.current = false;
@@ -183,28 +197,42 @@ export default function CartRogueGame() {
         setScrap(scrapRef.current);
       }
 
-      const clearedArena = next.nodeKind === "arena"
+      const stageNumber = cartStageClearNumber(next.nodeId);
+      const clearedPerkStage = isCartPerkStageClear(next.nodeId)
         && next.enemiesTotal > 0
         && next.enemiesAlive === 0
-        && !offeredRoomsRef.current.has(next.nodeId);
-      if (clearedArena) {
-        offeredRoomsRef.current.add(next.nodeId);
+        && !offeredStagesRef.current.has(next.nodeId);
+      if (clearedPerkStage && stageNumber !== null) {
+        offeredStagesRef.current.add(next.nodeId);
         const offerIndex = offerCounterRef.current;
         offerCounterRef.current += 1;
         demoRef.current?.pause();
-        setPerkOffer({
-          nodeId: next.nodeId,
-          offerIndex,
-          rerollIndex: 0,
-          choices: rollCartRunUpgradeChoices(runSeedRef.current, offerIndex, 0),
-        });
+        setStageClear({ nodeId: next.nodeId, stage: stageNumber, runClear: false });
+        if (clearTimerRef.current !== null) window.clearTimeout(clearTimerRef.current);
+        clearTimerRef.current = window.setTimeout(() => {
+          clearTimerRef.current = null;
+          setStageClear(null);
+          setPerkOffer({
+            nodeId: next.nodeId,
+            offerIndex,
+            rerollIndex: 0,
+            choices: rollCartRunUpgradeChoices(runSeedRef.current, offerIndex, 0),
+          });
+        }, 1550);
       }
 
       if (next.runComplete && !previous.runComplete && !resultShownRef.current) {
         resultShownRef.current = true;
         demoRef.current?.pause();
         const timeSeconds = Math.max(0, (performance.now() - runStartRef.current) / 1000);
-        setResult(updateRunRecords(timeSeconds, scrapRef.current));
+        const finalResult = updateRunRecords(timeSeconds, scrapRef.current);
+        setStageClear({ nodeId: next.nodeId, stage: 3, runClear: true });
+        if (clearTimerRef.current !== null) window.clearTimeout(clearTimerRef.current);
+        clearTimerRef.current = window.setTimeout(() => {
+          clearTimerRef.current = null;
+          setStageClear(null);
+          setResult(finalResult);
+        }, 1850);
       }
 
       previousSnapshotRef.current = next;
@@ -243,6 +271,10 @@ export default function CartRogueGame() {
     }
 
     return () => {
+      if (clearTimerRef.current !== null) {
+        window.clearTimeout(clearTimerRef.current);
+        clearTimerRef.current = null;
+      }
       demo?.dispose();
       demoRef.current = null;
     };
@@ -353,12 +385,17 @@ export default function CartRogueGame() {
   };
 
   const startNewRun = () => {
+    if (clearTimerRef.current !== null) {
+      window.clearTimeout(clearTimerRef.current);
+      clearTimerRef.current = null;
+    }
     setSnapshot(INITIAL);
     setRendererName("WEBGL");
     setRuntimeMessage(null);
     setScrap(0);
     setUpgrades([]);
     setPerkOffer(null);
+    setStageClear(null);
     setResult(null);
     setRunSerial((value) => value + 1);
   };
@@ -387,7 +424,7 @@ export default function CartRogueGame() {
           </div>
         </div>
 
-        {!perkOffer && !result && <CartRunRouteMap nodeId={snapshot.nodeId} gateLocked={snapshot.gateLocked} />}
+        {!perkOffer && !result && !stageClear && <CartRunRouteMap nodeId={snapshot.nodeId} gateLocked={snapshot.gateLocked} />}
 
         {upgrades.length > 0 && (
           <div className={phase8Styles.upgradeStrip}>
@@ -404,12 +441,12 @@ export default function CartRogueGame() {
             <div className={phase8Styles.bossPhase}>TITAN PHASE {currentBossPhase} · {currentBossPhase === 1 ? "HUNT" : currentBossPhase === 2 ? "CHARGE" : "ENRAGED"}</div>
           </>
         )}
-        {snapshot.runComplete && !result && <div className={phase4Styles.runClear}>RUN CLEAR!</div>}
+        {stageClear && <div className={phase4Styles.runClear}>{stageClear.runClear ? "RUN CLEAR!" : `STAGE ${stageClear.stage} CLEAR!`}</div>}
         {snapshot.ramCombo > 1 && <div className={styles.combo}>FLOW COMBO! <strong>×{snapshot.ramCombo}</strong></div>}
-        {snapshot.nodeKind !== "boss" && snapshot.enemiesTotal > 0 && !snapshot.gateLocked && !perkOffer && <div className={styles.gateOpen}>GATE OPEN!</div>}
+        {snapshot.nodeKind !== "boss" && snapshot.enemiesTotal > 0 && !snapshot.gateLocked && !perkOffer && !stageClear && <div className={styles.gateOpen}>GATE OPEN!</div>}
         {snapshot.boostActive && <div className={styles.ramBanner}>TURBO RAM</div>}
         {snapshot.wallSliding && <div className={phaseStyles.wallRide}>WALL RIDE</div>}
-        {snapshot.lastReward && !perkOffer && <div className={phaseStyles.rewardBanner}>{snapshot.lastReward}</div>}
+        {snapshot.lastReward && !perkOffer && !stageClear && <div className={phaseStyles.rewardBanner}>{snapshot.lastReward}</div>}
 
         <div className={styles.bottomHud}>
           <div className={styles.meterCard}>
@@ -459,7 +496,7 @@ export default function CartRogueGame() {
             onPointerCancel={releaseBoost}
             onLostPointerCapture={releaseBoost}
           >
-            <strong>TURBO</strong><small>{snapshot.boostCharges > 0 ? "RAM / SMASH" : "CHARGING"}</small>
+            <strong>TURBO</strong><small>{snapshot.boostCharges > 0 ? "HOLD DRIFT · RELEASE DASH" : "CHARGING"}</small>
           </button>
         </div>
 
@@ -470,7 +507,7 @@ export default function CartRogueGame() {
           <div className={phase8Styles.perkOverlay} role="dialog" aria-modal="true" aria-label="Choose an upgrade">
             <div className={phase8Styles.perkPanel}>
               <div className={phase8Styles.perkHead}>
-                <div><small>{perkOffer.nodeId.toUpperCase()} CLEAR</small><h2>CHOOSE YOUR BUILD</h2></div>
+                <div><small>STAGE {cartStageClearNumber(perkOffer.nodeId) ?? "?"} CLEAR</small><h2>CHOOSE YOUR BUILD</h2></div>
                 <div className={phase8Styles.perkWallet}>SCRAP {scrap}</div>
               </div>
               <div className={phase8Styles.perkGrid}>
@@ -488,7 +525,7 @@ export default function CartRogueGame() {
                 })}
               </div>
               <div className={phase8Styles.perkFooter}>
-                <span>Perks stack for this run only. Build for RAM, control, demolition, mobility hunting, or boss damage.</span>
+                <span>Perks are awarded at stage clears only and stack for this run.</span>
                 <button className={phase8Styles.rerollButton} disabled={scrap < rerollCost} onClick={rerollPerks}>REROLL · {rerollCost} SCRAP</button>
               </div>
             </div>
