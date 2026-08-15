@@ -404,7 +404,7 @@ export function applyTurboRam(
   const baseDamage = enemy.kind === "boss"
     ? 88
     : enemy.archetype === "tank"
-      ? 96
+      ? 105
       : enemy.kind === "heavy"
         ? 105
         : enemy.archetype === "bomber"
