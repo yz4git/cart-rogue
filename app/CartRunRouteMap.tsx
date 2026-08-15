@@ -1,6 +1,11 @@
 "use client";
 
-import { cartUpcomingRouteChoices, type CartRouteChoice, type CartRouteType } from "../src/cart/CartWorldGraph";
+import {
+  cartUpcomingRouteChoices,
+  cartWorldNodeById,
+  type CartRouteChoice,
+  type CartRouteType,
+} from "../src/cart/CartWorldGraph";
 import styles from "./CartRunRouteMap.module.css";
 
 interface Props {
@@ -24,14 +29,20 @@ function routeSide(choice: CartRouteChoice): string {
   return "CENTER";
 }
 
+export function shouldShowCartRouteFork(nodeId: string, gateLocked: boolean): boolean {
+  const current = cartWorldNodeById(nodeId);
+  return Boolean(current && !gateLocked && current.next.length > 1);
+}
+
 export default function CartRunRouteMap({ nodeId, gateLocked }: Props) {
+  if (!shouldShowCartRouteFork(nodeId, gateLocked)) return null;
   const choices = cartUpcomingRouteChoices(nodeId);
   if (choices.length < 2) return null;
   return (
     <aside className={styles.panel} aria-label="Upcoming route fork">
       <div className={styles.head}>
         <span>RUN MAP · ROUTE FORK</span>
-        <strong>{gateLocked ? "CLEAR ROOM TO UNLOCK" : "STEER INTO A ROUTE"}</strong>
+        <strong>STEER INTO A ROUTE</strong>
       </div>
       <div className={styles.branches}>
         {choices.map((choice) => (
