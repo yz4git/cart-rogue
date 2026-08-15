@@ -1,10 +1,19 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 const isGitHubPagesBuild = process.env.VOXEL_RALLY_PAGES === "1";
 const githubPagesBasePath = isGitHubPagesBuild
   ? `/${process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "cart-rogue"}`
   : "";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#bfe6e9",
+};
 
 export const metadata: Metadata = {
   title: "Cart Rogue — Turbo Ram Roguelite",
@@ -16,7 +25,10 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
   },
   formatDetection: { telephone: false },
-  other: { "codex-preview": "development" },
+  other: {
+    "codex-preview": "development",
+    "mobile-web-app-capable": "yes",
+  },
   icons: {
     icon: `${githubPagesBasePath}/favicon.svg`,
     shortcut: `${githubPagesBasePath}/favicon.svg`,
