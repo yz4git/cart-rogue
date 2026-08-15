@@ -1,12 +1,15 @@
 import { getCartRunModifiers } from "./CartRunProgression";
 import { CART_WORLD_GRAPH, type CartWorldNode } from "./CartWorldGraph";
 
-export type CartEnemyKind = "blocker" | "heavy" | "chaser" | "striker" | "orbiter" | "boss";
+export type CartEnemyKind = "blocker" | "heavy" | "chaser" | "boss";
+export type CartEnemyArchetype = "standard" | "striker" | "orbiter";
+type GeneratedEnemyType = CartEnemyKind | "striker" | "orbiter";
 
 export interface CartEnemyState {
   id: string;
   nodeId: string;
   kind: CartEnemyKind;
+  archetype?: CartEnemyArchetype;
   x: number;
   z: number;
   radius: number;
@@ -34,16 +37,16 @@ export function createInitialCartEnemies(): CartEnemyState[] {
     // The first two rooms remain authored onboarding checkpoints.
     { id: "enemy-a", nodeId: "arena-01", kind: "blocker", x: -10, z: 25, radius: 1.75, maxHp: 100, hp: 100, alive: true, heading: 0.5, moveSpeed: 0 },
     { id: "enemy-b", nodeId: "arena-01", kind: "blocker", x: 10, z: 34, radius: 1.75, maxHp: 100, hp: 100, alive: true, heading: -0.8, moveSpeed: 0 },
-    { id: "enemy-c", nodeId: "arena-01", kind: "chaser", x: -4, z: 43, radius: 1.72, maxHp: 100, hp: 100, alive: true, heading: 2.2, moveSpeed: 2.8 },
-    { id: "enemy-e", nodeId: "arena-02", kind: "chaser", x: -16, z: 108, radius: 1.72, maxHp: 100, hp: 100, alive: true, heading: 0.4, moveSpeed: 4.0 },
-    { id: "enemy-f", nodeId: "arena-02", kind: "chaser", x: 16, z: 120, radius: 1.72, maxHp: 100, hp: 100, alive: true, heading: -1.0, moveSpeed: 4.2 },
+    { id: "enemy-c", nodeId: "arena-01", kind: "chaser", archetype: "standard", x: -4, z: 43, radius: 1.72, maxHp: 100, hp: 100, alive: true, heading: 2.2, moveSpeed: 2.8 },
+    { id: "enemy-e", nodeId: "arena-02", kind: "chaser", archetype: "standard", x: -16, z: 108, radius: 1.72, maxHp: 100, hp: 100, alive: true, heading: 0.4, moveSpeed: 4.0 },
+    { id: "enemy-f", nodeId: "arena-02", kind: "chaser", archetype: "standard", x: 16, z: 120, radius: 1.72, maxHp: 100, hp: 100, alive: true, heading: -1.0, moveSpeed: 4.2 },
     { id: "enemy-g", nodeId: "arena-02", kind: "blocker", x: -7, z: 130, radius: 1.82, maxHp: 110, hp: 110, alive: true, heading: 2.4, moveSpeed: 0 },
     { id: "elite-a", nodeId: "arena-02", kind: "heavy", x: 9, z: 109, radius: 2.45, maxHp: 220, hp: 220, alive: true, heading: -2.5, moveSpeed: 2.0 },
   ];
 
   for (const node of CART_WORLD_GRAPH.nodes) {
     if (node.id === "arena-01" || node.id === "arena-02" || node.kind === "boss") continue;
-    if (node.encounter !== "combat" && node.encounter !== "elite") continue;
+    if (node.routeType !== "combat" && node.routeType !== "elite") continue;
     enemies.push(...createGeneratedWave(node));
   }
 
@@ -70,7 +73,7 @@ export function createInitialCartEnemies(): CartEnemyState[] {
 }
 
 export function createGeneratedWave(node: CartWorldNode): CartEnemyState[] {
-  const elite = node.encounter === "elite";
+  const elite = node.routeType === "elite";
   const count = elite ? 5 : node.id === "arena-03" ? 5 : 4;
   const positions = [
     [-0.5, -0.38],
@@ -79,22 +82,25 @@ export function createGeneratedWave(node: CartWorldNode): CartEnemyState[] {
     [0.42, 0.44],
     [0.02, 0.04],
   ] as const;
-  const normalPool: readonly CartEnemyKind[] = ["chaser", "striker", "orbiter", "blocker"];
-  const elitePool: readonly CartEnemyKind[] = ["heavy", "striker", "orbiter", "chaser"];
+  const normalPool: readonly GeneratedEnemyType[] = ["chaser", "striker", "orbiter", "blocker"];
+  const elitePool: readonly GeneratedEnemyType[] = ["heavy", "striker", "orbiter", "chaser"];
   let state = node.waveSeed ?? hashId(node.id);
   const result: CartEnemyState[] = [];
   for (let index = 0; index < count; index += 1) {
     state = xorshift32(state);
     const pool = elite ? elitePool : normalPool;
-    const kind = elite && index === 0 ? "heavy" : pool[Math.abs(state) % pool.length];
+    const generatedType: GeneratedEnemyType = elite && index === 0 ? "heavy" : pool[Math.abs(state) % pool.length];
     const [px, pz] = positions[index % positions.length];
     const x = node.rect.centerX + px * Math.max(10, node.rect.halfWidth * 1.35);
     const z = node.rect.centerZ + pz * Math.max(10, node.rect.halfDepth * 1.35);
-    const stats = enemyStats(kind, elite);
+    const stats = enemyStats(generatedType, elite);
+    const kind: CartEnemyKind = generatedType === "striker" || generatedType === "orbiter" ? "chaser" : generatedType;
+    const archetype: CartEnemyArchetype | undefined = generatedType === "striker" || generatedType === "orbiter" ? generatedType : kind === "chaser" ? "standard" : undefined;
     result.push({
       id: `${node.id}-wave-${index + 1}`,
       nodeId: node.id,
       kind,
+      archetype,
       x,
       z,
       radius: stats.radius,
@@ -103,9 +109,9 @@ export function createGeneratedWave(node: CartWorldNode): CartEnemyState[] {
       alive: true,
       heading: normalizeAngle((state % 628) / 100),
       moveSpeed: stats.speed,
-      aiClock: kind === "striker" || kind === "orbiter" ? Math.abs(state % 100) / 20 : undefined,
-      chargeCooldown: kind === "striker" ? 0.9 + Math.abs(state % 7) * 0.15 : undefined,
-      chargeTime: kind === "striker" ? 0 : undefined,
+      aiClock: archetype === "striker" || archetype === "orbiter" ? Math.abs(state % 100) / 20 : undefined,
+      chargeCooldown: archetype === "striker" ? 0.9 + Math.abs(state % 7) * 0.15 : undefined,
+      chargeTime: archetype === "striker" ? 0 : undefined,
     });
   }
   return result;
@@ -151,18 +157,18 @@ export function updateCartEnemyMovement(
     const dx = playerX - enemy.x;
     const dz = playerZ - enemy.z;
     const distance = Math.hypot(dx, dz);
-    const activationDistance = enemy.kind === "boss" ? 38 : enemy.kind === "heavy" ? 20 : enemy.kind === "striker" ? 30 : 26;
+    const activationDistance = enemy.kind === "boss" ? 38 : enemy.kind === "heavy" ? 20 : enemy.archetype === "striker" ? 30 : 26;
     if (distance < 0.001 || distance > activationDistance) continue;
 
     if (enemy.kind === "boss") {
       updateBossMovement(enemy, playerX, playerZ, distance, delta, bounds, modifiers.enemySpeedMultiplier);
       continue;
     }
-    if (enemy.kind === "striker") {
+    if (enemy.archetype === "striker") {
       updateStrikerMovement(enemy, playerX, playerZ, distance, delta, bounds, modifiers.enemySpeedMultiplier);
       continue;
     }
-    if (enemy.kind === "orbiter") {
+    if (enemy.archetype === "orbiter") {
       updateOrbiterMovement(enemy, playerX, playerZ, distance, delta, bounds, modifiers.enemySpeedMultiplier);
       continue;
     }
@@ -323,9 +329,9 @@ export function applyTurboRam(
     ? 88
     : enemy.kind === "heavy"
       ? 105
-      : enemy.kind === "striker"
+      : enemy.archetype === "striker"
         ? 118
-        : enemy.kind === "orbiter"
+        : enemy.archetype === "orbiter"
           ? 112
           : 115;
   const modifiers = getCartRunModifiers();
@@ -333,7 +339,7 @@ export function applyTurboRam(
   damage *= modifiers.ramDamageMultiplier;
   if (enemy.kind === "heavy") damage *= modifiers.heavyDamageMultiplier;
   if (enemy.kind === "boss") damage *= modifiers.bossDamageMultiplier;
-  if (enemy.kind === "chaser" || enemy.kind === "striker" || enemy.kind === "orbiter") damage *= modifiers.mobileDamageMultiplier;
+  if (enemy.kind === "chaser") damage *= modifiers.mobileDamageMultiplier;
   if (absoluteSpeed >= modifiers.redlineSpeed) damage *= modifiers.redlineDamageMultiplier;
   if (enemy.hp / Math.max(1, enemy.maxHp) <= modifiers.executionThreshold) {
     damage *= modifiers.executionDamageMultiplier;
@@ -344,7 +350,7 @@ export function applyTurboRam(
   return { hit: true, destroyed: !enemy.alive, enemyId: enemy.id, damage: roundedDamage };
 }
 
-function enemyStats(kind: CartEnemyKind, eliteRoom: boolean): { radius: number; hp: number; speed: number } {
+function enemyStats(kind: GeneratedEnemyType, eliteRoom: boolean): { radius: number; hp: number; speed: number } {
   const eliteScale = eliteRoom ? 1.12 : 1;
   switch (kind) {
     case "heavy":
