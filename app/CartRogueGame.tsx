@@ -6,9 +6,21 @@ import type { CartArenaSessionSnapshot } from "../src/cart/CartArenaSession";
 import { CartRogueCanvasPreview } from "../src/cart/CartRogueCanvasPreview";
 import type { CartRogueDemoHandle } from "../src/cart/CartRogueDemo";
 import { CartRogueWebGLDemo } from "../src/cart/CartRogueWebGLDemo";
+import {
+  applyCartRunUpgrade,
+  cartRunUpgradeRank,
+  cartScrapReward,
+  getAppliedCartRunUpgrades,
+  getCartRunModifiers,
+  resetCartRunProgression,
+  rollCartRunUpgradeChoices,
+  type CartRunUpgradeDefinition,
+  type CartRunUpgradeState,
+} from "../src/cart/CartRunProgression";
 import styles from "./CartRogueGame.module.css";
 import phaseStyles from "./CartRoguePhase3.module.css";
 import phase4Styles from "./CartRoguePhase4.module.css";
+import phase8Styles from "./CartRoguePhase8.module.css";
 
 const INITIAL: CartArenaSessionSnapshot = {
   nodeId: "arena-01",
@@ -42,16 +54,51 @@ const INITIAL: CartArenaSessionSnapshot = {
   obstacles: [],
 };
 
+interface PerkOffer {
+  nodeId: string;
+  offerIndex: number;
+  rerollIndex: number;
+  choices: CartRunUpgradeDefinition[];
+}
+
+interface RunResult {
+  timeSeconds: number;
+  scrap: number;
+  bestTimeSeconds: number;
+  bestScrap: number;
+}
+
 function objective(snapshot: CartArenaSessionSnapshot): string {
   if (snapshot.runComplete) return "RUN CLEAR · BOSS DESTROYED";
   if (snapshot.nodeId === "arena-01" && snapshot.gateLocked) return `TURBO RAM LIGHT TARGETS · ${snapshot.enemiesAlive} LEFT`;
-  if (snapshot.nodeId === "arena-01") return "GATE OPEN · ENTER CORRIDOR";
+  if (snapshot.nodeId === "arena-01") return "UPGRADE READY · THEN ENTER CORRIDOR";
   if (snapshot.nodeId === "corridor-01") return "CORRIDOR · COLLECT CELLS · REACH ELITE";
   if (snapshot.nodeId === "arena-02" && snapshot.gateLocked) return `ELITE ARENA · ${snapshot.enemiesAlive} LEFT`;
-  if (snapshot.nodeId === "arena-02") return "ELITE CLEAR · NEXT CORRIDOR OPEN";
+  if (snapshot.nodeId === "arena-02") return "ELITE CLEAR · BUILD UPGRADE READY";
   if (snapshot.nodeId === "corridor-02") return "BOSS CORRIDOR · STOCK TURBO";
   if (snapshot.nodeKind === "boss") return `TURBO RAM BOSS · ${Math.ceil(snapshot.bossHp)} HP`;
   return "KEEP MOVING";
+}
+
+function scrapForEnemy(kind: string): number {
+  if (kind === "boss") return 30;
+  if (kind === "heavy") return 12;
+  if (kind === "chaser") return 5;
+  return 4;
+}
+
+function formatTime(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds - minutes * 60;
+  return `${minutes}:${rest.toFixed(1).padStart(4, "0")}`;
+}
+
+function bossPhase(snapshot: CartArenaSessionSnapshot): 1 | 2 | 3 {
+  if (snapshot.bossMaxHp <= 0) return 1;
+  const ratio = snapshot.bossHp / snapshot.bossMaxHp;
+  if (ratio > 0.66) return 1;
+  if (ratio > 0.33) return 2;
+  return 3;
 }
 
 export default function CartRogueGame() {
@@ -61,9 +108,20 @@ export default function CartRogueGame() {
   const steerOriginRef = useRef(0);
   const boostPointersRef = useRef(new Set<number>());
   const brakePointersRef = useRef(new Set<number>());
+  const previousSnapshotRef = useRef<CartArenaSessionSnapshot>(INITIAL);
+  const offeredRoomsRef = useRef(new Set<string>());
+  const offerCounterRef = useRef(0);
+  const runSeedRef = useRef(1);
+  const scrapRef = useRef(0);
+  const runStartRef = useRef(0);
   const [snapshot, setSnapshot] = useState(INITIAL);
   const [rendererName, setRendererName] = useState<"WEBGL" | "CANVAS">("WEBGL");
   const [runtimeMessage, setRuntimeMessage] = useState<string | null>(null);
+  const [runSerial, setRunSerial] = useState(0);
+  const [scrap, setScrap] = useState(0);
+  const [upgrades, setUpgrades] = useState<CartRunUpgradeState[]>([]);
+  const [perkOffer, setPerkOffer] = useState<PerkOffer | null>(null);
+  const [result, setResult] = useState<RunResult | null>(null);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -71,14 +129,47 @@ export default function CartRogueGame() {
     let demo: CartRogueDemoHandle | null = null;
     let switching = false;
 
+    resetCartRunProgression();
+    previousSnapshotRef.current = INITIAL;
+    offeredRoomsRef.current.clear();
+    offerCounterRef.current = 0;
+    runSeedRef.current = ((Date.now() & 0x7fffffff) ^ ((runSerial + 1) * 0x45d9f3b)) | 0;
+    scrapRef.current = 0;
+    runStartRef.current = performance.now();
+    setSnapshot(INITIAL);
+    setScrap(0);
+    setUpgrades([]);
+    setPerkOffer(null);
+    setResult(null);
+    setRuntimeMessage(null);
+
+    const handleSnapshot = (next: CartArenaSessionSnapshot) => {
+      const previous = previousSnapshotRef.current;
+      let earned = 0;
+      for (const enemy of next.enemies) {
+        const before = previous.enemies.find((candidate) => candidate.id === enemy.id);
+        if (before?.alive && !enemy.alive) earned += scrapForEnemy(enemy.kind);
+      }
+      for (const obstacle of next.obstacles) {
+        const before = previous.obstacles.find((candidate) => candidate.id === obstacle.id);
+        if (before && !before.destroyed && obstacle.destroyed) earned += 2;
+      }
+      if (earned > 0) {
+        scrapRef.current += cartScrapReward(earned);
+        setScrap(scrapRef.current);
+      }
+      previousSnapshotRef.current = next;
+      setSnapshot(next);
+    };
+
     const startCanvas = (message?: string) => {
       if (switching) return;
       switching = true;
       demo?.dispose();
       mount.replaceChildren();
-      demo = new CartRogueCanvasPreview(mount, setSnapshot);
+      demo = new CartRogueCanvasPreview(mount, handleSnapshot);
       demoRef.current = demo;
-      setSnapshot(demo.getSnapshot());
+      handleSnapshot(demo.getSnapshot());
       setRendererName("CANVAS");
       if (message) setRuntimeMessage(message);
       switching = false;
@@ -90,12 +181,12 @@ export default function CartRogueGame() {
       if (!hasWebGL) {
         startCanvas("WebGLを利用できないためCanvas表示で続行しています。");
       } else {
-        demo = new CartRogueWebGLDemo(mount, setSnapshot, (message, error) => {
+        demo = new CartRogueWebGLDemo(mount, handleSnapshot, (message, error) => {
           console.error("[Cart Rogue] WebGL runtime failure", error);
           startCanvas(message);
         });
         demoRef.current = demo;
-        setSnapshot(demo.getSnapshot());
+        handleSnapshot(demo.getSnapshot());
         setRendererName("WEBGL");
       }
     } catch (error) {
@@ -107,7 +198,42 @@ export default function CartRogueGame() {
       demo?.dispose();
       demoRef.current = null;
     };
-  }, []);
+  }, [runSerial]);
+
+  useEffect(() => {
+    if (snapshot.runComplete || perkOffer || result) return;
+    if (snapshot.nodeKind !== "arena" || snapshot.enemiesTotal <= 0 || snapshot.enemiesAlive > 0) return;
+    if (offeredRoomsRef.current.has(snapshot.nodeId)) return;
+    offeredRoomsRef.current.add(snapshot.nodeId);
+    const offerIndex = offerCounterRef.current;
+    offerCounterRef.current += 1;
+    demoRef.current?.pause();
+    setPerkOffer({
+      nodeId: snapshot.nodeId,
+      offerIndex,
+      rerollIndex: 0,
+      choices: rollCartRunUpgradeChoices(runSeedRef.current, offerIndex, 0),
+    });
+  }, [snapshot.nodeId, snapshot.nodeKind, snapshot.enemiesTotal, snapshot.enemiesAlive, snapshot.runComplete, perkOffer, result]);
+
+  useEffect(() => {
+    if (!snapshot.runComplete || result) return;
+    demoRef.current?.pause();
+    const timeSeconds = Math.max(0, (performance.now() - runStartRef.current) / 1000);
+    let bestTimeSeconds = timeSeconds;
+    let bestScrap = scrapRef.current;
+    try {
+      const storedTime = Number(localStorage.getItem("cart-rogue-best-time"));
+      const storedScrap = Number(localStorage.getItem("cart-rogue-best-scrap"));
+      if (Number.isFinite(storedTime) && storedTime > 0) bestTimeSeconds = Math.min(storedTime, timeSeconds);
+      if (Number.isFinite(storedScrap) && storedScrap >= 0) bestScrap = Math.max(storedScrap, scrapRef.current);
+      localStorage.setItem("cart-rogue-best-time", String(bestTimeSeconds));
+      localStorage.setItem("cart-rogue-best-scrap", String(bestScrap));
+    } catch {
+      // Private browsing/storage denial should never block the result screen.
+    }
+    setResult({ timeSeconds, scrap: scrapRef.current, bestTimeSeconds, bestScrap });
+  }, [snapshot.runComplete, result]);
 
   useEffect(() => {
     const keys = new Set<string>();
@@ -147,7 +273,8 @@ export default function CartRogueGame() {
   const moveSteer = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (steerPointerRef.current !== event.pointerId) return;
     event.preventDefault();
-    demoRef.current?.setSteering(Math.max(-1, Math.min(1, (event.clientX - steerOriginRef.current) / 44)));
+    const steeringSensitivity = getCartRunModifiers().steeringSensitivity;
+    demoRef.current?.setSteering(Math.max(-1, Math.min(1, ((event.clientX - steerOriginRef.current) / 44) * steeringSensitivity)));
   };
 
   const releaseSteer = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -191,10 +318,34 @@ export default function CartRogueGame() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
+  const choosePerk = (upgrade: CartRunUpgradeDefinition) => {
+    applyCartRunUpgrade(upgrade.id);
+    setUpgrades(getAppliedCartRunUpgrades());
+    setPerkOffer(null);
+    demoRef.current?.resume();
+  };
+
+  const rerollPerks = () => {
+    if (!perkOffer) return;
+    const cost = 8 + perkOffer.rerollIndex * 4;
+    if (scrapRef.current < cost) return;
+    scrapRef.current -= cost;
+    setScrap(scrapRef.current);
+    const rerollIndex = perkOffer.rerollIndex + 1;
+    setPerkOffer({
+      ...perkOffer,
+      rerollIndex,
+      choices: rollCartRunUpgradeChoices(runSeedRef.current, perkOffer.offerIndex, rerollIndex),
+    });
+  };
+
   const gasPercent = Math.round(snapshot.gas * 100);
   const enemyDefeated = Math.max(0, snapshot.enemiesTotal - snapshot.enemiesAlive);
   const rechargePercent = Math.round(snapshot.turboRechargeProgress * 100);
   const bossPercent = snapshot.bossMaxHp > 0 ? Math.round(snapshot.bossHp / snapshot.bossMaxHp * 100) : 0;
+  const totalPerkRanks = upgrades.reduce((total, upgrade) => total + upgrade.rank, 0);
+  const currentBossPhase = bossPhase(snapshot);
+  const rerollCost = perkOffer ? 8 + perkOffer.rerollIndex * 4 : 0;
 
   return (
     <main className={styles.shell} onContextMenu={(event) => event.preventDefault()}>
@@ -202,7 +353,7 @@ export default function CartRogueGame() {
         <div ref={mountRef} className={styles.viewport} />
 
         <div className={styles.topHud}>
-          <div className={styles.runCard}><small>RUN 01</small><strong>{snapshot.nodeId.toUpperCase()}</strong></div>
+          <div className={styles.runCard}><small>RUN {String(runSerial + 1).padStart(2, "0")} · SCRAP {scrap}</small><strong>{snapshot.nodeId.toUpperCase()}</strong></div>
           <div className={styles.objective}>{objective(snapshot)}</div>
           <div className={`${styles.enemyCard}${snapshot.nodeKind === "boss" ? ` ${phase4Styles.bossCard}` : ""}`}>
             <small>{snapshot.nodeKind === "boss" ? "BOSS" : "ENEMIES"}</small>
@@ -212,18 +363,27 @@ export default function CartRogueGame() {
           </div>
         </div>
 
-        {snapshot.nodeKind === "boss" && !snapshot.runComplete && (
-          <div className={phase4Styles.bossMeter}>
-            <div className={phase4Styles.bossMeterHead}><span>RAM TITAN</span><strong>{Math.ceil(snapshot.bossHp)} / {snapshot.bossMaxHp}</strong></div>
-            <div className={phase4Styles.bossMeterTrack}><i style={{ width: `${bossPercent}%` }} /></div>
+        {upgrades.length > 0 && (
+          <div className={phase8Styles.upgradeStrip}>
+            {upgrades.slice(0, 6).map((upgrade) => <span key={upgrade.id} className={phase8Styles.upgradeChip}>{upgrade.shortName} {upgrade.rank > 1 ? `×${upgrade.rank}` : ""}</span>)}
           </div>
         )}
-        {snapshot.runComplete && <div className={phase4Styles.runClear}>RUN CLEAR!</div>}
+
+        {snapshot.nodeKind === "boss" && !snapshot.runComplete && (
+          <>
+            <div className={phase4Styles.bossMeter}>
+              <div className={phase4Styles.bossMeterHead}><span>RAM TITAN</span><strong>{Math.ceil(snapshot.bossHp)} / {snapshot.bossMaxHp}</strong></div>
+              <div className={phase4Styles.bossMeterTrack}><i style={{ width: `${bossPercent}%` }} /></div>
+            </div>
+            <div className={phase8Styles.bossPhase}>TITAN PHASE {currentBossPhase} · {currentBossPhase === 1 ? "HUNT" : currentBossPhase === 2 ? "CHARGE" : "ENRAGED"}</div>
+          </>
+        )}
+        {snapshot.runComplete && !result && <div className={phase4Styles.runClear}>RUN CLEAR!</div>}
         {snapshot.ramCombo > 1 && <div className={styles.combo}>FLOW COMBO! <strong>×{snapshot.ramCombo}</strong></div>}
-        {snapshot.nodeKind !== "boss" && snapshot.enemiesTotal > 0 && !snapshot.gateLocked && <div className={styles.gateOpen}>GATE OPEN!</div>}
+        {snapshot.nodeKind !== "boss" && snapshot.enemiesTotal > 0 && !snapshot.gateLocked && !perkOffer && <div className={styles.gateOpen}>GATE OPEN!</div>}
         {snapshot.boostActive && <div className={styles.ramBanner}>TURBO RAM</div>}
         {snapshot.wallSliding && <div className={phaseStyles.wallRide}>WALL RIDE</div>}
-        {snapshot.lastReward && <div className={phaseStyles.rewardBanner}>{snapshot.lastReward}</div>}
+        {snapshot.lastReward && !perkOffer && <div className={phaseStyles.rewardBanner}>{snapshot.lastReward}</div>}
 
         <div className={styles.bottomHud}>
           <div className={styles.meterCard}>
@@ -231,7 +391,7 @@ export default function CartRogueGame() {
             <div className={styles.meterTrack}><i style={{ width: `${gasPercent}%` }} /></div>
           </div>
           <div className={styles.itemStrip}>
-            <span>RAM</span><span>FLOW</span><span>SMASH</span>
+            <span>RAM</span><span>P{totalPerkRanks}</span><span>SCR{scrap}</span>
           </div>
           <div className={`${styles.meterCard} ${styles.turboCard}`}>
             <div className={styles.meterHead}><span>TURBO</span><strong>×{snapshot.boostCharges}</strong></div>
@@ -254,7 +414,7 @@ export default function CartRogueGame() {
           onPointerCancel={releaseSteer}
           onLostPointerCapture={releaseSteer}
         >
-          <span>ARCADE TURN · REVERSED</span>
+          <span>ARCADE TURN · BUILD ×{getCartRunModifiers().steeringSensitivity.toFixed(2)}</span>
         </div>
 
         <div className={styles.actions}>
@@ -279,6 +439,53 @@ export default function CartRogueGame() {
 
         <span className={styles.rendererBadge}>{rendererName}</span>
         {runtimeMessage && <div className={styles.runtimeMessage}>{runtimeMessage}</div>}
+
+        {perkOffer && (
+          <div className={phase8Styles.perkOverlay} role="dialog" aria-modal="true" aria-label="Choose an upgrade">
+            <div className={phase8Styles.perkPanel}>
+              <div className={phase8Styles.perkHead}>
+                <div><small>{perkOffer.nodeId.toUpperCase()} CLEAR</small><h2>CHOOSE YOUR BUILD</h2></div>
+                <div className={phase8Styles.perkWallet}>SCRAP {scrap}</div>
+              </div>
+              <div className={phase8Styles.perkGrid}>
+                {perkOffer.choices.map((upgrade) => {
+                  const nextRank = Math.min(upgrade.maxRank, cartRunUpgradeRank(upgrade.id) + 1);
+                  return (
+                    <button key={upgrade.id} className={phase8Styles.perkButton} onClick={() => choosePerk(upgrade)}>
+                      <span className={`${phase8Styles.perkTopline}${upgrade.rarity === "RARE" ? ` ${phase8Styles.perkRare}` : upgrade.rarity === "EPIC" ? ` ${phase8Styles.perkEpic}` : ""}`}>
+                        <span>{upgrade.rarity}</span><span>RANK {nextRank}/{upgrade.maxRank}</span>
+                      </span>
+                      <strong>{upgrade.name}</strong>
+                      <p>{upgrade.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className={phase8Styles.perkFooter}>
+                <span>Perks stack for this run only. Build for RAM, control, demolition, or boss damage.</span>
+                <button className={phase8Styles.rerollButton} disabled={scrap < rerollCost} onClick={rerollPerks}>REROLL · {rerollCost} SCRAP</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {result && (
+          <div className={phase8Styles.resultOverlay} role="dialog" aria-modal="true" aria-label="Run result">
+            <div className={phase8Styles.resultPanel}>
+              <div className={phase8Styles.resultHead}><div><small>RAM TITAN DESTROYED</small><h2>RUN CLEAR</h2></div></div>
+              <div className={phase8Styles.resultStats}>
+                <div className={phase8Styles.resultStat}><small>TIME</small><strong>{formatTime(result.timeSeconds)}</strong></div>
+                <div className={phase8Styles.resultStat}><small>SCRAP</small><strong>{result.scrap}</strong></div>
+                <div className={phase8Styles.resultStat}><small>PERKS</small><strong>{totalPerkRanks}</strong></div>
+              </div>
+              <div className={phase8Styles.resultPerks}>
+                BEST {formatTime(result.bestTimeSeconds)} · BEST SCRAP {result.bestScrap}<br />
+                {upgrades.length > 0 ? upgrades.map((upgrade) => `${upgrade.shortName}×${upgrade.rank}`).join(" · ") : "NO PERKS"}
+              </div>
+              <button className={phase8Styles.newRunButton} onClick={() => setRunSerial((value) => value + 1)}>NEW RUN</button>
+            </div>
+          </div>
+        )}
       </section>
     </main>
   );
