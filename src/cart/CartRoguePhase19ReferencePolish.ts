@@ -18,6 +18,14 @@ function materialLightness(material: THREE.Material): number | null {
   return hsl.l;
 }
 
+function effectiveSize(mesh: THREE.Mesh): THREE.Vector3 {
+  if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+  const size = new THREE.Vector3();
+  mesh.geometry.boundingBox?.getSize(size);
+  size.multiply(new THREE.Vector3(Math.abs(mesh.scale.x), Math.abs(mesh.scale.y), Math.abs(mesh.scale.z)));
+  return size;
+}
+
 function cleanupLegacyDarkScenery(demo: Phase19PolishDemo): void {
   demo.scene.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
@@ -28,12 +36,7 @@ function cleanupLegacyDarkScenery(demo: Phase19PolishDemo): void {
     });
     if (!dark) return;
 
-    if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
-    const box = object.geometry.boundingBox;
-    if (!box) return;
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    size.multiply(new THREE.Vector3(Math.abs(object.scale.x), Math.abs(object.scale.y), Math.abs(object.scale.z)));
+    const size = effectiveSize(object);
     const horizontalArea = size.x * size.z;
     const world = new THREE.Vector3();
     object.getWorldPosition(world);
@@ -42,6 +45,59 @@ function cleanupLegacyDarkScenery(demo: Phase19PolishDemo): void {
     const distantMonolith = (Math.abs(world.x) > 32 || Math.abs(world.z) > 48) && (size.y > 1.8 || horizontalArea > 3.5);
     const oversizedDarkShape = size.y > 5.5 || horizontalArea > 20;
     if (flatGroundArtifact || distantMonolith || oversizedDarkShape) object.visible = false;
+  });
+}
+
+function pastelizeRemainingDarkWorld(demo: Phase19PolishDemo): void {
+  const trunkColor = new THREE.Color(0x916b52);
+  const fenceColor = new THREE.Color(0xdedbd1);
+  const shrubColor = new THREE.Color(0x84b966);
+  const matrix = new THREE.Matrix4();
+  const position = new THREE.Vector3();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  const instanceColor = new THREE.Color();
+
+  demo.scene.traverse((object) => {
+    if (!(object instanceof THREE.Mesh) || !object.visible) return;
+
+    if (object instanceof THREE.InstancedMesh && object.instanceColor) {
+      if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+      const baseSize = new THREE.Vector3(1, 1, 1);
+      object.geometry.boundingBox?.getSize(baseSize);
+      let changed = false;
+      for (let index = 0; index < object.count; index += 1) {
+        object.getColorAt(index, instanceColor);
+        if (materialLightness(new THREE.MeshBasicMaterial({ color: instanceColor }))! >= 0.23) continue;
+        object.getMatrixAt(index, matrix);
+        matrix.decompose(position, quaternion, scale);
+        const sx = Math.abs(baseSize.x * scale.x);
+        const sy = Math.abs(baseSize.y * scale.y);
+        const sz = Math.abs(baseSize.z * scale.z);
+        const tall = sy > Math.max(sx, sz) * 1.25;
+        const rail = sy < 0.8 && Math.max(sx, sz) > 1.8;
+        object.setColorAt(index, tall ? trunkColor : rail ? fenceColor : shrubColor);
+        changed = true;
+      }
+      if (changed && object.instanceColor) object.instanceColor.needsUpdate = true;
+      return;
+    }
+
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    const size = effectiveSize(object);
+    const tall = size.y > Math.max(size.x, size.z) * 1.25;
+    const rail = size.y < 0.8 && Math.max(size.x, size.z) > 1.8;
+    for (const material of materials) {
+      if (!(material instanceof THREE.MeshStandardMaterial) && !(material instanceof THREE.MeshBasicMaterial)) continue;
+      const lightness = materialLightness(material);
+      if (lightness === null || lightness >= 0.23) continue;
+      material.color.copy(tall ? trunkColor : rail ? fenceColor : shrubColor);
+      if (material instanceof THREE.MeshStandardMaterial) {
+        material.metalness = 0;
+        material.roughness = Math.max(0.82, material.roughness);
+      }
+      material.needsUpdate = true;
+    }
   });
 }
 
@@ -105,6 +161,7 @@ export function installCartRoguePhase19ReferencePolish(): void {
   prototype.buildWorld = function buildWorldPhase19Polish(this: Phase19PolishDemo): void {
     originalBuildWorld.call(this);
     cleanupLegacyDarkScenery(this);
+    pastelizeRemainingDarkWorld(this);
     brightenPastelWorld(this);
     softenReferenceLighting(this);
   };
