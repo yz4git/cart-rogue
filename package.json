@@ -12,7 +12,7 @@
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test:rules": "node --import tsx --test tests/rally-rules.test.ts tests/settings-safety.test.ts",
     "test:track": "node --import tsx --test tests/rally-track-geometry.test.ts",
-    "test:cart": "node --import tsx --test tests/cart-arena-core.test.ts tests/cart-phase5.test.ts",
+    "test:cart": "node --import tsx --test tests/cart-arena-core.test.ts tests/cart-phase5.test.ts tests/cart-phase6.test.ts",
     "test:pwa": "node --test tests/pwa-cache.test.mjs tests/startup-safety.test.mjs",
     "test:pages": "npm run build:pages && node --test tests/rendered-html.test.mjs",
     "test": "npm run build && npm run test:rules && npm run test:track && npm run test:cart && npm run test:pwa && npm run test:pages",
