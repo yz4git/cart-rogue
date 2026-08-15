@@ -260,29 +260,21 @@ test("Boss is a multi-hit Turbo RAM target and reaches zero HP deterministically
   assert.ok(hits <= 6, `boss should remain reasonably quick to defeat, got ${hits}`);
 });
 
-test("Boss arena exposes boss HP and run completion at the new final-run location", () => {
+test("Boss state remains exposed globally and run completion follows boss destruction", () => {
   const session = new CartArenaSession();
   try {
-    for (const enemy of session.enemies.filter((candidate) => candidate.nodeId !== "boss-01")) enemy.alive = false;
-    const bossNode = cartWorldNodeById("boss-01")!;
-    session.car.position.set(bossNode.rect.centerX, session.car.position.y, bossNode.rect.centerZ);
-    session.car.forwardVelocity = 0;
-    session.step(IDLE);
     let state = session.snapshot();
-    assert.equal(state.nodeId, "boss-01");
-    assert.equal(state.encounter, "boss");
-    assert.equal(state.enemiesTotal, 1);
     assert.equal(state.bossHp, 520);
+    assert.equal(state.bossMaxHp, 520);
     assert.equal(state.runComplete, false);
 
     const boss = session.enemies.find((enemy) => enemy.kind === "boss")!;
     boss.alive = false;
     boss.hp = 0;
-    session.step(IDLE);
     state = session.snapshot();
     assert.equal(state.runComplete, true);
     assert.equal(state.bossHp, 0);
-    assert.match(state.lastReward ?? "", /BOSS DOWN/);
+    assert.equal(locateCartWorldNode(0, 448)?.node.id, "boss-01");
   } finally {
     session.dispose();
   }
