@@ -1,5 +1,6 @@
 export type CartWorldNodeKind = "arena" | "corridor" | "boss";
-export type CartEncounterKind = "combat" | "elite" | "reward" | "service" | "scrap" | "event" | "boss" | "none";
+export type CartEncounterKind = "combat" | "elite" | "reward" | "boss" | "none";
+export type CartRouteType = "combat" | "elite" | "service" | "scrap" | "event" | "boss" | "transit";
 export type CartRouteLane = "left" | "right" | "center";
 
 export interface CartWorldRect {
@@ -15,6 +16,7 @@ export interface CartWorldNode {
   rect: CartWorldRect;
   encounter: CartEncounterKind;
   next: readonly string[];
+  routeType?: CartRouteType;
   label?: string;
   tier?: number;
   lane?: CartRouteLane;
@@ -37,13 +39,15 @@ export interface CartWorldLocation {
 export interface CartRouteChoice {
   nodeId: string;
   encounter: CartEncounterKind;
+  routeType: CartRouteType;
   label: string;
   lane: CartRouteLane;
   danger: 1 | 2 | 3;
   rewardHint: string;
 }
 
-interface EncounterProfile {
+interface RouteProfile {
+  routeType: CartRouteType;
   encounter: CartEncounterKind;
   label: string;
   danger: 1 | 2 | 3;
@@ -67,6 +71,7 @@ export const CART_WORLD_GRAPH: CartWorldGraphDefinition = {
       rect: { centerX: 0, centerZ: 28, halfWidth: 28, halfDepth: 24 },
       encounter: "combat",
       next: ["corridor-01"],
+      routeType: "combat",
       label: "OPENING BRAWL",
       tier: 1,
       lane: "center",
@@ -80,6 +85,7 @@ export const CART_WORLD_GRAPH: CartWorldGraphDefinition = {
       rect: { centerX: 0, centerZ: 72, halfWidth: 6.5, halfDepth: 20 },
       encounter: "none",
       next: ["arena-02"],
+      routeType: "transit",
       label: "SUPPLY LANE",
       tier: 1,
       lane: "center",
@@ -92,6 +98,7 @@ export const CART_WORLD_GRAPH: CartWorldGraphDefinition = {
       rect: { centerX: 0, centerZ: 116, halfWidth: 30, halfDepth: 24 },
       encounter: "elite",
       next: ["junction-02"],
+      routeType: "elite",
       label: "ELITE BLOCKADE",
       tier: 2,
       lane: "center",
@@ -105,6 +112,7 @@ export const CART_WORLD_GRAPH: CartWorldGraphDefinition = {
       rect: { centerX: 0, centerZ: 158, halfWidth: 18, halfDepth: 18 },
       encounter: "none",
       next: ROUTE_03_IDS,
+      routeType: "transit",
       label: "FORK A",
       tier: 2,
       lane: "center",
@@ -117,6 +125,7 @@ export const CART_WORLD_GRAPH: CartWorldGraphDefinition = {
       rect: { centerX: -18, centerZ: 198, halfWidth: 20, halfDepth: 22 },
       encounter: "combat",
       next: ["junction-03"],
+      routeType: "combat",
       label: "BRAWL ZONE",
       tier: 3,
       lane: "left",
@@ -128,8 +137,9 @@ export const CART_WORLD_GRAPH: CartWorldGraphDefinition = {
       id: "route-03-right",
       kind: "arena",
       rect: { centerX: 18, centerZ: 198, halfWidth: 20, halfDepth: 22 },
-      encounter: "service",
+      encounter: "reward",
       next: ["junction-03"],
+      routeType: "service",
       label: "FUEL DEPOT",
       tier: 3,
       lane: "right",
@@ -143,6 +153,7 @@ export const CART_WORLD_GRAPH: CartWorldGraphDefinition = {
       rect: { centerX: 0, centerZ: 238, halfWidth: 18, halfDepth: 18 },
       encounter: "none",
       next: ["arena-03"],
+      routeType: "transit",
       label: "MERGE A",
       tier: 3,
       lane: "center",
@@ -155,6 +166,7 @@ export const CART_WORLD_GRAPH: CartWorldGraphDefinition = {
       rect: { centerX: 0, centerZ: 280, halfWidth: 32, halfDepth: 24 },
       encounter: "combat",
       next: ["junction-04"],
+      routeType: "combat",
       label: "MID-RUN CLASH",
       tier: 4,
       lane: "center",
@@ -168,6 +180,7 @@ export const CART_WORLD_GRAPH: CartWorldGraphDefinition = {
       rect: { centerX: 0, centerZ: 322, halfWidth: 18, halfDepth: 18 },
       encounter: "none",
       next: ROUTE_04_IDS,
+      routeType: "transit",
       label: "FORK B",
       tier: 4,
       lane: "center",
@@ -180,6 +193,7 @@ export const CART_WORLD_GRAPH: CartWorldGraphDefinition = {
       rect: { centerX: -18, centerZ: 362, halfWidth: 20, halfDepth: 22 },
       encounter: "elite",
       next: ["corridor-02"],
+      routeType: "elite",
       label: "ELITE BLOCKADE",
       tier: 5,
       lane: "left",
@@ -191,8 +205,9 @@ export const CART_WORLD_GRAPH: CartWorldGraphDefinition = {
       id: "route-04-right",
       kind: "arena",
       rect: { centerX: 18, centerZ: 362, halfWidth: 20, halfDepth: 22 },
-      encounter: "event",
+      encounter: "reward",
       next: ["corridor-02"],
+      routeType: "event",
       label: "TURBO STORM",
       tier: 5,
       lane: "right",
@@ -206,6 +221,7 @@ export const CART_WORLD_GRAPH: CartWorldGraphDefinition = {
       rect: { centerX: 0, centerZ: 402, halfWidth: 18, halfDepth: 18 },
       encounter: "none",
       next: ["boss-01"],
+      routeType: "transit",
       label: "BOSS APPROACH",
       tier: 5,
       lane: "center",
@@ -218,6 +234,7 @@ export const CART_WORLD_GRAPH: CartWorldGraphDefinition = {
       rect: { centerX: 0, centerZ: 448, halfWidth: 34, halfDepth: 28 },
       encounter: "boss",
       next: [],
+      routeType: "boss",
       label: "RAM TITAN",
       tier: 6,
       lane: "center",
@@ -228,7 +245,7 @@ export const CART_WORLD_GRAPH: CartWorldGraphDefinition = {
   ],
 };
 
-const STAGE_03_PAIRS: readonly (readonly [CartEncounterKind, CartEncounterKind])[] = [
+const STAGE_03_PAIRS: readonly (readonly [CartRouteType, CartRouteType])[] = [
   ["combat", "service"],
   ["elite", "scrap"],
   ["combat", "event"],
@@ -236,7 +253,7 @@ const STAGE_03_PAIRS: readonly (readonly [CartEncounterKind, CartEncounterKind])
   ["scrap", "combat"],
 ];
 
-const STAGE_04_PAIRS: readonly (readonly [CartEncounterKind, CartEncounterKind])[] = [
+const STAGE_04_PAIRS: readonly (readonly [CartRouteType, CartRouteType])[] = [
   ["elite", "service"],
   ["combat", "scrap"],
   ["elite", "event"],
@@ -284,6 +301,7 @@ export function cartUpcomingRouteChoices(
   return candidates.map((node) => ({
     nodeId: node.id,
     encounter: node.encounter,
+    routeType: node.routeType ?? routeTypeFromEncounter(node.encounter),
     label: node.label ?? node.id.toUpperCase(),
     lane: node.lane ?? "center",
     danger: node.danger ?? 1,
@@ -358,18 +376,19 @@ export function validateCartWorldGraph(graph: CartWorldGraphDefinition = CART_WO
 
 function applyGeneratedPair(
   ids: readonly [string, string],
-  pair: readonly [CartEncounterKind, CartEncounterKind],
+  pair: readonly [CartRouteType, CartRouteType],
   seed: number,
   tier: number,
 ): void {
   let state = seed;
   const swap = (state & 1) === 1;
-  const encounters: readonly [CartEncounterKind, CartEncounterKind] = swap ? [pair[1], pair[0]] : pair;
+  const routeTypes: readonly [CartRouteType, CartRouteType] = swap ? [pair[1], pair[0]] : pair;
   ids.forEach((id, index) => {
     const node = cartWorldNodeById(id);
     if (!node) return;
-    const profile = encounterProfile(encounters[index]);
+    const profile = routeProfile(routeTypes[index]);
     state = xorshift32(state ^ Math.imul(index + tier, 0x45d9f3b));
+    node.routeType = profile.routeType;
     node.encounter = profile.encounter;
     node.label = profile.label;
     node.danger = profile.danger;
@@ -379,31 +398,38 @@ function applyGeneratedPair(
 }
 
 function choosePair(
-  pairs: readonly (readonly [CartEncounterKind, CartEncounterKind])[],
+  pairs: readonly (readonly [CartRouteType, CartRouteType])[],
   seed: number,
-): readonly [CartEncounterKind, CartEncounterKind] {
+): readonly [CartRouteType, CartRouteType] {
   const state = xorshift32(seed);
   return pairs[Math.abs(state) % pairs.length];
 }
 
-function encounterProfile(encounter: CartEncounterKind): EncounterProfile {
-  switch (encounter) {
+function routeProfile(routeType: CartRouteType): RouteProfile {
+  switch (routeType) {
     case "elite":
-      return { encounter, label: "ELITE BLOCKADE", danger: 3, rewardHint: "HIGH SCRAP + PERK" };
+      return { routeType, encounter: "elite", label: "ELITE BLOCKADE", danger: 3, rewardHint: "HIGH SCRAP + PERK" };
     case "service":
-    case "reward":
-      return { encounter, label: "FUEL DEPOT", danger: 1, rewardHint: "GAS / TURBO" };
+      return { routeType, encounter: "reward", label: "FUEL DEPOT", danger: 1, rewardHint: "GAS / TURBO" };
     case "scrap":
-      return { encounter, label: "SALVAGE YARD", danger: 1, rewardHint: "SCRAP CACHE" };
+      return { routeType, encounter: "reward", label: "SALVAGE YARD", danger: 1, rewardHint: "SCRAP CACHE" };
     case "event":
-      return { encounter, label: "TURBO STORM", danger: 2, rewardHint: "TURBO / SMASH" };
+      return { routeType, encounter: "reward", label: "TURBO STORM", danger: 2, rewardHint: "TURBO / SMASH" };
     case "combat":
-      return { encounter, label: "BRAWL ZONE", danger: 2, rewardHint: "PERK + SCRAP" };
+      return { routeType, encounter: "combat", label: "BRAWL ZONE", danger: 2, rewardHint: "PERK + SCRAP" };
     case "boss":
-      return { encounter, label: "RAM TITAN", danger: 3, rewardHint: "RUN CLEAR" };
+      return { routeType, encounter: "boss", label: "RAM TITAN", danger: 3, rewardHint: "RUN CLEAR" };
     default:
-      return { encounter, label: "TRANSIT", danger: 1, rewardHint: "MOVE" };
+      return { routeType, encounter: "none", label: "TRANSIT", danger: 1, rewardHint: "MOVE" };
   }
+}
+
+function routeTypeFromEncounter(encounter: CartEncounterKind): CartRouteType {
+  if (encounter === "combat") return "combat";
+  if (encounter === "elite") return "elite";
+  if (encounter === "boss") return "boss";
+  if (encounter === "reward") return "service";
+  return "transit";
 }
 
 function normalizeSeed(seed: number): number {
