@@ -40,15 +40,15 @@ export function createInitialCartObstacles(): CartObstacleState[] {
 
   for (const node of CART_WORLD_GRAPH.nodes) {
     if (!node.id.startsWith("route-") && node.id !== "arena-03") continue;
-    if (node.encounter === "scrap") {
+    if (node.routeType === "scrap") {
       addPattern(obstacles, node.id, node.rect.centerX, node.rect.centerZ, [
         [-10, -10], [-3, -7], [6, -10], [10, -2], [-9, 1], [-2, 5], [7, 5], [1, 11],
       ], 0.92);
-    } else if (node.encounter === "event") {
+    } else if (node.routeType === "event") {
       addPattern(obstacles, node.id, node.rect.centerX, node.rect.centerZ, [
         [-9, -9], [8, -5], [-7, 0], [7, 4], [-4, 10], [10, 11],
       ], 1.05);
-    } else if (node.encounter === "combat" || node.encounter === "elite") {
+    } else if (node.routeType === "combat" || node.routeType === "elite") {
       addPattern(obstacles, node.id, node.rect.centerX, node.rect.centerZ, [
         [-13, 6], [13, -5],
       ], 1.2);
