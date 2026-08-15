@@ -22,6 +22,11 @@ import "../src/cart/CartRoguePhase24GroundMotion";
 import "../src/cart/CartRoguePhase25TurboVisuals";
 import "../src/cart/CartRoguePhase26StageIdentity";
 import "../src/cart/CartRoguePhase27EnemyDamageVisuals";
+import "../src/cart/CartRoguePhase28HeroSurface";
+import "../src/cart/CartRoguePhase29SurfaceLife";
+import "../src/cart/CartRoguePhase30EnemyBreakup";
+import "../src/cart/CartRoguePhase31BossAtmosphere";
+import "../src/cart/CartRoguePhase32NearCameraParticles";
 import CartRogueGame from "./CartRogueGame";
 
 export default function CartRogueGamePhase13() {
