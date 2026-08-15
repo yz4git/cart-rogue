@@ -21,6 +21,32 @@
   text-shadow: 0 3px 0 rgba(31, 95, 83, 0.35);
   box-shadow: 0 14px 34px rgba(48, 90, 87, 0.2);
   pointer-events: none;
+  animation: stageClearBurst 1.55s cubic-bezier(.16,.84,.28,1) both;
+}
+
+@keyframes stageClearBurst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(-6deg) scale(.42);
+    filter: brightness(1.8);
+  }
+  14% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(2deg) scale(1.18);
+    filter: brightness(1.35);
+  }
+  28% {
+    transform: translate(-50%, -50%) rotate(-2deg) scale(1);
+    filter: brightness(1);
+  }
+  76% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(-2deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -58%) rotate(-2deg) scale(1.08);
+  }
 }
 
 .bossMeter {
