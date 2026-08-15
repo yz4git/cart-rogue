@@ -1,3 +1,5 @@
+import { getCartRunModifiers } from "./CartRunProgression";
+
 export type CartObstacleKind = "rock";
 
 export interface CartObstacleState {
@@ -18,6 +20,10 @@ export interface CartObstacleHitResult {
 }
 
 export const CART_ROCK_SMASH_MIN_SPEED = 8;
+
+export function cartRockSmashMinSpeed(): number {
+  return CART_ROCK_SMASH_MIN_SPEED * getCartRunModifiers().rockSmashSpeedMultiplier;
+}
 
 export function createInitialCartObstacles(): CartObstacleState[] {
   return [
@@ -75,7 +81,7 @@ export function applyTurboRockSmash(
   forwardSpeed: number,
 ): CartObstacleHitResult {
   if (obstacle.destroyed) return { hit: false, destroyed: false };
-  if (!turboActive || Math.abs(forwardSpeed) < CART_ROCK_SMASH_MIN_SPEED) {
+  if (!turboActive || Math.abs(forwardSpeed) < cartRockSmashMinSpeed()) {
     return { hit: true, destroyed: false };
   }
   obstacle.destroyed = true;

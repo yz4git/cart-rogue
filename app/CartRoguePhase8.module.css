@@ -1,0 +1,275 @@
+.scrapCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 68px;
+  padding: 5px 9px;
+  border: 1px solid rgba(255,255,255,.34);
+  border-radius: 10px;
+  background: rgba(31,39,57,.68);
+  backdrop-filter: blur(8px);
+  color: #fff5c6;
+  box-shadow: 0 7px 24px rgba(30,35,50,.12);
+}
+
+.scrapCard small {
+  font-size: 8px;
+  letter-spacing: .16em;
+  opacity: .72;
+}
+
+.scrapCard strong {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.upgradeStrip {
+  position: absolute;
+  left: max(10px, env(safe-area-inset-left));
+  top: 62px;
+  z-index: 12;
+  display: flex;
+  gap: 5px;
+  max-width: 62vw;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.upgradeChip {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.38);
+  background: rgba(48,57,78,.7);
+  color: white;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-shadow: 0 1px 3px rgba(0,0,0,.25);
+}
+
+.bossPhase {
+  position: absolute;
+  top: 82px;
+  left: 50%;
+  z-index: 15;
+  transform: translateX(-50%);
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(74,42,90,.74);
+  border: 1px solid rgba(255,195,230,.5);
+  color: #ffe3f3;
+  font-size: 9px;
+  font-weight: 1000;
+  letter-spacing: .14em;
+  pointer-events: none;
+}
+
+.perkOverlay,
+.resultOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  background: rgba(39,51,64,.42);
+  backdrop-filter: blur(10px) saturate(1.08);
+  touch-action: manipulation;
+}
+
+.perkPanel,
+.resultPanel {
+  width: min(760px, 96vw);
+  max-height: 92vh;
+  overflow: auto;
+  border: 1px solid rgba(255,255,255,.62);
+  border-radius: 20px;
+  background: rgba(245,246,235,.94);
+  color: #34424f;
+  box-shadow: 0 24px 70px rgba(48,58,72,.28);
+  padding: 14px;
+}
+
+.perkHead,
+.resultHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.perkHead small,
+.resultHead small {
+  display: block;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .18em;
+  color: #788691;
+}
+
+.perkHead h2,
+.resultHead h2 {
+  margin: 2px 0 0;
+  font-size: clamp(18px, 4vw, 28px);
+  line-height: 1;
+  color: #374b55;
+}
+
+.perkWallet {
+  text-align: right;
+  font-weight: 1000;
+  color: #806a2e;
+  white-space: nowrap;
+}
+
+.perkGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.perkButton {
+  appearance: none;
+  min-height: 104px;
+  padding: 11px;
+  border: 1px solid rgba(74,90,102,.18);
+  border-radius: 15px;
+  background: rgba(255,255,255,.86);
+  color: #34424f;
+  text-align: left;
+  box-shadow: 0 7px 18px rgba(70,80,91,.08);
+}
+
+.perkButton:active {
+  transform: scale(.985);
+}
+
+.perkButton strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 14px;
+  line-height: 1.05;
+}
+
+.perkButton p {
+  margin: 7px 0 0;
+  font-size: 10px;
+  line-height: 1.35;
+  color: #63727e;
+}
+
+.perkTopline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 8px;
+  font-weight: 1000;
+  letter-spacing: .11em;
+  color: #8d6c70;
+}
+
+.perkRare {
+  color: #7d67af;
+}
+
+.perkEpic {
+  color: #ba5d8f;
+}
+
+.perkFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 9px;
+}
+
+.perkFooter span {
+  font-size: 9px;
+  color: #7d8890;
+}
+
+.rerollButton,
+.newRunButton {
+  appearance: none;
+  border: 0;
+  border-radius: 11px;
+  padding: 9px 13px;
+  background: #526f79;
+  color: white;
+  font-weight: 1000;
+  font-size: 10px;
+  letter-spacing: .06em;
+}
+
+.rerollButton:disabled {
+  opacity: .4;
+}
+
+.resultPanel {
+  width: min(460px, 92vw);
+  text-align: center;
+  padding: 18px;
+}
+
+.resultHead {
+  justify-content: center;
+}
+
+.resultStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin: 12px 0;
+}
+
+.resultStat {
+  padding: 10px 5px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(70,90,100,.12);
+}
+
+.resultStat small {
+  display: block;
+  font-size: 8px;
+  color: #7b8992;
+  letter-spacing: .12em;
+}
+
+.resultStat strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 18px;
+  color: #40545e;
+}
+
+.resultPerks {
+  min-height: 28px;
+  margin: 8px 0 13px;
+  font-size: 9px;
+  color: #6e7a82;
+}
+
+.newRunButton {
+  min-width: 148px;
+  background: #5f9b8b;
+  font-size: 12px;
+  padding: 11px 20px;
+}
+
+@media (max-height: 360px) {
+  .upgradeStrip { top: 54px; }
+  .perkPanel { padding: 10px; border-radius: 15px; }
+  .perkHead { margin-bottom: 7px; }
+  .perkGrid { gap: 6px; }
+  .perkButton { min-height: 82px; padding: 8px; }
+  .perkButton p { font-size: 9px; margin-top: 4px; }
+  .perkFooter { margin-top: 6px; }
+  .resultPanel { padding: 12px; }
+  .resultStats { margin: 8px 0; }
+}
