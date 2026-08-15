@@ -9,7 +9,9 @@ describe("Cart Rogue Phase 21 impact polish", () => {
   it("loads phase21 after the phase20 presentation passes", () => {
     const wrapper = read("app/CartRogueGamePhase13.tsx");
     expect(wrapper).toContain("CartRoguePhase21ImpactPolish");
+    expect(wrapper).toContain("CartRoguePhase21WorldGrade");
     expect(wrapper.indexOf("CartRoguePhase21ImpactPolish")).toBeGreaterThan(wrapper.indexOf("CartRoguePhase20ReferenceMatch"));
+    expect(wrapper.indexOf("CartRoguePhase21WorldGrade")).toBeGreaterThan(wrapper.indexOf("CartRoguePhase21ImpactPolish"));
   });
 
   it("adds dense instanced ground, hero and enemy presentation, and pooled impact FX", () => {
@@ -21,6 +23,15 @@ describe("Cart Rogue Phase 21 impact polish", () => {
     expect(source).toContain("spawnImpact");
     expect(source).toContain("addImpactCameraPunch");
     expect(source).toContain("cartArenaContains");
+  });
+
+  it("finishes the world with a pastel environment-only grade", () => {
+    const source = read("src/cart/CartRoguePhase21WorldGrade.ts");
+    expect(source).toContain("recolorDarkEnvironment");
+    expect(source).toContain("enrichPastelPalette");
+    expect(source).toContain("phase21-soft-ambient");
+    expect(source).not.toContain("playerVisual");
+    expect(source).not.toContain("enemyGroups");
   });
 
   it("remains a presentation-only texture-free pass", () => {
