@@ -1,4 +1,4 @@
-import CartRogueGame from "./CartRogueGame";
+import CartRogueGame from "./CartRogueGamePhase13";
 import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
 
 export default function Page() {
