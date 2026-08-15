@@ -58,8 +58,10 @@ function brightenPastelWorld(demo: Phase19PolishDemo): void {
       const green = hsl.h > 0.19 && hsl.h < 0.43 && hsl.s > 0.18;
       const pink = (hsl.h > 0.88 || hsl.h < 0.035) && hsl.s > 0.22;
       const warmGround = hsl.h > 0.055 && hsl.h < 0.17 && hsl.s > 0.18;
+      const brown = hsl.h > 0.035 && hsl.h < 0.105 && hsl.s > 0.16 && hsl.l < 0.52;
       if (green) material.color.setHSL(hsl.h, Math.min(0.84, hsl.s * 1.08 + 0.05), Math.min(0.72, hsl.l * 1.06 + 0.035));
       else if (pink) material.color.setHSL(hsl.h, Math.min(0.9, hsl.s * 1.1 + 0.04), Math.min(0.76, hsl.l * 1.05 + 0.04));
+      else if (brown) material.color.setHSL(hsl.h, Math.min(0.72, hsl.s * 0.92 + 0.04), Math.min(0.56, hsl.l * 1.16 + 0.06));
       else if (warmGround && hsl.l < 0.78) material.color.setHSL(hsl.h, Math.min(0.76, hsl.s * 1.05 + 0.025), Math.min(0.78, hsl.l * 1.06 + 0.025));
       material.metalness = Math.min(material.metalness, 0.04);
       material.roughness = Math.max(material.roughness, 0.72);
@@ -81,17 +83,17 @@ function applyHigherReferenceCamera(demo: Phase19PolishDemo, snapshot: CartArena
   const rightX = Math.cos(snapshot.heading);
   const rightZ = -Math.sin(snapshot.heading);
   const speedRatio = THREE.MathUtils.clamp(Math.abs(snapshot.speed) / 28, 0, 1);
-  const distance = snapshot.boostActive ? 11.7 : 10.35 + speedRatio * 0.55;
-  const height = snapshot.boostActive ? 8.65 : 8.1 + speedRatio * 0.35;
-  const lateral = -demo.steer * 0.34;
+  const distance = snapshot.boostActive ? 10.6 : 9.55 + speedRatio * 0.46;
+  const height = snapshot.boostActive ? 7.55 : 6.95 + speedRatio * 0.3;
+  const lateral = -demo.steer * 0.32;
   demo.camera.position.set(
     snapshot.x - forwardX * distance + rightX * lateral,
     height,
     snapshot.z - forwardZ * distance + rightZ * lateral,
   );
-  const lookAhead = 4.35 + speedRatio * 1.55;
-  demo.camera.lookAt(new THREE.Vector3(snapshot.x + forwardX * lookAhead, 0.62, snapshot.z + forwardZ * lookAhead));
-  demo.camera.fov = snapshot.boostActive ? 61.5 : 56.5 + speedRatio * 1.4;
+  const lookAhead = 4.75 + speedRatio * 1.45;
+  demo.camera.lookAt(new THREE.Vector3(snapshot.x + forwardX * lookAhead, 0.72, snapshot.z + forwardZ * lookAhead));
+  demo.camera.fov = snapshot.boostActive ? 60.5 : 55.2 + speedRatio * 1.25;
   demo.camera.updateProjectionMatrix();
 }
 
