@@ -30,26 +30,27 @@ self.addEventListener("fetch", (event) => {
   const acceptsHtml = event.request.headers.get("accept")?.includes("text/html") ?? false;
   if (event.request.mode === "navigate" || acceptsHtml) {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: "no-store" })
         .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE).then((cache) => cache.put(event.request, copy));
-          }
+          if (response.ok) void caches.open(CACHE).then((cache) => cache.put(ROOT, response.clone()));
           return response;
         })
-        .catch(() => caches.match(event.request).then((cached) => cached ?? caches.match(ROOT))),
+        .catch(() => caches.match(ROOT)),
     );
     return;
   }
-
   event.respondWith(
-    caches.match(event.request).then((cached) => cached ?? fetch(event.request).then((response) => {
-      if (response.ok && new URL(event.request.url).origin === self.location.origin) {
-        const copy = response.clone();
-        caches.open(CACHE).then((cache) => cache.put(event.request, copy));
-      }
-      return response;
-    })),
+    caches.match(event.request).then((cached) =>
+      cached ??
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok && new URL(event.request.url).origin === self.location.origin) {
+            const copy = response.clone();
+            void caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(ROOT)),
+    ),
   );
 });
