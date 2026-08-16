@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession, type CartArenaSessionSnapshot } from "./CartArenaSession";
+import { cartArenaShapeForNode, projectCartPointInsideArena } from "./CartArenaShapes";
+import type { CartEnemyState } from "./CartCombat";
+import { cartStageClearNumber } from "./CartRoguePhase16Flow";
 import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
 import {
   cartWorldNodeById,
@@ -10,18 +13,37 @@ import {
 
 interface Phase45Session {
   car: CartArenaSession["car"];
+  enemies: CartEnemyState[];
   location: CartWorldLocation;
   wallSlideTimer?: number;
   step(input: RallyInputState, fixedDelta?: number): void;
+  snapshot(): CartArenaSessionSnapshot;
 }
 
 interface Phase45Demo {
   scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  session: CartArenaSession;
+  elapsed: number;
   buildWorld(): void;
+  updateVisuals(delta: number): void;
 }
 
 interface TransitRecoveryState {
   stalledSeconds: number;
+}
+
+interface ClearGraceState {
+  pendingNodeId: string | null;
+  remainingSeconds: number;
+}
+
+interface ExitGuideState {
+  root: THREE.Group;
+  remainingSeconds: number;
+  delaySeconds: number;
+  lastSignal: boolean;
+  lastNodeId: string;
 }
 
 interface GuidePoint {
@@ -30,6 +52,8 @@ interface GuidePoint {
 }
 
 const transitRecovery = new WeakMap<object, TransitRecoveryState>();
+const clearGraceStates = new WeakMap<object, ClearGraceState>();
+const exitGuideStates = new WeakMap<object, ExitGuideState>();
 const TRANSIT_WALL_INSET = 1.55;
 const TRANSIT_WALL_BAND = 0.62;
 const TRANSIT_RELEASE_NUDGE = 0.92;
@@ -261,25 +285,210 @@ function recoverTransitWallTrap(
   state.stalledSeconds = 0;
 }
 
+function clearGraceState(session: Phase45Session): ClearGraceState {
+  const key = session as unknown as object;
+  const current = clearGraceStates.get(key);
+  if (current) return current;
+  const created: ClearGraceState = { pendingNodeId: null, remainingSeconds: 0 };
+  clearGraceStates.set(key, created);
+  return created;
+}
+
+function aliveInNode(session: Phase45Session, nodeId: string): number {
+  return session.enemies.filter((enemy) => enemy.nodeId === nodeId && enemy.alive).length;
+}
+
+function clearGraceSeconds(nodeId: string): number {
+  return cartStageClearNumber(nodeId) === 3
+    ? CART_PHASE45_BOSS_CLEAR_GRACE_MS / 1000
+    : CART_PHASE45_STAGE_CLEAR_GRACE_MS / 1000;
+}
+
+function containClearGrace(session: Phase45Session, nodeId: string): void {
+  const node = cartWorldNodeById(nodeId);
+  if (!node) return;
+  let x = session.car.position.x;
+  let z = session.car.position.z;
+  if (cartArenaShapeForNode(node.id)) {
+    const projected = projectCartPointInsideArena(node.id, x, z, 2.05);
+    x = projected.x;
+    z = projected.z;
+  } else {
+    x = clamp(x, node.rect.centerX - node.rect.halfWidth + 2.05, node.rect.centerX + node.rect.halfWidth - 2.05);
+    z = clamp(z, node.rect.centerZ - node.rect.halfDepth + 2.05, node.rect.centerZ + node.rect.halfDepth - 2.05);
+  }
+  session.car.position.x = x;
+  session.car.position.z = z;
+  session.car.forwardVelocity *= 0.93;
+  session.car.lateralVelocity *= 0.72;
+  session.location = {
+    node,
+    localX: x - node.rect.centerX,
+    localZ: z - node.rect.centerZ,
+  };
+  syncHorizontalVelocity(session);
+}
+
+function createExitGuide(demo: Phase45Demo): ExitGuideState {
+  const key = demo as unknown as object;
+  const existing = exitGuideStates.get(key);
+  if (existing) return existing;
+
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xffe36e,
+    transparent: true,
+    opacity: 0.96,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const accent = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.88,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const root = new THREE.Group();
+  root.name = "phase45-exit-guide";
+  root.position.set(0, 0.15, -1.15);
+
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.012, 4, 18), accent);
+  halo.renderOrder = 1001;
+  const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.17, 0.018), material);
+  shaft.position.y = 0.025;
+  shaft.renderOrder = 1002;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.078, 0.14, 4), material);
+  head.position.y = 0.16;
+  head.rotation.y = Math.PI / 4;
+  head.renderOrder = 1002;
+  root.add(halo, shaft, head);
+  root.visible = false;
+  demo.camera.add(root);
+
+  const created: ExitGuideState = {
+    root,
+    remainingSeconds: 0,
+    delaySeconds: 0,
+    lastSignal: false,
+    lastNodeId: "",
+  };
+  exitGuideStates.set(key, created);
+  return created;
+}
+
+function updateExitGuide(demo: Phase45Demo, delta: number): void {
+  const state = createExitGuide(demo);
+  const snapshot = demo.session.snapshot();
+  if (snapshot.nodeId !== state.lastNodeId) state.lastSignal = false;
+  const clearSignal = snapshot.runComplete
+    || (snapshot.nodeKind !== "boss"
+      && snapshot.enemiesTotal > 0
+      && snapshot.enemiesAlive === 0
+      && !snapshot.gateLocked);
+
+  if (clearSignal && !state.lastSignal) {
+    const angle = cartPhase45ExitGuideAngle(snapshot);
+    if (angle !== null) {
+      state.remainingSeconds = CART_PHASE45_EXIT_GUIDE_MS / 1000;
+      state.delaySeconds = cartStageClearNumber(snapshot.nodeId) === null ? 0.72 : 0;
+    }
+  }
+  state.lastSignal = clearSignal;
+  state.lastNodeId = snapshot.nodeId;
+
+  if (state.delaySeconds > 0) {
+    state.delaySeconds = Math.max(0, state.delaySeconds - delta);
+    state.root.visible = false;
+    return;
+  }
+  if (state.remainingSeconds <= 0) {
+    state.root.visible = false;
+    return;
+  }
+
+  const angle = cartPhase45ExitGuideAngle(snapshot);
+  if (angle === null) {
+    state.root.visible = false;
+    state.remainingSeconds = 0;
+    return;
+  }
+  state.remainingSeconds = Math.max(0, state.remainingSeconds - delta);
+  state.root.visible = state.remainingSeconds > 0;
+  state.root.rotation.z = -angle;
+  const pulse = 1 + Math.sin(demo.elapsed * 7.2) * 0.075;
+  state.root.scale.setScalar(pulse);
+}
+
 export function installCartRoguePhase45StabilityGuidance(): void {
   const sessionPrototype = CartArenaSession.prototype as unknown as Phase45Session;
   const originalStep = sessionPrototype.step;
+  const originalSnapshot = sessionPrototype.snapshot;
+
   sessionPrototype.step = function phase45StabilityStep(
     this: Phase45Session,
     input: RallyInputState,
     fixedDelta = 1 / 60,
   ): void {
+    const clearState = clearGraceState(this);
+    const pendingAtStart = clearState.pendingNodeId !== null && clearState.remainingSeconds > 0;
+    const beforeNodeId = this.location.node.id;
+    const beforeAlive = aliveInNode(this, beforeNodeId);
     const beforeX = this.car.position.x;
     const beforeZ = this.car.position.z;
-    originalStep.call(this, input, fixedDelta);
-    recoverTransitWallTrap(this, input, fixedDelta, beforeX, beforeZ);
+    const effectiveInput: RallyInputState = pendingAtStart
+      ? { throttle: 0, brake: 0, steer: 0, boost: false }
+      : input;
+
+    originalStep.call(this, effectiveInput, fixedDelta);
+    recoverTransitWallTrap(this, effectiveInput, fixedDelta, beforeX, beforeZ);
+
+    let startedGrace = false;
+    if (!pendingAtStart
+      && clearState.pendingNodeId === null
+      && this.location.node.id === beforeNodeId
+      && cartStageClearNumber(beforeNodeId) !== null
+      && beforeAlive > 0
+      && aliveInNode(this, beforeNodeId) === 0) {
+      clearState.pendingNodeId = beforeNodeId;
+      clearState.remainingSeconds = clearGraceSeconds(beforeNodeId);
+      startedGrace = true;
+    }
+
+    if (clearState.pendingNodeId && clearState.remainingSeconds > 0) {
+      containClearGrace(this, clearState.pendingNodeId);
+      if (!startedGrace) clearState.remainingSeconds = Math.max(0, clearState.remainingSeconds - fixedDelta);
+      if (clearState.remainingSeconds <= 0) clearState.pendingNodeId = null;
+    }
+  };
+
+  sessionPrototype.snapshot = function phase45PresentationSnapshot(this: Phase45Session): CartArenaSessionSnapshot {
+    const snapshot = originalSnapshot.call(this);
+    const clearState = clearGraceState(this);
+    if (!clearState.pendingNodeId || clearState.remainingSeconds <= 0) return snapshot;
+    const pendingNodeId = clearState.pendingNodeId;
+    return {
+      ...snapshot,
+      enemiesAlive: Math.max(1, snapshot.enemiesAlive),
+      gateLocked: snapshot.nodeKind === "boss" ? snapshot.gateLocked : true,
+      arena2GateLocked: pendingNodeId === "arena-02" ? true : snapshot.arena2GateLocked,
+      lastReward: null,
+      runComplete: false,
+    };
   };
 
   const demoPrototype = CartRogueWebGLDemo.prototype as unknown as Phase45Demo;
   const originalWorld = demoPrototype.buildWorld;
+  const originalUpdate = demoPrototype.updateVisuals;
   demoPrototype.buildWorld = function phase45StableWorld(this: Phase45Demo): void {
     originalWorld.call(this);
     stabilizeGroundLayers(this.scene);
+    createExitGuide(this);
+  };
+  demoPrototype.updateVisuals = function phase45GuidedUpdate(this: Phase45Demo, delta: number): void {
+    originalUpdate.call(this, delta);
+    updateExitGuide(this, delta);
   };
 }
 
