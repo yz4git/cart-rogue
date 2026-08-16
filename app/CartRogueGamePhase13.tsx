@@ -43,6 +43,7 @@ import "../src/cart/CartRoguePhase47TransitCompletion";
 import "../src/cart/CartRoguePhase48RouteExitCompletion";
 import "../src/cart/CartRoguePhase49HandlingContact";
 import "../src/cart/CartRoguePhase50Arena03CenterClearance";
+import "../src/cart/CartRoguePhase51Arena03Gate";
 import CartRogueGame from "./CartRogueGame";
 
 export default function CartRogueGamePhase13() {
