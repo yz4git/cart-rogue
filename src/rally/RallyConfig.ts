@@ -57,7 +57,10 @@ export const RALLY_CONFIG = {
     recoveryMinX: -180,
     recoveryMaxX: 180,
     recoveryMinZ: -150,
-    recoveryMaxZ: 280,
+    // Cart Rogue's authored run extends through the boss arena at z=476.
+    // Keep the shared finite-position guard beyond that world instead of
+    // treating Arena 03's center at z=280 as the old rally recovery edge.
+    recoveryMaxZ: 520,
     recoveryMinY: -24,
     recoveryMaxY: 90,
     driftMinSpeed: 7.5,
