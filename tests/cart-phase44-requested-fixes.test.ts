@@ -48,8 +48,8 @@ test("Phase 44 slows the stationary Turbo pivot slightly without removing decisi
 
     const turn = angleDistance(startHeading, session.car.heading);
     const travel = Math.hypot(session.car.position.x - startX, session.car.position.z - startZ);
-    assert.ok(turn > 0.55, `pivot should still turn clearly, got ${turn.toFixed(3)} rad`);
-    assert.ok(turn < 0.92, `pivot should be slightly calmer than before, got ${turn.toFixed(3)} rad`);
+    assert.ok(turn > 1.5, `pivot should remain decisive after the modest slowdown, got ${turn.toFixed(3)} rad`);
+    assert.ok(turn < 2.0, `Phase 44 should keep the chained stationary pivot below the previous ~2.19 rad pace, got ${turn.toFixed(3)} rad`);
     assert.ok(travel < 0.05, `pivot must remain stationary, travelled ${travel.toFixed(3)}`);
   } finally {
     session.dispose();
