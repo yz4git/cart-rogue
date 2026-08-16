@@ -36,6 +36,7 @@ import "../src/cart/CartRoguePhase38ReliableMosaic";
 import "../src/cart/CartRoguePhase39VertexColorPipeline";
 import "../src/cart/CartRoguePhase42StaticInstanceColorRepair";
 import "../src/cart/CartRoguePhase43ArchitectureVertexColors";
+import "../src/cart/CartRoguePhase44RequestedFixes";
 import CartRogueGame from "./CartRogueGame";
 
 export default function CartRogueGamePhase13() {
