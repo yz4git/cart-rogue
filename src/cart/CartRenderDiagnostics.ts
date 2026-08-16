@@ -7,6 +7,7 @@ export interface CartRenderObjectState {
 
 export interface CartRenderCameraState {
   exists: boolean;
+  path: string | null;
   fov: number | null;
   y: number | null;
 }
@@ -106,10 +107,14 @@ function cameraState(scene: THREE.Scene): CartRenderCameraState {
   scene.traverse((object) => {
     if (!camera && object instanceof THREE.PerspectiveCamera) camera = object;
   });
+  if (!camera) return { exists: false, path: null, fov: null, y: null };
+  const worldPosition = new THREE.Vector3();
+  camera.getWorldPosition(worldPosition);
   return {
-    exists: camera !== null,
-    fov: camera ? camera.fov : null,
-    y: camera ? camera.position.y : null,
+    exists: true,
+    path: objectPath(camera),
+    fov: camera.fov,
+    y: worldPosition.y,
   };
 }
 

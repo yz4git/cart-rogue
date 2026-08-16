@@ -115,6 +115,7 @@ try {
       const badge = Array.from(document.querySelectorAll('span')).map((el) => el.textContent?.trim()).find((value) => value === 'WEBGL' || value === 'CANVAS') || '';
       if (!canvas) return { ready: false, badge, stage: Boolean(stage), href: location.href, renderDiagnostics: null };
       const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+      canvas.dispatchEvent(new Event('cart-render-audit-request'));
       let renderDiagnostics = null;
       try {
         renderDiagnostics = canvas.dataset.cartRenderDiagnostics ? JSON.parse(canvas.dataset.cartRenderDiagnostics) : null;
