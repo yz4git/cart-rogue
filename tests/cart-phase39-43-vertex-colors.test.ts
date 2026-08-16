@@ -7,7 +7,7 @@ import { applyCartPerFaceVertexColor } from "../src/cart/CartRoguePhase39VertexC
 const pipelineSource = readFileSync(new URL("../src/cart/CartRoguePhase39VertexColorPipeline.ts", import.meta.url), "utf8");
 const repairSource = readFileSync(new URL("../src/cart/CartRoguePhase42StaticInstanceColorRepair.ts", import.meta.url), "utf8");
 const architectureSource = readFileSync(new URL("../src/cart/CartRoguePhase43ArchitectureVertexColors.ts", import.meta.url), "utf8");
-const appSource = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
+const appSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 
 test("Phase 39 per-face vertex colors keep every triangle flat-colored", () => {
   const mesh = new THREE.Mesh(

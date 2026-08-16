@@ -11,7 +11,7 @@ import {
 import { cartPhase38RoadTileY } from "../src/cart/CartRoguePhase38ReliableMosaic";
 
 const source = readFileSync(new URL("../src/cart/CartRoguePhase46GroundPatternRecovery.ts", import.meta.url), "utf8");
-const appSource = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
+const appSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 
 test("Phase 46 restores a visible fixed-color road pattern without the risky instance-color path", () => {
   assert.equal(cartPhase46UsesInstanceColors(), false);

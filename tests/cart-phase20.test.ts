@@ -8,7 +8,7 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 
 describe("Cart Rogue Phase 20 diorama quality", () => {
   it("loads both phase20 presentation passes after phase19", () => {
-    const wrapper = read("app/CartRogueGamePhase13.tsx");
+    const wrapper = read("src/cart/CartRogueRuntime.ts");
     assert.ok(wrapper.includes("CartRoguePhase20DioramaQuality"));
     assert.ok(wrapper.includes("CartRoguePhase20ReferenceMatch"));
     assert.ok(wrapper.indexOf("CartRoguePhase20DioramaQuality") > wrapper.indexOf("CartRoguePhase19ArtifactCleanup"));

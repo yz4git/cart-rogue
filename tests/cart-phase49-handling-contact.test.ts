@@ -24,7 +24,7 @@ import { cartWorldNodeById, type CartWorldLocation } from "../src/cart/CartWorld
 const DRIVE = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
 const PIVOT = { throttle: 1, brake: 0, steer: 0.82, boost: true } as const;
 const source = readFileSync(new URL("../src/cart/CartRoguePhase49HandlingContact.ts", import.meta.url), "utf8");
-const appSource = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
+const appSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 
 function angleDistance(from: number, to: number): number {
   return Math.abs(Math.atan2(Math.sin(to - from), Math.cos(to - from)));
@@ -62,8 +62,6 @@ test("Phase 49 keeps the floor after a corridor traversable through and beyond i
       enemy.alive = false;
       enemy.hp = 0;
     }
-    // Keep one harmless enemy far to the side so this test does not enter the
-    // stage-clear grace state; we are testing ordinary open-floor traversal.
     local[0].alive = true;
     local[0].hp = local[0].maxHp;
     local[0].x = 25;

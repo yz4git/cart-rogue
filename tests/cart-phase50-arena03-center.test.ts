@@ -21,7 +21,7 @@ import { cartWorldNodeById, locateCartWorldNode, type CartWorldLocation } from "
 import { RALLY_CONFIG } from "../src/rally/RallyConfig";
 
 const DRIVE = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
-const appSource = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
+const appSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 
 function forceLocation(session: CartArenaSession, nodeId: string, x: number, z: number, heading = 0): void {
   const node = cartWorldNodeById(nodeId);

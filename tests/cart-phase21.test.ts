@@ -8,7 +8,7 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 
 describe("Cart Rogue Phase 21 impact polish", () => {
   it("loads phase21 after the phase20 presentation passes", () => {
-    const wrapper = read("app/CartRogueGamePhase13.tsx");
+    const wrapper = read("src/cart/CartRogueRuntime.ts");
     assert.ok(wrapper.includes("CartRoguePhase21ImpactPolish"));
     assert.ok(wrapper.includes("CartRoguePhase21WorldGrade"));
     assert.ok(wrapper.indexOf("CartRoguePhase21ImpactPolish") > wrapper.indexOf("CartRoguePhase20ReferenceMatch"));

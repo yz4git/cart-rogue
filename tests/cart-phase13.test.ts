@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const source = readFileSync(new URL("../src/cart/CartRoguePhase13Visuals.ts", import.meta.url), "utf8");
-const wrapper = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
+const wrapper = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
 
 test("Phase 13 adds instanced micro relief and persistent skid presentation", () => {
@@ -40,7 +40,7 @@ test("Phase 13 brings the chase camera closer without changing gameplay", () => 
 });
 
 test("Phase 13 presentation remains available as source but is retired from the Phase 19 runtime", () => {
-  assert.doesNotMatch(wrapper, /import "\.\.\/src\/cart\/CartRoguePhase13Visuals"/);
+  assert.doesNotMatch(wrapper, /CartRoguePhase13Visuals/);
   assert.doesNotMatch(wrapper, /CartRoguePhase13Grade/);
   assert.match(wrapper, /CartRoguePhase19TargetArt/);
   assert.match(page, /CartRogueGamePhase13/);

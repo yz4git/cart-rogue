@@ -64,7 +64,7 @@ test("fresh Turbo re-entry deals damage even while an old contact cooldown remai
 });
 
 test("Cart-specific comfort camera overrides the close Phase 20 baseline before impact shake", () => {
-  const wrapper = read("app/CartRogueGamePhase13.tsx");
+  const wrapper = read("src/cart/CartRogueRuntime.ts");
   const source = read("src/cart/CartRoguePhase22CameraComfort.ts");
   const phase20 = wrapper.indexOf("CartRoguePhase20ReferenceMatch");
   const comfort = wrapper.indexOf("CartRoguePhase22CameraComfort");
@@ -76,7 +76,7 @@ test("Cart-specific comfort camera overrides the close Phase 20 baseline before 
 });
 
 test("RAM sweep is installed between Turbo release handling and Flow reactions", () => {
-  const wrapper = read("app/CartRogueGamePhase13.tsx");
+  const wrapper = read("src/cart/CartRogueRuntime.ts");
   const turbo = wrapper.indexOf("CartRoguePhase15Turbo");
   const sweep = wrapper.indexOf("CartRoguePhase22RamSweep");
   const flow = wrapper.indexOf("CartRoguePhase16Flow");

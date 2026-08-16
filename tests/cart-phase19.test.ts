@@ -7,7 +7,7 @@ const creature = readFileSync(new URL("../src/cart/CartRoguePhase19CreaturePolis
 const ground = readFileSync(new URL("../src/cart/CartRoguePhase19GroundCover.ts", import.meta.url), "utf8");
 const polish = readFileSync(new URL("../src/cart/CartRoguePhase19ReferencePolish.ts", import.meta.url), "utf8");
 const cleanup = readFileSync(new URL("../src/cart/CartRoguePhase19ArtifactCleanup.ts", import.meta.url), "utf8");
-const wrapper = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
+const wrapper = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 
 test("Phase 19 replaces the abstract horizon with a pastel voxel garden world", () => {
   assert.match(source, /hideAbstractPhase18World/);

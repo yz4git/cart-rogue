@@ -30,7 +30,7 @@ import { cartWorldNodeById } from "../src/cart/CartWorldGraph";
 const phaseSource = readFileSync(new URL("../src/cart/CartRoguePhase35MosaicDiorama.ts", import.meta.url), "utf8");
 const phase36Source = readFileSync(new URL("../src/cart/CartRoguePhase36TraversalVisibility.ts", import.meta.url), "utf8");
 const phase38Source = readFileSync(new URL("../src/cart/CartRoguePhase38ReliableMosaic.ts", import.meta.url), "utf8");
-const appSource = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
+const appSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 const IDLE = { throttle: 0, brake: 0, steer: 0, boost: false } as const;
 const DRIVE = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
 

@@ -20,7 +20,7 @@ import { cartWorldNodeById, type CartWorldLocation } from "../src/cart/CartWorld
 
 const DRIVE = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
 const IDLE = { throttle: 0, brake: 0, steer: 0, boost: false } as const;
-const appSource = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
+const appSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 
 function forceLocation(session: CartArenaSession, nodeId: string, x: number, z: number, heading = 0): void {
   const node = cartWorldNodeById(nodeId);

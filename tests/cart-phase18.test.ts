@@ -4,7 +4,7 @@ import test from "node:test";
 
 const source = readFileSync(new URL("../src/cart/CartRoguePhase18VisualOverdrive.ts", import.meta.url), "utf8");
 const polish = readFileSync(new URL("../src/cart/CartRoguePhase18VisualPolish.ts", import.meta.url), "utf8");
-const wrapper = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
+const wrapper = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 
 test("Phase 18 upgrades the world with instanced faceted horizon, arena inlays, guidance lighting and architecture", () => {
   assert.match(source, /addFacetedHorizon/);

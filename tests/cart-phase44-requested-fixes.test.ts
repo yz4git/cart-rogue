@@ -16,7 +16,7 @@ import { CartArenaSession } from "../src/cart/CartArenaSession";
 const DRIVE = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
 const PIVOT = { throttle: 1, brake: 0, steer: 0.82, boost: true } as const;
 const source = readFileSync(new URL("../src/cart/CartRoguePhase44RequestedFixes.ts", import.meta.url), "utf8");
-const appSource = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
+const appSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 
 function angleDistance(from: number, to: number): number {
   return Math.abs(Math.atan2(Math.sin(to - from), Math.cos(to - from)));
