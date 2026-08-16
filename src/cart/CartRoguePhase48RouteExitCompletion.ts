@@ -150,6 +150,12 @@ export function installCartRoguePhase48RouteExitCompletion(): void {
     fixedDelta = 1 / 60,
   ): void {
     const previous = this.location.node;
+
+    // Curved-route wall projection runs inside older phases. Complete a valid
+    // cleared route exit *before* those wall guards can project the cart back
+    // into the room. This removes the invisible seam on the late-run merge.
+    if (cartPhase48TryCompleteClearedRouteExit(this, previous, input)) return;
+
     originalStep.call(this, input, fixedDelta);
     cartPhase48TryCompleteClearedRouteExit(this, previous, input);
   };
