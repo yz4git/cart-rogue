@@ -17,8 +17,16 @@ function addBucket(root: THREE.Group, name: string): void {
   root.add(mesh);
 }
 
+function addAuditCamera(scene: THREE.Scene): void {
+  const camera = new THREE.PerspectiveCamera(55, 16 / 9, 0.1, 100);
+  camera.name = "audit-chase-camera";
+  camera.position.set(0, 6.7, 0);
+  scene.add(camera);
+}
+
 test("render diagnostics recognize one visible final ground and hidden legacy layers", () => {
   const scene = new THREE.Scene();
+  addAuditCamera(scene);
   const finalGround = new THREE.Group();
   finalGround.name = "phase46-safe-ground-pattern";
   scene.add(finalGround);
@@ -37,11 +45,16 @@ test("render diagnostics recognize one visible final ground and hidden legacy la
   assert.equal(diagnostics.finalGround.visible, true);
   assert.equal(diagnostics.finalGroundBucketCount, 5);
   assert.equal(diagnostics.finalWearBucketCount, 1);
+  assert.equal(diagnostics.camera.exists, true);
+  assert.equal(diagnostics.camera.path, "audit-chase-camera");
+  assert.equal(diagnostics.camera.fov, 55);
+  assert.ok((diagnostics.camera.y ?? 0) > 6.6);
   assert.deepEqual(diagnostics.issues, []);
 });
 
 test("render diagnostics reject a visible legacy road even if the final ground exists", () => {
   const scene = new THREE.Scene();
+  addAuditCamera(scene);
   const finalGround = new THREE.Group();
   finalGround.name = "phase46-safe-ground-pattern";
   scene.add(finalGround);
