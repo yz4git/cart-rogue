@@ -91,10 +91,16 @@ try {
       const stage = document.querySelector('section[aria-label="Cart Rogue game"]');
       const text = document.body.innerText || '';
       const badge = Array.from(document.querySelectorAll('span')).map((el) => el.textContent?.trim()).find((value) => value === 'WEBGL' || value === 'CANVAS') || '';
-      if (!canvas) return { ready: false, badge, stage: Boolean(stage), href: location.href };
+      if (!canvas) return { ready: false, badge, stage: Boolean(stage), href: location.href, renderDiagnostics: null };
       const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+      let renderDiagnostics = null;
+      try {
+        renderDiagnostics = canvas.dataset.cartRenderDiagnostics ? JSON.parse(canvas.dataset.cartRenderDiagnostics) : null;
+      } catch {
+        renderDiagnostics = { ok: false, issues: ['render diagnostics payload is invalid JSON'] };
+      }
       return {
-        ready: Boolean(gl) && !gl.isContextLost() && Boolean(stage),
+        ready: Boolean(gl) && !gl.isContextLost() && Boolean(stage) && Boolean(renderDiagnostics),
         badge,
         webgl: Boolean(gl),
         contextLost: gl ? gl.isContextLost() : null,
@@ -107,6 +113,7 @@ try {
         clientWidth: canvas.clientWidth,
         clientHeight: canvas.clientHeight,
         href: location.href,
+        renderDiagnostics,
       };
     `);
     if (state?.ready && state?.badge === "WEBGL" && state?.hasGasHud && state?.hasTurboHud && state?.hasEnemyHud) break;
@@ -121,6 +128,9 @@ try {
   }
   if ((state.width ?? 0) <= 0 || (state.height ?? 0) <= 0) {
     throw new Error(`WebGL canvas has invalid backing size: ${JSON.stringify(state)}`);
+  }
+  if (!state.renderDiagnostics?.ok) {
+    throw new Error(`Cart Rogue render graph audit failed: ${JSON.stringify(state.renderDiagnostics)}`);
   }
 
   await sleep(600);
