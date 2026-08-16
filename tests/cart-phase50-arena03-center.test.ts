@@ -18,15 +18,10 @@ import {
 import { CartArenaSession } from "../src/cart/CartArenaSession";
 import { cartArenaContains } from "../src/cart/CartArenaShapes";
 import { cartWorldNodeById, locateCartWorldNode, type CartWorldLocation } from "../src/cart/CartWorldGraph";
+import { RALLY_CONFIG } from "../src/rally/RallyConfig";
 
 const DRIVE = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
 const appSource = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
-
-interface DebugCarState {
-  nearestSegmentHint: number;
-  stuckTime: number;
-  lastSafeTransform: { x: number; y: number; z: number; heading: number };
-}
 
 function forceLocation(session: CartArenaSession, nodeId: string, x: number, z: number, heading = 0): void {
   const node = cartWorldNodeById(nodeId);
@@ -44,6 +39,16 @@ function forceLocation(session: CartArenaSession, nodeId: string, x: number, z: 
     localZ: z - node.rect.centerZ,
   };
 }
+
+test("Phase 50 keeps the shared recovery boundary beyond the full Cart Rogue run", () => {
+  const boss = cartWorldNodeById("boss-01");
+  assert.ok(boss);
+  const authoredRunEndZ = boss.rect.centerZ + boss.rect.halfDepth;
+  assert.ok(
+    RALLY_CONFIG.vehicle.recoveryMaxZ > authoredRunEndZ,
+    `recoveryMaxZ=${RALLY_CONFIG.vehicle.recoveryMaxZ} must be beyond authored run end z=${authoredRunEndZ}`,
+  );
+});
 
 test("Phase 50 disables every inherited Rally gate-post collider for Cart Rogue", () => {
   const session = new CartArenaSession();
@@ -103,7 +108,7 @@ test("Phase 50 removes low-level static collisions from the Arena 03 centerline"
   }
 });
 
-test("Phase 50 keeps Arena 03 centerline continuously traversable with combat contacts isolated", () => {
+test("Phase 50 crosses Arena 03 center without triggering automatic recovery", () => {
   const session = new CartArenaSession();
   try {
     session.snapshot();
@@ -120,47 +125,20 @@ test("Phase 50 keeps Arena 03 centerline continuously traversable with combat co
     harmless.z = 294;
 
     forceLocation(session, "arena-03", 0, 263, 0);
-    const debugCar = session.car as unknown as DebugCarState;
+    const respawnsBefore = session.car.respawnCount;
     let guard = 0;
-    let maxZ = session.car.position.z;
-    let previousZ = session.car.position.z;
-    let firstRewind = "none";
-    let previousRespawns = session.car.respawnCount;
     while (session.snapshot().z < 286 && guard < 180) {
       session.step(DRIVE);
       guard += 1;
-      const query = session.track.queryAt(session.car.position.x, session.car.position.z, debugCar.nearestSegmentHint);
-      if (firstRewind === "none" && session.car.position.z < previousZ - 0.05) {
-        firstRewind = [
-          `frame=${guard}`,
-          `beforeZ=${previousZ}`,
-          `afterZ=${session.car.position.z}`,
-          `forward=${session.car.forwardVelocity}`,
-          `lateral=${session.car.lateralVelocity}`,
-          `heading=${session.car.heading}`,
-          `speed=${session.car.speed}`,
-          `grounded=${session.car.grounded}`,
-          `respawns=${session.car.respawnCount}`,
-          `respawnDelta=${session.car.respawnCount - previousRespawns}`,
-          `stuckTime=${debugCar.stuckTime}`,
-          `safeZ=${debugCar.lastSafeTransform.z}`,
-          `hint=${debugCar.nearestSegmentHint}`,
-          `querySegment=${query.segmentIndex}`,
-          `queryProgress=${query.progress}`,
-          `queryOnRoad=${query.onRoad}`,
-          `queryLateral=${query.lateralDistance}`,
-          `queryHeading=${query.heading}`,
-        ].join(", ");
-      }
-      previousRespawns = session.car.respawnCount;
-      previousZ = session.car.position.z;
-      maxZ = Math.max(maxZ, session.car.position.z);
     }
     const snapshot = session.snapshot();
+
     assert.equal(snapshot.nodeId, "arena-03");
-    assert.ok(
-      snapshot.z >= 286,
-      `Arena 03 center should be passable after removing Rally gates, z=${snapshot.z}, maxZ=${maxZ}, heading=${snapshot.heading}, frames=${guard}, firstRewind=[${firstRewind}], respawns=${session.car.respawnCount}, stuckTime=${debugCar.stuckTime}, safeZ=${debugCar.lastSafeTransform.z}`,
+    assert.ok(snapshot.z >= 286, `Arena 03 center should be passable, z=${snapshot.z}, frames=${guard}`);
+    assert.equal(
+      session.car.respawnCount,
+      respawnsBefore,
+      `crossing z=280 must not trigger RallyCar recovery; before=${respawnsBefore}, after=${session.car.respawnCount}`,
     );
     assert.ok(snapshot.speed > 2.5, `cart should retain useful speed through the center, speed=${snapshot.speed}`);
   } finally {
