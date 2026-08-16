@@ -29,6 +29,7 @@ import "../src/cart/CartRoguePhase31BossAtmosphere";
 import "../src/cart/CartRoguePhase32NearCameraParticles";
 import "../src/cart/CartRoguePhase33HandlingCombat";
 import "../src/cart/CartRoguePhase34FloorDetail";
+import "../src/cart/CartRoguePhase35MosaicDiorama";
 import CartRogueGame from "./CartRogueGame";
 
 export default function CartRogueGamePhase13() {
