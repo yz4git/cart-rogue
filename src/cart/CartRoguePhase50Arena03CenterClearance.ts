@@ -22,6 +22,7 @@ export const CART_PHASE50_ARENA03_CENTER_CLEAR_RADIUS = 7.25;
 export const CART_PHASE50_ARENA03_LEGACY_COLLIDER_HALF_WIDTH = 7.5;
 export const CART_PHASE50_ARENA03_LEGACY_COLLIDER_HALF_DEPTH = 8.5;
 export const CART_PHASE50_MOBILE_ENEMY_CLEARANCE = 1.86;
+export const CART_PHASE50_CENTER_SEAM_HALF_WIDTH = 10.5;
 export const CART_PHASE50_CENTER_SEAM_HALF_DEPTH = 0.42;
 export const CART_PHASE50_CENTER_SEAM_BRIDGE_DISTANCE = 1.15;
 
@@ -96,14 +97,14 @@ function hasVisibleCenterCollision(session: Phase50Session): boolean {
   const z = session.car.position.z;
   for (const enemy of session.enemies) {
     if (!enemy.alive || enemy.nodeId !== "arena-03") continue;
-    const radius = enemy.radius + 2.15;
+    const radius = enemy.radius + 1.45;
     const dx = enemy.x - x;
     const dz = enemy.z - z;
     if (dx * dx + dz * dz <= radius * radius) return true;
   }
   for (const obstacle of session.obstacles) {
     if (obstacle.destroyed || obstacle.nodeId !== "arena-03") continue;
-    const radius = obstacle.radius + 1.9;
+    const radius = obstacle.radius + 1.45;
     const dx = obstacle.x - x;
     const dz = obstacle.z - z;
     if (dx * dx + dz * dz <= radius * radius) return true;
@@ -122,22 +123,25 @@ function bridgeArena03CenterSeam(
   const node = session.location.node;
   const centerZ = node.rect.centerZ;
   const currentZ = session.car.position.z;
+  if (Math.abs(session.car.position.x - node.rect.centerX) > CART_PHASE50_CENTER_SEAM_HALF_WIDTH) return false;
   if (Math.abs(currentZ - centerZ) > CART_PHASE50_CENTER_SEAM_HALF_DEPTH) return false;
+  if (hasVisibleCenterCollision(session)) return false;
 
-  const forwardZ = Math.cos(session.car.heading);
-  if (Math.abs(forwardZ) < 0.35) return false;
-  const direction = forwardZ >= 0 ? 1 : -1;
-  const approachedFromCorrectSide = direction > 0
-    ? beforeZ <= centerZ + CART_PHASE50_CENTER_SEAM_HALF_DEPTH
-    : beforeZ >= centerZ - CART_PHASE50_CENTER_SEAM_HALF_DEPTH;
-  if (!approachedFromCorrectSide || hasVisibleCenterCollision(session)) return false;
+  // The inherited low-level collision can rotate the car sideways exactly on
+  // z=280. Do not use the post-collision heading to decide whether the player
+  // intended to cross. The side the cart entered the seam from is authoritative.
+  let direction: 1 | -1;
+  if (beforeZ < centerZ - 0.001) direction = 1;
+  else if (beforeZ > centerZ + 0.001) direction = -1;
+  else direction = session.car.velocity.z >= 0 ? 1 : -1;
 
   const targetZ = centerZ + direction * CART_PHASE50_CENTER_SEAM_BRIDGE_DISTANCE;
   const projected = projectCartPointInsideArena(node.id, session.car.position.x, targetZ, 1.35);
   session.car.position.x = projected.x;
   session.car.position.z = projected.z;
+  session.car.heading = direction > 0 ? 0 : Math.PI;
   session.car.forwardVelocity = Math.max(4.2, Math.abs(session.car.forwardVelocity));
-  session.car.lateralVelocity *= 0.45;
+  session.car.lateralVelocity *= 0.25;
   session.car.collisionImpact = Math.max(session.car.collisionImpact, 0.12);
   session.location = {
     node,
@@ -174,8 +178,6 @@ function yieldArena03MobileEnemyContact(session: Phase50Session, enemy: CartEnem
     enemy.z = projected.z - projected.normalZ * 0.08;
   }
 
-  // Mobile enemies should yield to an ordinary driving contact instead of
-  // behaving like an immovable invisible barrier across Arena 03's center.
   session.car.forwardVelocity = Math.max(3.2, Math.abs(session.car.forwardVelocity) * 0.97);
   session.car.lateralVelocity *= 0.72;
   session.car.collisionImpact = Math.max(session.car.collisionImpact, 0.32);
