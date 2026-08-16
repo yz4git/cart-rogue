@@ -12,11 +12,13 @@ import {
   cartMosaicRoadTileSize,
 } from "../src/cart/CartRoguePhase35MosaicDiorama";
 import {
-  cartPhase36MosaicContrast,
-  cartPhase36MosaicRoadLift,
   cartPhase36NormalSpeedCap,
   cartPhase36PointInStrictGateLane,
 } from "../src/cart/CartRoguePhase36TraversalVisibility";
+import {
+  cartRoadsideContrast,
+  cartRoadsideGrassLift,
+} from "../src/cart/CartRoadsideVisibility";
 import { cartPhase37UsesUnlitMosaic } from "../src/cart/CartRoguePhase37MosaicColorPass";
 import {
   cartPhase38RoadPalette,
@@ -29,6 +31,8 @@ import { cartWorldNodeById } from "../src/cart/CartWorldGraph";
 
 const phaseSource = readFileSync(new URL("../src/cart/CartRoguePhase35MosaicDiorama.ts", import.meta.url), "utf8");
 const phase36Source = readFileSync(new URL("../src/cart/CartRoguePhase36TraversalVisibility.ts", import.meta.url), "utf8");
+const roadsideSource = readFileSync(new URL("../src/cart/CartRoadsideVisibility.ts", import.meta.url), "utf8");
+const phase37Source = readFileSync(new URL("../src/cart/CartRoguePhase37MosaicColorPass.ts", import.meta.url), "utf8");
 const phase38Source = readFileSync(new URL("../src/cart/CartRoguePhase38ReliableMosaic.ts", import.meta.url), "utf8");
 const appSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 const IDLE = { throttle: 0, brake: 0, steer: 0, boost: false } as const;
@@ -39,24 +43,20 @@ function clearNode(session: CartArenaSession, nodeId: string): void {
 }
 
 test("Phase 35 uses a coarse lightweight mosaic rather than subdividing gameplay terrain", () => {
-  assert.ok(cartMosaicRoadTileSize() >= 2.4, "road tiles should stay coarse enough for mobile");
+  assert.ok(cartMosaicRoadTileSize() >= 2.4, "reference road tiles should stay coarse enough for mobile");
   assert.ok(cartMosaicApronWidth() >= 7, "visual apron should create a readable roadside band");
   assert.match(phaseSource, /InstancedMesh/);
   assert.match(phaseSource, /PlaneGeometry/);
   assert.doesNotMatch(phaseSource, /collider|physicsBody|RigidBody/i);
 });
 
-test("Phase 35 separates warm road colors from green roadside colors", () => {
+test("Phase 35 keeps distinct reference road and live roadside palettes", () => {
   const road = cartMosaicRoadPalette("meadow");
   const grass = cartMosaicGrassPalette("meadow");
   assert.ok(road.length >= 4);
   assert.ok(grass.length >= 4);
   assert.notDeepEqual(road, grass);
   assert.notEqual(road[0], grass[0]);
-});
-
-test("Phase 35 keeps distinct stage palettes for the mosaic floor", () => {
-  assert.notDeepEqual(cartMosaicRoadPalette("meadow"), cartMosaicRoadPalette("boss"));
   assert.notDeepEqual(cartMosaicGrassPalette("orchard"), cartMosaicGrassPalette("grove"));
 });
 
@@ -67,18 +67,23 @@ test("Phase 35 includes flat roadside water, banks, flower beds and sparse hero 
   assert.match(phaseSource, /phase35-hero-tree-canopies/);
 });
 
-test("Phase 36 lifts the mosaic above the legacy arena floor and strengthens tile contrast", () => {
-  assert.ok(cartPhase36MosaicRoadLift() >= 0.05, "mosaic needs a clear depth separation from the legacy floor");
-  const contrast = Array.from({ length: 14 }, (_, index) => cartPhase36MosaicContrast(index));
-  assert.ok(Math.min(...contrast) <= 0.8, "some tiles should be visibly darker");
-  assert.ok(Math.max(...contrast) >= 1.08, "some tiles should be visibly lighter");
-  assert.match(phase36Source, /phase35-road-mosaic/);
-  assert.match(phase36Source, /instanceColor/);
-  assert.match(phase36Source, /phase34-floor-detail/);
+test("roadside visibility owns live Phase 35 lift and contrast without dead road or floor work", () => {
+  assert.ok(cartRoadsideGrassLift() >= 0.03);
+  const contrast = Array.from({ length: 14 }, (_, index) => cartRoadsideContrast(index));
+  assert.ok(Math.min(...contrast) <= 0.8, "some roadside instances should be visibly darker");
+  assert.ok(Math.max(...contrast) >= 1.08, "some roadside instances should be visibly lighter");
+  assert.match(roadsideSource, /phase35-grass-mosaic/);
+  assert.match(roadsideSource, /phase35-water-mosaic/);
+  assert.match(roadsideSource, /phase35-stone-banks/);
+  assert.match(roadsideSource, /phase35-flower-beds/);
+  assert.match(roadsideSource, /instanceColor/);
+  assert.doesNotMatch(roadsideSource, /phase35-road-mosaic|phase34-floor-detail/);
+  assert.doesNotMatch(phase36Source, /from "three"|phase35-|phase34-floor-detail|instanceColor/);
 });
 
-test("archived Phase 38 remains a safe fixed-color implementation but is no longer a runtime road", () => {
+test("Phase 37 is roadside-only and archived Phase 38 stays out of runtime", () => {
   assert.equal(cartPhase37UsesUnlitMosaic(), true);
+  assert.doesNotMatch(phase37Source, /phase35-road-mosaic/);
   assert.equal(cartPhase38UsesInstanceColors(), false);
   assert.ok(cartPhase38RoadTileSize() >= 2.4);
   assert.ok(cartPhase38RoadTileY() > 0.07);
@@ -164,10 +169,13 @@ test("Phase 36 rejects the old wide Stage 1 gate shortcut through the visible si
   }
 });
 
-test("runtime skips the superseded Phase 38 road and proceeds directly from color pass to vertex colors", () => {
+test("runtime installs roadside visibility between Phase 36 gameplay and Phase 37 material pass", () => {
+  const phase36 = appSource.indexOf("CartRoguePhase36TraversalVisibility");
+  const roadside = appSource.indexOf("CartRoadsideVisibility");
   const phase37 = appSource.indexOf("CartRoguePhase37MosaicColorPass");
   const phase39 = appSource.indexOf("CartRoguePhase39VertexColorPipeline");
-  assert.ok(phase37 >= 0);
+  assert.ok(phase36 >= 0);
+  assert.ok(roadside > phase36);
+  assert.ok(phase37 > roadside);
   assert.ok(phase39 > phase37);
-  assert.doesNotMatch(appSource, /import "\.\/CartRoguePhase38ReliableMosaic"/);
 });

@@ -6,8 +6,7 @@ interface Phase37Demo {
   buildWorld(): void;
 }
 
-const MOSAIC_NAMES = [
-  "phase35-road-mosaic",
+const ROADSIDE_MOSAIC_NAMES = [
   "phase35-grass-mosaic",
   "phase35-water-mosaic",
   "phase35-stone-banks",
@@ -36,8 +35,8 @@ function replaceWithVisibleColorMaterial(mesh: THREE.InstancedMesh): void {
   for (const oldMaterial of oldMaterials) oldMaterial.dispose();
 }
 
-function applyMosaicColorPass(scene: THREE.Scene): void {
-  for (const name of MOSAIC_NAMES) {
+function applyRoadsideColorPass(scene: THREE.Scene): void {
+  for (const name of ROADSIDE_MOSAIC_NAMES) {
     const object = scene.getObjectByName(name);
     if (!(object instanceof THREE.InstancedMesh)) continue;
     replaceWithVisibleColorMaterial(object);
@@ -49,7 +48,7 @@ export function installCartRoguePhase37MosaicColorPass(): void {
   const oldWorld = prototype.buildWorld;
   prototype.buildWorld = function phase37World(this: Phase37Demo): void {
     oldWorld.call(this);
-    applyMosaicColorPass(this.scene);
+    applyRoadsideColorPass(this.scene);
   };
 }
 

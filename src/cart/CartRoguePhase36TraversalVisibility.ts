@@ -1,4 +1,3 @@
-import * as THREE from "three";
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
 import { aliveCartEnemies, type CartEnemyState } from "./CartCombat";
@@ -7,7 +6,6 @@ import {
   cartArenaShapeForNode,
   projectCartPointInsideArena,
 } from "./CartArenaShapes";
-import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
 import {
   cartWorldNodeById,
   type CartWorldLocation,
@@ -22,19 +20,10 @@ interface Phase36Session {
   step(input: RallyInputState, fixedDelta?: number): void;
 }
 
-interface Phase36Demo {
-  scene: THREE.Scene;
-  buildWorld(): void;
-}
-
 const GATE_LATERAL_TOLERANCE = 0.55;
 const GATE_APPROACH_DEPTH = 1.35;
 const ARENA_GATE_NEAR_MARGIN = 2.75;
 const CORRIDOR_ENTRY_MARGIN = 1.35;
-const MOSAIC_ROAD_LIFT = 0.058;
-const MOSAIC_GRASS_LIFT = 0.035;
-const MOSAIC_DECOR_LIFT = 0.045;
-const FLOOR_DETAIL_LIFT = 0.065;
 
 const FINAL_NORMAL_SPEED_CAPS: Readonly<Record<CartWorldNodeKind, number>> = {
   arena: 16.8,
@@ -42,19 +31,8 @@ const FINAL_NORMAL_SPEED_CAPS: Readonly<Record<CartWorldNodeKind, number>> = {
   boss: 16.0,
 };
 
-const MOSAIC_CONTRAST_PATTERN = [0.76, 1.08, 0.91, 1.0, 0.83, 1.13, 0.95] as const;
-
 export function cartPhase36NormalSpeedCap(kind: CartWorldNodeKind): number {
   return FINAL_NORMAL_SPEED_CAPS[kind];
-}
-
-export function cartPhase36MosaicRoadLift(): number {
-  return MOSAIC_ROAD_LIFT;
-}
-
-export function cartPhase36MosaicContrast(index: number): number {
-  const normalized = Math.abs(Math.floor(index));
-  return MOSAIC_CONTRAST_PATTERN[(normalized * 5 + 3) % MOSAIC_CONTRAST_PATTERN.length];
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -235,46 +213,6 @@ function capFinalNormalSpeed(session: Phase36Session, input: RallyInputState): v
   syncHorizontalVelocity(session);
 }
 
-function adjustInstancedColors(mesh: THREE.InstancedMesh, seed: number): void {
-  if (!mesh.instanceColor) return;
-  const color = new THREE.Color();
-  for (let index = 0; index < mesh.count; index += 1) {
-    mesh.getColorAt(index, color);
-    color.multiplyScalar(cartPhase36MosaicContrast(index + seed));
-    color.r = Math.min(1, color.r);
-    color.g = Math.min(1, color.g);
-    color.b = Math.min(1, color.b);
-    mesh.setColorAt(index, color);
-  }
-  mesh.instanceColor.needsUpdate = true;
-  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-  for (const material of materials) {
-    if (!(material instanceof THREE.MeshStandardMaterial)) continue;
-    material.polygonOffset = true;
-    material.polygonOffsetFactor = -1;
-    material.polygonOffsetUnits = -1;
-    material.needsUpdate = true;
-  }
-}
-
-function liftMosaicLayer(scene: THREE.Scene, name: string, lift: number, seed: number): void {
-  const object = scene.getObjectByName(name);
-  if (!(object instanceof THREE.InstancedMesh)) return;
-  object.position.y = lift;
-  adjustInstancedColors(object, seed);
-}
-
-function strengthenMosaicVisibility(scene: THREE.Scene): void {
-  liftMosaicLayer(scene, "phase35-road-mosaic", MOSAIC_ROAD_LIFT, 0);
-  liftMosaicLayer(scene, "phase35-grass-mosaic", MOSAIC_GRASS_LIFT, 11);
-  liftMosaicLayer(scene, "phase35-water-mosaic", MOSAIC_DECOR_LIFT, 19);
-  liftMosaicLayer(scene, "phase35-stone-banks", MOSAIC_DECOR_LIFT + 0.008, 23);
-  liftMosaicLayer(scene, "phase35-flower-beds", MOSAIC_DECOR_LIFT + 0.014, 29);
-
-  const detailRoot = scene.getObjectByName("phase34-floor-detail");
-  if (detailRoot) detailRoot.position.y = FLOOR_DETAIL_LIFT;
-}
-
 export function installCartRoguePhase36TraversalVisibility(): void {
   const sessionPrototype = CartArenaSession.prototype as unknown as Phase36Session;
   const originalStep = sessionPrototype.step;
@@ -304,13 +242,6 @@ export function installCartRoguePhase36TraversalVisibility(): void {
 
     capFinalNormalSpeed(this, input);
     activeValidationEnemies = [];
-  };
-
-  const demoPrototype = CartRogueWebGLDemo.prototype as unknown as Phase36Demo;
-  const originalWorld = demoPrototype.buildWorld;
-  demoPrototype.buildWorld = function phase36World(this: Phase36Demo): void {
-    originalWorld.call(this);
-    strengthenMosaicVisibility(this.scene);
   };
 }
 

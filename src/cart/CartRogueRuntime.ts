@@ -29,6 +29,7 @@ import "./CartRoguePhase33HandlingCombat";
 import "./CartRoguePhase34FloorDetail";
 import "./CartRoguePhase35MosaicDiorama";
 import "./CartRoguePhase36TraversalVisibility";
+import "./CartRoadsideVisibility";
 import "./CartRoguePhase37MosaicColorPass";
 import "./CartRoguePhase39VertexColorPipeline";
 import "./CartRoguePhase42StaticInstanceColorRepair";
