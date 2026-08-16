@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import * as THREE from "three";
 import { collectCartRenderDiagnostics } from "../src/cart/CartRenderDiagnostics";
+
+const phase35Source = readFileSync(new URL("../src/cart/CartRoguePhase35MosaicDiorama.ts", import.meta.url), "utf8");
+const runtimeSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 
 function addBucket(root: THREE.Group, name: string): void {
   const mesh = new THREE.InstancedMesh(
@@ -51,4 +55,11 @@ test("render diagnostics reject a visible legacy road even if the final ground e
   const diagnostics = collectCartRenderDiagnostics(scene);
   assert.equal(diagnostics.ok, false);
   assert.ok(diagnostics.issues.some((issue) => issue.includes("phase35-road-mosaic")));
+});
+
+test("runtime has one road authority: Phase 35 is roadside-only and Phase 38 is not installed", () => {
+  assert.doesNotMatch(phase35Source, /buildRoadTiles/);
+  assert.doesNotMatch(phase35Source, /phase35-road-mosaic/);
+  assert.doesNotMatch(runtimeSource, /import "\.\/CartRoguePhase38ReliableMosaic"/);
+  assert.match(runtimeSource, /import "\.\/CartRoguePhase46GroundPatternRecovery"/);
 });

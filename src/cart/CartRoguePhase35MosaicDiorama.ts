@@ -34,6 +34,10 @@ const ROAD_TILE_SIZE = 2.6;
 const APRON_TILE_SIZE = 3.2;
 const APRON_WIDTH = 8.2;
 
+/**
+ * Kept as an exported visual-reference palette for tests/tools. Runtime road
+ * rendering is owned by the fixed-color Phase 46 ground renderer.
+ */
 const ROAD_PALETTES: Readonly<Record<CartGraphicStage, readonly number[]>> = {
   meadow: [0xe7c887, 0xd8b673, 0xf0d397, 0xcda665, 0xe1bf7c],
   orchard: [0xe9c58b, 0xdcb477, 0xf2d19b, 0xcda16a, 0xe4bb82],
@@ -162,38 +166,6 @@ function createTileMesh(entries: readonly TileEntry[], name: string, y: number):
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   return mesh;
-}
-
-function buildRoadTiles(): TileEntry[] {
-  const bounds = worldBounds();
-  const entries: TileEntry[] = [];
-  const startX = Math.floor(bounds.minX / ROAD_TILE_SIZE) * ROAD_TILE_SIZE;
-  const startZ = Math.floor(bounds.minZ / ROAD_TILE_SIZE) * ROAD_TILE_SIZE;
-  const endX = Math.ceil(bounds.maxX / ROAD_TILE_SIZE) * ROAD_TILE_SIZE;
-  const endZ = Math.ceil(bounds.maxZ / ROAD_TILE_SIZE) * ROAD_TILE_SIZE;
-
-  let xi = 0;
-  for (let x = startX; x <= endX; x += ROAD_TILE_SIZE, xi += 1) {
-    let zi = 0;
-    for (let z = startZ; z <= endZ; z += ROAD_TILE_SIZE, zi += 1) {
-      const node = nodeForPoint(x, z);
-      if (!node) continue;
-      const stage = cartGraphicStageForNode(node.id);
-      const palette = ROAD_PALETTES[stage];
-      const color = colorFromPalette(palette, xi, zi, node.id.length + (node.tier ?? 0));
-      const centerRatio = Math.abs(x - node.rect.centerX) / Math.max(1, node.rect.halfWidth);
-      if (centerRatio < 0.24 && (zi + xi) % 3 !== 0) color.multiplyScalar(1.045);
-      if ((xi + zi * 2) % 7 === 0) color.multiplyScalar(0.93);
-      entries.push({
-        x,
-        z,
-        sx: ROAD_TILE_SIZE * 0.965,
-        sz: ROAD_TILE_SIZE * 0.965,
-        color,
-      });
-    }
-  }
-  return entries;
 }
 
 function buildApronTiles(): { grass: TileEntry[]; flowers: TileEntry[] } {
@@ -366,12 +338,12 @@ function buildMosaicDiorama(demo: Phase35Demo): void {
   demo.scene.add(root);
   states.set(key, root);
 
-  const road = buildRoadTiles();
+  // Road rendering used to be generated here and then replaced twice by later
+  // phases. Phase 35 now owns roadside-only scenery; Phase 46 is the sole road.
   const apron = buildApronTiles();
   const waterAndBanks = buildWaterAndBanks();
 
   root.add(createTileMesh(apron.grass, "phase35-grass-mosaic", 0.012));
-  root.add(createTileMesh(road, "phase35-road-mosaic", 0.022));
   root.add(createTileMesh(waterAndBanks.water, "phase35-water-mosaic", 0.028));
   root.add(createTileMesh(waterAndBanks.banks, "phase35-stone-banks", 0.033));
   root.add(createTileMesh(apron.flowers, "phase35-flower-beds", 0.038));
