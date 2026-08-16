@@ -226,7 +226,7 @@ function recoverInteriorGhostStall(
     current.seconds = 0;
   }
 
-  const tryingForward = input.throttle > 0.12 && input.brake < 0.24;
+  const tryingForward = input.throttle > 0.12 && input.brake < 0.24 && !input.boost;
   const moved = Math.hypot(session.car.position.x - beforeX, session.car.position.z - beforeZ);
   const eligible = node.kind !== "corridor"
     && tryingForward
