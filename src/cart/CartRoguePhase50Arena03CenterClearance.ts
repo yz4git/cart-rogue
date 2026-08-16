@@ -2,12 +2,14 @@ import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession, type CartArenaSessionSnapshot } from "./CartArenaSession";
 import { projectCartPointInsideArena } from "./CartArenaShapes";
 import type { CartEnemyState } from "./CartCombat";
+import type { CartObstacleState } from "./CartObstacles";
 import { cartWorldNodeById, type CartWorldLocation } from "./CartWorldGraph";
 
 interface Phase50Session {
   track: CartArenaSession["track"];
   car: CartArenaSession["car"];
   enemies: CartEnemyState[];
+  obstacles: CartObstacleState[];
   location: CartWorldLocation;
   step(input: RallyInputState, fixedDelta?: number): void;
   snapshot(): CartArenaSessionSnapshot;
@@ -20,6 +22,8 @@ export const CART_PHASE50_ARENA03_CENTER_CLEAR_RADIUS = 7.25;
 export const CART_PHASE50_ARENA03_LEGACY_COLLIDER_HALF_WIDTH = 7.5;
 export const CART_PHASE50_ARENA03_LEGACY_COLLIDER_HALF_DEPTH = 8.5;
 export const CART_PHASE50_MOBILE_ENEMY_CLEARANCE = 1.86;
+export const CART_PHASE50_CENTER_SEAM_HALF_DEPTH = 0.42;
+export const CART_PHASE50_CENTER_SEAM_BRIDGE_DISTANCE = 1.15;
 
 function syncHorizontalVelocity(session: Phase50Session): void {
   const forwardX = Math.sin(session.car.heading);
@@ -87,6 +91,63 @@ export function cartPhase50EnsureArena03CenterClear(session: Phase50Session): vo
   };
 }
 
+function hasVisibleCenterCollision(session: Phase50Session): boolean {
+  const x = session.car.position.x;
+  const z = session.car.position.z;
+  for (const enemy of session.enemies) {
+    if (!enemy.alive || enemy.nodeId !== "arena-03") continue;
+    const radius = enemy.radius + 2.15;
+    const dx = enemy.x - x;
+    const dz = enemy.z - z;
+    if (dx * dx + dz * dz <= radius * radius) return true;
+  }
+  for (const obstacle of session.obstacles) {
+    if (obstacle.destroyed || obstacle.nodeId !== "arena-03") continue;
+    const radius = obstacle.radius + 1.9;
+    const dx = obstacle.x - x;
+    const dz = obstacle.z - z;
+    if (dx * dx + dz * dz <= radius * radius) return true;
+  }
+  return false;
+}
+
+function bridgeArena03CenterSeam(
+  session: Phase50Session,
+  input: RallyInputState,
+  beforeZ: number,
+): boolean {
+  if (session.location.node.id !== "arena-03") return false;
+  if (input.boost || input.throttle <= 0.12 || input.brake >= 0.24) return false;
+
+  const node = session.location.node;
+  const centerZ = node.rect.centerZ;
+  const currentZ = session.car.position.z;
+  if (Math.abs(currentZ - centerZ) > CART_PHASE50_CENTER_SEAM_HALF_DEPTH) return false;
+
+  const forwardZ = Math.cos(session.car.heading);
+  if (Math.abs(forwardZ) < 0.35) return false;
+  const direction = forwardZ >= 0 ? 1 : -1;
+  const approachedFromCorrectSide = direction > 0
+    ? beforeZ <= centerZ + CART_PHASE50_CENTER_SEAM_HALF_DEPTH
+    : beforeZ >= centerZ - CART_PHASE50_CENTER_SEAM_HALF_DEPTH;
+  if (!approachedFromCorrectSide || hasVisibleCenterCollision(session)) return false;
+
+  const targetZ = centerZ + direction * CART_PHASE50_CENTER_SEAM_BRIDGE_DISTANCE;
+  const projected = projectCartPointInsideArena(node.id, session.car.position.x, targetZ, 1.35);
+  session.car.position.x = projected.x;
+  session.car.position.z = projected.z;
+  session.car.forwardVelocity = Math.max(4.2, Math.abs(session.car.forwardVelocity));
+  session.car.lateralVelocity *= 0.45;
+  session.car.collisionImpact = Math.max(session.car.collisionImpact, 0.12);
+  session.location = {
+    node,
+    localX: session.car.position.x - node.rect.centerX,
+    localZ: session.car.position.z - node.rect.centerZ,
+  };
+  syncHorizontalVelocity(session);
+  return true;
+}
+
 function yieldArena03MobileEnemyContact(session: Phase50Session, enemy: CartEnemyState): boolean {
   if (session.location.node.id !== "arena-03" || enemy.nodeId !== "arena-03" || !enemy.alive || enemy.kind !== "chaser") {
     return false;
@@ -134,7 +195,9 @@ export function installCartRoguePhase50Arena03CenterClearance(): void {
     fixedDelta = 1 / 60,
   ): void {
     cartPhase50EnsureArena03CenterClear(this);
+    const beforeZ = this.car.position.z;
     originalStep.call(this, input, fixedDelta);
+    bridgeArena03CenterSeam(this, input, beforeZ);
   };
 
   prototype.snapshot = function phase50Arena03CenterSnapshot(this: Phase50Session): CartArenaSessionSnapshot {
