@@ -42,22 +42,22 @@ const WEAR_Y = 0.202;
 
 const STAGES: readonly CartGraphicStage[] = ["meadow", "orchard", "grove", "canyon", "boss"];
 
-// Fixed-color pastel buckets preserve the visible mosaic while keeping the road
-// inside the bright diorama palette. No instanceColor/vertex-color path is used.
+// Very light fixed-color pastel buckets keep the mosaic readable while making
+// the ground recede behind the brighter cart, foliage and combat effects.
 const PALETTES: Readonly<Record<CartGraphicStage, readonly [number, number, number, number, number]>> = {
-  meadow: [0xead6a8, 0xdfc690, 0xf3e0b9, 0xe5ce9b, 0xd7bb83],
-  orchard: [0xefcfb1, 0xe4bfa0, 0xf6dfc7, 0xe9c7aa, 0xd9ae8e],
-  grove: [0xc9c6a6, 0xb9b697, 0xd9d6b8, 0xb1ad90, 0xc3bea0],
-  canyon: [0xe4b29a, 0xd39a83, 0xefc4ad, 0xca8e79, 0xdcaa94],
-  boss: [0xaaa0b1, 0x918798, 0xbdb1c4, 0x827985, 0x9e92a5],
+  meadow: [0xf2e6c9, 0xeadcbc, 0xf8edd7, 0xefe2c3, 0xe4d4b2],
+  orchard: [0xf4dfd1, 0xebd3c4, 0xf9e9df, 0xf0dbce, 0xe3c8b8],
+  grove: [0xd9dac8, 0xced0be, 0xe6e7d8, 0xc4c7b5, 0xd2d3c2],
+  canyon: [0xf0d4ca, 0xe6c4b9, 0xf7e2da, 0xdfb9af, 0xeacad0],
+  boss: [0xc3becd, 0xb3adbd, 0xd3cedc, 0xa8a2b2, 0xbab4c4],
 };
 
 const WEAR_COLORS: Readonly<Record<CartGraphicStage, number>> = {
-  meadow: 0xc4a774,
-  orchard: 0xc39a80,
-  grove: 0x9c987c,
-  canyon: 0xb88472,
-  boss: 0x726978,
+  meadow: 0xd9c5a6,
+  orchard: 0xdab9ab,
+  grove: 0xb4b39f,
+  canyon: 0xd1aba1,
+  boss: 0x918b99,
 };
 
 export function cartPhase46UsesInstanceColors(): boolean {
