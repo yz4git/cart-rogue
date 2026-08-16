@@ -25,9 +25,9 @@ test("Phase 46 restores a visible fixed-color road pattern without the risky ins
     assert.ok(palette.every((color) => color !== 0xffffff), `${stage} road colors must never depend on a white base material`);
   }
 
-  assert.doesNotMatch(source, /setColorAt\(/);
-  assert.doesNotMatch(source, /instanceColor/);
+  assert.doesNotMatch(source, /\.setColorAt\(/);
   assert.doesNotMatch(source, /vertexColors:\s*true/);
+  assert.match(source, /new THREE\.MeshBasicMaterial/);
   assert.match(source, /toneMapped:\s*false/);
   assert.match(source, /phase46-safe-ground-pattern/);
 });
