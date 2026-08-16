@@ -24,6 +24,7 @@ import { cartWorldNodeById, type CartWorldLocation } from "../src/cart/CartWorld
 
 const DRIVE = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
 const phase51Source = readFileSync(new URL("../src/cart/CartRoguePhase51Arena03Gate.ts", import.meta.url), "utf8");
+const visualSource = readFileSync(new URL("../src/cart/CartArena03GateVisual.ts", import.meta.url), "utf8");
 const appSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 
 function forceLocation(session: CartArenaSession, nodeId: string, x: number, z: number, heading = 0): void {
@@ -56,8 +57,10 @@ test("Phase 51 keeps the Arena 03 gate visibly closed while its encounter is ali
   try {
     assert.equal(cartPhase51Arena03GateLocked(session.enemies), true);
     assert.ok(CART_PHASE51_ARENA03_GATE_Z > CART_PHASE51_ARENA03_TRIGGER_Z);
-    assert.match(phase51Source, /phase51-arena03-gate-bar/);
-    assert.match(phase51Source, /updateGate\("arena-03"/);
+    assert.match(visualSource, /phase51-arena03-gate-bar/);
+    assert.match(visualSource, /updateGate\("arena-03"/);
+    assert.match(phase51Source, /CartArena03GateRules/);
+    assert.match(phase51Source, /installCartArena03GateVisuals/);
   } finally {
     session.dispose();
   }
