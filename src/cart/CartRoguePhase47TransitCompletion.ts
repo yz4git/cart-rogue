@@ -1,6 +1,7 @@
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
 import { cartTraversalBridgeIntoNode } from "./CartTraversalBridge";
+import { cartTraversalHasExitIntent } from "./CartTraversalIntent";
 import { cartTraversalAxisToNext } from "./CartTraversalMath";
 import {
   cartWorldNodeById,
@@ -68,15 +69,6 @@ function nearOutgoingFace(from: CartWorldNode, to: CartWorldNode, x: number, z: 
   return lateral && longitudinal >= -0.3 && longitudinal <= CART_PHASE47_EXIT_TRIGGER_DEPTH;
 }
 
-function hasOutgoingIntent(session: Phase47Session, from: CartWorldNode, to: CartWorldNode, input: RallyInputState): boolean {
-  const direction = cartTraversalAxisToNext(from, to);
-  const nx = direction.axis === "x" ? direction.sign : 0;
-  const nz = direction.axis === "z" ? direction.sign : 0;
-  const velocityDot = session.car.velocity.x * nx + session.car.velocity.z * nz;
-  const forwardDot = Math.sin(session.car.heading) * nx + Math.cos(session.car.heading) * nz;
-  return velocityDot > 0.08 || (input.throttle > 0.04 && input.brake < 0.45 && forwardDot > -0.12);
-}
-
 export function cartPhase47TryCompleteTransitExit(
   session: Phase47Session,
   from: CartWorldNode,
@@ -88,7 +80,13 @@ export function cartPhase47TryCompleteTransitExit(
   const target = cartWorldNodeById(targetId);
   if (!target || !from.next.includes(target.id)) return false;
   if (!nearOutgoingFace(from, target, session.car.position.x, session.car.position.z)) return false;
-  if (!hasOutgoingIntent(session, from, target, input)) return false;
+  if (!cartTraversalHasExitIntent(session.car, from, target, input, {
+    direction: "axis",
+    brakeLimit: 0.45,
+    velocityThreshold: 0.08,
+    throttleThreshold: 0.04,
+    forwardThreshold: -0.12,
+  })) return false;
   cartTraversalBridgeIntoNode(session, from, target, {
     entryInset: CART_PHASE47_ENTRY_INSET,
     turnMax: 0.3,

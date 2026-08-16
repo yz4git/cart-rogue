@@ -2,6 +2,7 @@ import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
 import { aliveCartEnemies, type CartEnemyState } from "./CartCombat";
 import { cartTraversalBridgeIntoNode } from "./CartTraversalBridge";
+import { cartTraversalHasExitIntent } from "./CartTraversalIntent";
 import { cartTraversalAxisToNext } from "./CartTraversalMath";
 import {
   cartWorldNodeById,
@@ -59,18 +60,6 @@ function nearRouteExit(from: CartWorldNode, to: CartWorldNode, x: number, z: num
     && lateralGap <= CART_PHASE48_LATERAL_FUNNEL;
 }
 
-function hasExitIntent(session: Phase48Session, from: CartWorldNode, to: CartWorldNode, input: RallyInputState): boolean {
-  if (input.brake >= 0.55) return false;
-  const dx = to.rect.centerX - from.rect.centerX;
-  const dz = to.rect.centerZ - from.rect.centerZ;
-  const length = Math.hypot(dx, dz) || 1;
-  const nx = dx / length;
-  const nz = dz / length;
-  const velocityDot = session.car.velocity.x * nx + session.car.velocity.z * nz;
-  const forwardDot = Math.sin(session.car.heading) * nx + Math.cos(session.car.heading) * nz;
-  return velocityDot > 0.08 || (input.throttle > 0.04 && forwardDot > -0.08);
-}
-
 export function cartPhase48TryCompleteClearedRouteExit(
   session: Phase48Session,
   from: CartWorldNode,
@@ -81,7 +70,13 @@ export function cartPhase48TryCompleteClearedRouteExit(
   const target = singleTransitTarget(from);
   if (!target || !from.next.includes(target.id)) return false;
   if (!nearRouteExit(from, target, session.car.position.x, session.car.position.z)) return false;
-  if (!hasExitIntent(session, from, target, input)) return false;
+  if (!cartTraversalHasExitIntent(session.car, from, target, input, {
+    direction: "center",
+    brakeLimit: 0.55,
+    velocityThreshold: 0.08,
+    throttleThreshold: 0.04,
+    forwardThreshold: -0.08,
+  })) return false;
   cartTraversalBridgeIntoNode(session, from, target, {
     entryInset: CART_PHASE48_ENTRY_INSET,
     turnMax: 0.38,

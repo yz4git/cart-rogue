@@ -1,6 +1,7 @@
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
 import { aliveCartEnemies, type CartEnemyState } from "./CartCombat";
+import { cartTraversalHasExitIntent } from "./CartTraversalIntent";
 import {
   cartTraversalClamp,
   cartTraversalSyncHorizontalVelocity,
@@ -22,22 +23,21 @@ export function cartArena03GateLocked(enemies: readonly CartEnemyState[]): boole
   return aliveCartEnemies(enemies as CartEnemyState[], "arena-03").length > 0;
 }
 
-function hasForwardExitIntent(session: CartArena03GateSession, input: RallyInputState): boolean {
-  if (input.brake >= 0.58) return false;
-  const velocityForward = session.car.velocity.z;
-  const headingForward = Math.cos(session.car.heading);
-  return velocityForward > 0.08 || (input.throttle > 0.04 && headingForward > -0.22);
-}
-
 export function cartTryOpenArena03Exit(session: CartArena03GateSession, input: RallyInputState): boolean {
   if (session.location.node.id !== "arena-03") return false;
   if (cartArena03GateLocked(session.enemies)) return false;
   if (Math.abs(session.car.position.x) > CART_ARENA03_GATE_HALF_OPENING) return false;
   if (session.car.position.z < CART_ARENA03_GATE_TRIGGER_Z) return false;
-  if (!hasForwardExitIntent(session, input)) return false;
 
   const target = cartWorldNodeById("junction-04");
   if (!target || !session.location.node.next.includes(target.id)) return false;
+  if (!cartTraversalHasExitIntent(session.car, session.location.node, target, input, {
+    direction: "axis",
+    brakeLimit: 0.58,
+    velocityThreshold: 0.08,
+    throttleThreshold: 0.04,
+    forwardThreshold: -0.22,
+  })) return false;
 
   const minX = target.rect.centerX - target.rect.halfWidth + 1.45;
   const maxX = target.rect.centerX + target.rect.halfWidth - 1.45;
