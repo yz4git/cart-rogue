@@ -18,7 +18,8 @@ import {
   CART_PHASE50_ARENA03_LEGACY_COLLIDER_HALF_WIDTH,
 } from "../src/cart/CartRoguePhase50Arena03CenterClearance";
 import { CartArenaSession } from "../src/cart/CartArenaSession";
-import { cartWorldNodeById, type CartWorldLocation } from "../src/cart/CartWorldGraph";
+import { cartArenaContains } from "../src/cart/CartArenaShapes";
+import { cartWorldNodeById, locateCartWorldNode, type CartWorldLocation } from "../src/cart/CartWorldGraph";
 
 const DRIVE = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
 const appSource = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
@@ -87,22 +88,50 @@ test("Phase 50 disables only legacy Rally colliders that intrude into the Arena 
   }
 });
 
-test("Phase 50 keeps Arena 03 centerline continuously traversable", () => {
+test("Phase 50 keeps Arena 03 centerline continuously traversable with combat contacts isolated", () => {
   const session = new CartArenaSession();
   try {
     session.snapshot();
-    for (const obstacle of session.obstacles.filter((candidate) => candidate.nodeId === "arena-03")) obstacle.destroyed = true;
-    for (const enemy of session.enemies.filter((candidate) => candidate.nodeId === "arena-03")) enemy.moveSpeed = 0;
-    forceLocation(session, "arena-03", 0, 263, 0);
+    const node = cartWorldNodeById("arena-03");
+    assert.ok(node);
+    assert.equal(locateCartWorldNode(0, 280)?.node.id, "arena-03");
+    assert.equal(cartArenaContains("arena-03", 0, 280, 1.62), true);
+    assert.equal(session.track.staticCollision(0, 280, 1.05), null);
 
+    for (const obstacle of session.obstacles.filter((candidate) => candidate.nodeId === "arena-03")) obstacle.destroyed = true;
+    const localEnemies = session.enemies.filter((candidate) => candidate.nodeId === "arena-03");
+    assert.ok(localEnemies.length > 0);
+    const harmless = localEnemies[0];
+    for (const enemy of localEnemies) {
+      enemy.alive = enemy.id === harmless.id;
+      enemy.hp = enemy.alive ? enemy.maxHp : 0;
+      enemy.moveSpeed = 0;
+    }
+    harmless.x = 25;
+    harmless.z = 294;
+
+    forceLocation(session, "arena-03", 0, 263, 0);
     let guard = 0;
+    let maxZ = session.car.position.z;
+    let minZAfterCross = Number.POSITIVE_INFINITY;
+    let crossed = false;
+    let headingAtMax = session.car.heading;
     while (session.snapshot().z < 286 && guard < 180) {
       session.step(DRIVE);
       guard += 1;
+      if (session.car.position.z > maxZ) {
+        maxZ = session.car.position.z;
+        headingAtMax = session.car.heading;
+      }
+      if (session.car.position.z > 280.5) crossed = true;
+      if (crossed) minZAfterCross = Math.min(minZAfterCross, session.car.position.z);
     }
     const snapshot = session.snapshot();
     assert.equal(snapshot.nodeId, "arena-03");
-    assert.ok(snapshot.z >= 286, `Arena 03 center should be passable, z=${snapshot.z}, frames=${guard}`);
+    assert.ok(
+      snapshot.z >= 286,
+      `Arena 03 center should be passable, z=${snapshot.z}, maxZ=${maxZ}, minAfterCross=${minZAfterCross}, headingAtMax=${headingAtMax}, frames=${guard}`,
+    );
     assert.ok(snapshot.speed > 2.5, `cart should retain useful speed through the center, speed=${snapshot.speed}`);
   } finally {
     session.dispose();
