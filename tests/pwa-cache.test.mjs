@@ -5,7 +5,7 @@ import test from "node:test";
 test("PWA service worker prefers fresh navigation HTML and retires old Voxel Rally caches", async () => {
   const worker = await readFile(new URL("../public/sw.js", import.meta.url), "utf8");
   assert.match(worker, /const CACHE_PREFIX = ["']voxel-rally-["'];/);
-  assert.match(worker, /const CACHE_VERSION = ["']v12["'];/);
+  assert.match(worker, /const CACHE_VERSION = ["']v13["'];/);
   assert.doesNotMatch(worker, /voxel-rally-v1/);
   assert.match(worker, /event\.request\.mode === ["']navigate["']/);
   assert.match(worker, /fetch\(event\.request, \{ cache: ["']no-store["'] \}\)/);
