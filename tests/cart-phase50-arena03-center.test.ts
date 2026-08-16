@@ -22,6 +22,12 @@ import { cartWorldNodeById, locateCartWorldNode, type CartWorldLocation } from "
 const DRIVE = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
 const appSource = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
 
+interface DebugCarState {
+  nearestSegmentHint: number;
+  stuckTime: number;
+  lastSafeTransform: { x: number; y: number; z: number; heading: number };
+}
+
 function forceLocation(session: CartArenaSession, nodeId: string, x: number, z: number, heading = 0): void {
   const node = cartWorldNodeById(nodeId);
   assert.ok(node);
@@ -114,18 +120,47 @@ test("Phase 50 keeps Arena 03 centerline continuously traversable with combat co
     harmless.z = 294;
 
     forceLocation(session, "arena-03", 0, 263, 0);
+    const debugCar = session.car as unknown as DebugCarState;
     let guard = 0;
     let maxZ = session.car.position.z;
+    let previousZ = session.car.position.z;
+    let firstRewind = "none";
+    let previousRespawns = session.car.respawnCount;
     while (session.snapshot().z < 286 && guard < 180) {
       session.step(DRIVE);
       guard += 1;
+      const query = session.track.queryAt(session.car.position.x, session.car.position.z, debugCar.nearestSegmentHint);
+      if (firstRewind === "none" && session.car.position.z < previousZ - 0.05) {
+        firstRewind = [
+          `frame=${guard}`,
+          `beforeZ=${previousZ}`,
+          `afterZ=${session.car.position.z}`,
+          `forward=${session.car.forwardVelocity}`,
+          `lateral=${session.car.lateralVelocity}`,
+          `heading=${session.car.heading}`,
+          `speed=${session.car.speed}`,
+          `grounded=${session.car.grounded}`,
+          `respawns=${session.car.respawnCount}`,
+          `respawnDelta=${session.car.respawnCount - previousRespawns}`,
+          `stuckTime=${debugCar.stuckTime}`,
+          `safeZ=${debugCar.lastSafeTransform.z}`,
+          `hint=${debugCar.nearestSegmentHint}`,
+          `querySegment=${query.segmentIndex}`,
+          `queryProgress=${query.progress}`,
+          `queryOnRoad=${query.onRoad}`,
+          `queryLateral=${query.lateralDistance}`,
+          `queryHeading=${query.heading}`,
+        ].join(", ");
+      }
+      previousRespawns = session.car.respawnCount;
+      previousZ = session.car.position.z;
       maxZ = Math.max(maxZ, session.car.position.z);
     }
     const snapshot = session.snapshot();
     assert.equal(snapshot.nodeId, "arena-03");
     assert.ok(
       snapshot.z >= 286,
-      `Arena 03 center should be passable after removing Rally gates, z=${snapshot.z}, maxZ=${maxZ}, heading=${snapshot.heading}, frames=${guard}`,
+      `Arena 03 center should be passable after removing Rally gates, z=${snapshot.z}, maxZ=${maxZ}, heading=${snapshot.heading}, frames=${guard}, firstRewind=[${firstRewind}], respawns=${session.car.respawnCount}, stuckTime=${debugCar.stuckTime}, safeZ=${debugCar.lastSafeTransform.z}`,
     );
     assert.ok(snapshot.speed > 2.5, `cart should retain useful speed through the center, speed=${snapshot.speed}`);
   } finally {
