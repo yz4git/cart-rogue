@@ -34,6 +34,7 @@ import "../src/cart/CartRoguePhase36TraversalVisibility";
 import "../src/cart/CartRoguePhase37MosaicColorPass";
 import "../src/cart/CartRoguePhase38ReliableMosaic";
 import "../src/cart/CartRoguePhase39VertexColorPipeline";
+import "../src/cart/CartRoguePhase42StaticInstanceColorRepair";
 import CartRogueGame from "./CartRogueGame";
 
 export default function CartRogueGamePhase13() {
