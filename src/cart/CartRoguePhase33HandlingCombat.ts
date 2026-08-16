@@ -111,11 +111,27 @@ function positionIsSafe(session: Phase33Session, x: number, z: number): boolean 
     && z <= node.rect.centerZ + node.rect.halfDepth - margin;
 }
 
-function releaseEnemySandwich(session: Phase33Session): void {
-  const local = aliveCartEnemies(session.enemies, session.location.node.id)
+function nearbySandwichIds(
+  session: Phase33Session,
+  nodeId: string,
+  x: number,
+  z: number,
+): Set<string> {
+  const result = new Set<string>();
+  for (const enemy of aliveCartEnemies(session.enemies, nodeId)) {
+    const radius = enemy.radius + SANDWICH_CONTACT_PADDING;
+    if (Math.hypot(x - enemy.x, z - enemy.z) <= radius) result.add(enemy.id);
+  }
+  return result;
+}
+
+function releaseEnemySandwich(session: Phase33Session, touchingBefore: ReadonlySet<string>): void {
+  const currentNodeId = session.location.node.id;
+  const local = aliveCartEnemies(session.enemies, currentNodeId)
     .filter((enemy) => {
       const radius = enemy.radius + SANDWICH_CONTACT_PADDING;
-      return Math.hypot(session.car.position.x - enemy.x, session.car.position.z - enemy.z) <= radius;
+      const touchingNow = Math.hypot(session.car.position.x - enemy.x, session.car.position.z - enemy.z) <= radius;
+      return touchingNow || touchingBefore.has(enemy.id);
     });
   if (local.length < 2) return;
 
@@ -244,6 +260,7 @@ export function installCartRoguePhase33HandlingCombat(): void {
     const nodeId = this.location.node.id;
     const beforeHp = new Map<string, number>();
     const expandedTouchingBefore = new Set<string>();
+    const sandwichTouchingBefore = nearbySandwichIds(this, nodeId, fromX, fromZ);
 
     for (const enemy of this.enemies) {
       if (!enemy.alive || enemy.nodeId !== nodeId) continue;
@@ -268,7 +285,7 @@ export function installCartRoguePhase33HandlingCombat(): void {
       expandedTouchingBefore,
       boostWasActive,
     );
-    releaseEnemySandwich(this);
+    releaseEnemySandwich(this, sandwichTouchingBefore);
     capNormalSpeed(this, input);
   };
 }
