@@ -6,6 +6,11 @@ interface Phase39Demo {
   buildWorld(): void;
 }
 
+interface Phase40Demo extends Phase39Demo {
+  playerVisual: THREE.Group;
+  buildPlayerVisual(): void;
+}
+
 interface FaceColorOptions {
   variance?: number;
   topLift?: number;
@@ -16,14 +21,26 @@ interface FaceColorOptions {
 }
 
 const STATIC_WORLD_COLORS = new Set([
-  0xc8c2b7, // rock
-  0xd8d2c7, // rock light
-  0xb7b0a5, // rock variant
-  0xaad98f, // grass
-  0x82c47d, // grass 2
-  0x5da96a, // grass dark
-  0xd4caba, // stone / fence shade
-  0xe7dfd1, // pale stone
+  0xc8c2b7,
+  0xd8d2c7,
+  0xb7b0a5,
+  0xaad98f,
+  0x82c47d,
+  0x5da96a,
+  0xd4caba,
+  0xe7dfd1,
+]);
+
+const HERO_CART_COLORS = new Set([
+  0x42bdb7,
+  0x258d8f,
+  0x73e0d5,
+  0xf4efe7,
+  0x496b79,
+  0x31484c,
+  0xfff5df,
+  0x34434a,
+  0x3b4a51,
 ]);
 
 function hash01(value: number): number {
@@ -127,6 +144,27 @@ function colorizeStaticWorld(scene: THREE.Scene): void {
   scene.userData.phase39VertexColoredMeshes = colored;
 }
 
+function colorizeHeroCart(playerVisual: THREE.Group): void {
+  let colored = 0;
+  playerVisual.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    if (Array.isArray(object.material) || !(object.material instanceof THREE.MeshStandardMaterial)) return;
+    const baseHex = object.material.color.getHex();
+    if (!HERO_CART_COLORS.has(baseHex)) return;
+    const bodyLike = baseHex === 0x42bdb7 || baseHex === 0x258d8f || baseHex === 0x73e0d5;
+    const glassLike = baseHex === 0x496b79;
+    if (applyCartPerFaceVertexColor(object, {
+      variance: bodyLike ? 0.075 : glassLike ? 0.025 : 0.045,
+      topLift: bodyLike ? 1.15 : 1.09,
+      sideShade: bodyLike ? 0.93 : 0.97,
+      bottomShade: bodyLike ? 0.72 : 0.8,
+      hueJitter: bodyLike ? 0.018 : 0.006,
+      seed: 100 + colored,
+    })) colored += 1;
+  });
+  playerVisual.userData.phase40VertexColoredMeshes = colored;
+}
+
 export function installCartRoguePhase39StaticVertexColors(): void {
   const prototype = CartRogueWebGLDemo.prototype as unknown as Phase39Demo;
   const oldWorld = prototype.buildWorld;
@@ -136,4 +174,14 @@ export function installCartRoguePhase39StaticVertexColors(): void {
   };
 }
 
+export function installCartRoguePhase40HeroVertexColors(): void {
+  const prototype = CartRogueWebGLDemo.prototype as unknown as Phase40Demo;
+  const oldPlayer = prototype.buildPlayerVisual;
+  prototype.buildPlayerVisual = function phase40Player(this: Phase40Demo): void {
+    oldPlayer.call(this);
+    colorizeHeroCart(this.playerVisual);
+  };
+}
+
 installCartRoguePhase39StaticVertexColors();
+installCartRoguePhase40HeroVertexColors();
