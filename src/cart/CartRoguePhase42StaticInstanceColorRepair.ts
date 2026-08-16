@@ -16,6 +16,7 @@ interface ColorBucket {
 }
 
 const STATIC_ROOTS = [
+  { name: "phase19-target-art-world", faceColor: true },
   { name: "phase19-near-garden-polish", faceColor: true },
   { name: "phase19-reference-ground-cover", faceColor: true },
   { name: "phase35-mosaic-diorama", faceColor: false },
