@@ -44,6 +44,28 @@ async function execute(sessionId, script, args = []) {
   return result?.value;
 }
 
+async function readRenderDiagnostics(sessionId) {
+  return execute(sessionId, `
+    const canvas = document.querySelector('canvas.cart-rogue-canvas');
+    if (!canvas) return null;
+    canvas.dispatchEvent(new Event('cart-render-audit-request'));
+    try {
+      return canvas.dataset.cartRenderDiagnostics ? JSON.parse(canvas.dataset.cartRenderDiagnostics) : null;
+    } catch {
+      return { ok: false, issues: ['render diagnostics payload is invalid JSON'] };
+    }
+  `);
+}
+
+async function setAuditKeys(sessionId, down) {
+  await execute(sessionId, `
+    const type = arguments[0] ? 'keydown' : 'keyup';
+    window.dispatchEvent(new KeyboardEvent(type, { key: 'Shift', code: 'ShiftLeft', bubbles: true, cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent(type, { key: 'ArrowRight', code: 'ArrowRight', bubbles: true, cancelable: true }));
+    return true;
+  `, [down]);
+}
+
 const driver = spawn(driverBin, [`--port=${driverPort}`, "--allowed-origins=*"], {
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -133,12 +155,31 @@ try {
     throw new Error(`Cart Rogue render graph audit failed: ${JSON.stringify(state.renderDiagnostics)}`);
   }
 
+  // Preserve the normal initial frame as the visual comparison artifact.
   await sleep(600);
   const screenshot = await request(`/session/${sessionId}/screenshot`, { method: "GET" });
   const pngBase64 = screenshot?.value;
   if (typeof pngBase64 !== "string" || pngBase64.length < 100) {
     throw new Error("ChromeDriver screenshot payload is missing");
   }
+
+  // Exercise the dynamic Turbo-drift presentation instead of only checking that
+  // its meshes exist. Hold Turbo + steer, refresh the scene diagnostics, then
+  // require both stamped skid instances and visible body roll.
+  await setAuditKeys(sessionId, true);
+  await sleep(520);
+  const dynamicTurboDriftDiagnostics = await readRenderDiagnostics(sessionId);
+  await setAuditKeys(sessionId, false);
+  if (!dynamicTurboDriftDiagnostics?.ok) {
+    throw new Error(`Dynamic Cart Rogue render graph audit failed: ${JSON.stringify(dynamicTurboDriftDiagnostics)}`);
+  }
+  if ((dynamicTurboDriftDiagnostics.stationaryTurboSkidActiveCount ?? 0) < 2) {
+    throw new Error(`Turbo drift did not stamp visible skid instances: ${JSON.stringify(dynamicTurboDriftDiagnostics)}`);
+  }
+  if (Math.abs(dynamicTurboDriftDiagnostics.heroPresentationRoll ?? 0) < 0.015) {
+    throw new Error(`Turbo drift did not produce visible hero body roll: ${JSON.stringify(dynamicTurboDriftDiagnostics)}`);
+  }
+  state.dynamicTurboDriftDiagnostics = dynamicTurboDriftDiagnostics;
 
   await mkdir(new URL("../artifacts/webgl-audit/", import.meta.url), { recursive: true });
   await mkdir(new URL(`../${output.split("/").slice(0, -1).join("/")}/`, import.meta.url), { recursive: true }).catch(() => undefined);

@@ -8,7 +8,7 @@ interface RenderAuditDemo {
   updateVisuals(delta: number): void;
 }
 
-const audited = new WeakSet<object>();
+const installed = new WeakSet<object>();
 
 function publishRenderDiagnostics(demo: RenderAuditDemo): void {
   const diagnostics = collectCartRenderDiagnostics(demo.scene);
@@ -22,9 +22,12 @@ export function installCartRenderAuditRuntime(): void {
   prototype.updateVisuals = function cartRenderAuditUpdate(this: RenderAuditDemo, delta: number): void {
     originalUpdate.call(this, delta);
     const key = this as unknown as object;
-    if (audited.has(key)) return;
+    if (installed.has(key)) return;
+
+    const refresh = () => publishRenderDiagnostics(this);
+    this.renderer.domElement.addEventListener("cart-render-audit-request", refresh);
     publishRenderDiagnostics(this);
-    audited.add(key);
+    installed.add(key);
   };
 }
 
