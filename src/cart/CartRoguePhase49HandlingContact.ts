@@ -10,9 +10,9 @@ import type { CartObstacleState } from "./CartObstacles";
 import type { CartResourcePickupState } from "./CartResources";
 import type { CartWorldLocation, CartWorldNode } from "./CartWorldGraph";
 
-interface Phase49Car extends CartArenaSession["car"] {
+type Phase49Car = CartArenaSession["car"] & {
   drifting?: boolean;
-}
+};
 
 interface Phase49Session {
   car: Phase49Car;
