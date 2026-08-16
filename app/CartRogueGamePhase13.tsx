@@ -40,6 +40,7 @@ import "../src/cart/CartRoguePhase44RequestedFixes";
 import "../src/cart/CartRoguePhase45StabilityGuidance";
 import "../src/cart/CartRoguePhase46GroundPatternRecovery";
 import "../src/cart/CartRoguePhase47TransitCompletion";
+import "../src/cart/CartRoguePhase48RouteExitCompletion";
 import CartRogueGame from "./CartRogueGame";
 
 export default function CartRogueGamePhase13() {
