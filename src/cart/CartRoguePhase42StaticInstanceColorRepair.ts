@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { applyCartPerFaceVertexColor } from "./CartRoguePhase39VertexColorPipeline";
+import { applyCartPerFaceVertexColor } from "./CartFaceColor";
 import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
 
 interface Phase42RepairDemo {

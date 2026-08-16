@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { applyCartPerFaceVertexColor } from "./CartRoguePhase39VertexColorPipeline";
+import { applyCartPerFaceVertexColor } from "./CartFaceColor";
 import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
 
 interface Phase43Demo {
@@ -23,6 +23,7 @@ const DARK_ARCHITECTURE = new Set([
 
 function colorizeArchitecture(scene: THREE.Scene): void {
   let colored = 0;
+  const worldPosition = new THREE.Vector3();
   scene.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
     if (object.userData.cartPerFaceVertexColor) return;
@@ -36,7 +37,7 @@ function colorizeArchitecture(scene: THREE.Scene): void {
     const dark = DARK_ARCHITECTURE.has(hex);
     if (!stone && !red && !dark) return;
 
-    const bossStructure = dark && object.getWorldPosition(new THREE.Vector3()).z > 400;
+    const bossStructure = dark && object.getWorldPosition(worldPosition).z > 400;
     if (applyCartPerFaceVertexColor(object, {
       variance: stone ? 0.045 : red ? 0.065 : 0.055,
       topLift: stone ? 1.09 : red ? 1.12 : bossStructure ? 1.1 : 1.07,
