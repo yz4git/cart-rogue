@@ -52,22 +52,34 @@ function disableUnrelatedInteractions(session: CartArenaSession): void {
   for (const enemy of session.enemies) enemy.moveSpeed = 0;
 }
 
-test("Phase 49 keeps the floor after a corridor traversable through its center", () => {
+test("Phase 49 keeps the floor after a corridor traversable through and beyond its center", () => {
   const session = new CartArenaSession();
   try {
     disableUnrelatedInteractions(session);
-    for (const enemy of session.enemies.filter((candidate) => candidate.nodeId === "arena-02")) {
+    const local = session.enemies.filter((candidate) => candidate.nodeId === "arena-02");
+    assert.ok(local.length > 0);
+    for (const enemy of local) {
       enemy.alive = false;
       enemy.hp = 0;
     }
+    // Keep one harmless enemy far to the side so this test does not enter the
+    // stage-clear grace state; we are testing ordinary open-floor traversal.
+    local[0].alive = true;
+    local[0].hp = local[0].maxHp;
+    local[0].x = 25;
+    local[0].z = 132;
     forceLocation(session, "arena-02", 0, 97, 0);
 
-    for (let frame = 0; frame < 95; frame += 1) session.step(DRIVE);
+    for (let frame = 0; frame < 78; frame += 1) session.step(DRIVE);
+    const before = session.snapshot();
+    for (let frame = 0; frame < 34; frame += 1) session.step(DRIVE);
+    const after = session.snapshot();
 
-    const snapshot = session.snapshot();
-    assert.equal(snapshot.nodeId, "arena-02");
-    assert.ok(snapshot.z > 123, `the open floor should remain traversable past its center, z=${snapshot.z}`);
-    assert.ok(snapshot.speed > 2.5, `the player should retain usable motion, speed=${snapshot.speed}`);
+    assert.equal(after.nodeId, "arena-02");
+    assert.ok(before.z > 113, `the car should reach the center region, z=${before.z}`);
+    assert.ok(after.z > 121, `the car should continue beyond the center, z=${after.z}`);
+    assert.ok(after.z > before.z + 4, `center traversal must keep making progress, before=${before.z}, after=${after.z}`);
+    assert.ok(after.speed > 2.5, `the player should retain usable motion, speed=${after.speed}`);
     assert.match(source, /recoverInteriorGhostStall/);
     assert.match(source, /hasNearbyVisibleCollision/);
   } finally {
@@ -75,7 +87,7 @@ test("Phase 49 keeps the floor after a corridor traversable through its center",
   }
 });
 
-test("Phase 49 lowers the maximum Turbo-drift turning speed", () => {
+test("Phase 49 lowers the maximum Turbo-drift turning speed without adding translation", () => {
   assert.equal(CART_PHASE49_DRIFT_TURN_SCALE, 0.78);
   assert.ok(CART_PHASE49_DRIFT_MAX_YAW_RATE < 3);
   const session = new CartArenaSession();
@@ -97,6 +109,7 @@ test("Phase 49 lowers the maximum Turbo-drift turning speed", () => {
     assert.ok(turn > 0.9, `drift turn should remain responsive, got ${turn.toFixed(3)} rad`);
     assert.ok(turn < 1.35, `drift turn should be slower than Phase44, got ${turn.toFixed(3)} rad`);
     assert.ok(travel < 0.08, `Turbo pivot should remain almost stationary, travelled ${travel.toFixed(3)}`);
+    assert.match(source, /input\.throttle > 0\.12 && input\.brake < 0\.24 && !input\.boost/);
   } finally {
     session.dispose();
   }
