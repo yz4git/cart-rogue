@@ -64,13 +64,14 @@ test("Phase 43 colors architecture while excluding emissive structures", () => {
   assert.match(architectureSource, /emissiveIntensity > 0\.25/);
 });
 
-test("vertex-color phases load after the reliable mosaic pass", () => {
-  const phase38 = appSource.indexOf("CartRoguePhase38ReliableMosaic");
+test("vertex-color phases load after Phase 37 while the superseded Phase 38 road is retired", () => {
+  const phase37 = appSource.indexOf("CartRoguePhase37MosaicColorPass");
   const phase39 = appSource.indexOf("CartRoguePhase39VertexColorPipeline");
   const phase42 = appSource.indexOf("CartRoguePhase42StaticInstanceColorRepair");
   const phase43 = appSource.indexOf("CartRoguePhase43ArchitectureVertexColors");
-  assert.ok(phase38 >= 0);
-  assert.ok(phase39 > phase38);
+  assert.ok(phase37 >= 0);
+  assert.ok(phase39 > phase37);
   assert.ok(phase42 > phase39);
   assert.ok(phase43 > phase42);
+  assert.doesNotMatch(appSource, /import "\.\/CartRoguePhase38ReliableMosaic"/);
 });

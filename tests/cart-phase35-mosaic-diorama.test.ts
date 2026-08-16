@@ -77,15 +77,15 @@ test("Phase 36 lifts the mosaic above the legacy arena floor and strengthens til
   assert.match(phase36Source, /phase34-floor-detail/);
 });
 
-test("Phase 38 replaces the unreliable per-instance road colors with fixed-color buckets", () => {
+test("archived Phase 38 remains a safe fixed-color implementation but is no longer a runtime road", () => {
   assert.equal(cartPhase37UsesUnlitMosaic(), true);
   assert.equal(cartPhase38UsesInstanceColors(), false);
   assert.ok(cartPhase38RoadTileSize() >= 2.4);
-  assert.ok(cartPhase38RoadTileY() > 0.07, "reliable mosaic should sit above legacy shaped floor tiles");
+  assert.ok(cartPhase38RoadTileY() > 0.07);
   assert.notDeepEqual(cartPhase38RoadPalette("meadow"), cartPhase38RoadPalette("boss"));
-  assert.match(phase38Source, /oldRoad\.visible = false/);
   assert.match(phase38Source, /MeshBasicMaterial/);
   assert.doesNotMatch(phase38Source, /setColorAt|instanceColor/);
+  assert.doesNotMatch(appSource, /import "\.\/CartRoguePhase38ReliableMosaic"/);
 });
 
 test("Phase 36 lowers final non-Turbo speed again", () => {
@@ -164,15 +164,10 @@ test("Phase 36 rejects the old wide Stage 1 gate shortcut through the visible si
   }
 });
 
-test("Phase 38 is loaded after all previous mosaic passes", () => {
-  const phase34 = appSource.indexOf("CartRoguePhase34FloorDetail");
-  const phase35 = appSource.indexOf("CartRoguePhase35MosaicDiorama");
-  const phase36 = appSource.indexOf("CartRoguePhase36TraversalVisibility");
+test("runtime skips the superseded Phase 38 road and proceeds directly from color pass to vertex colors", () => {
   const phase37 = appSource.indexOf("CartRoguePhase37MosaicColorPass");
-  const phase38 = appSource.indexOf("CartRoguePhase38ReliableMosaic");
-  assert.ok(phase34 >= 0);
-  assert.ok(phase35 > phase34);
-  assert.ok(phase36 > phase35);
-  assert.ok(phase37 > phase36);
-  assert.ok(phase38 > phase37);
+  const phase39 = appSource.indexOf("CartRoguePhase39VertexColorPipeline");
+  assert.ok(phase37 >= 0);
+  assert.ok(phase39 > phase37);
+  assert.doesNotMatch(appSource, /import "\.\/CartRoguePhase38ReliableMosaic"/);
 });

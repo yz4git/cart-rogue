@@ -30,7 +30,6 @@ import "./CartRoguePhase34FloorDetail";
 import "./CartRoguePhase35MosaicDiorama";
 import "./CartRoguePhase36TraversalVisibility";
 import "./CartRoguePhase37MosaicColorPass";
-import "./CartRoguePhase38ReliableMosaic";
 import "./CartRoguePhase39VertexColorPipeline";
 import "./CartRoguePhase42StaticInstanceColorRepair";
 import "./CartRoguePhase43ArchitectureVertexColors";
@@ -85,7 +84,6 @@ export const CART_ROGUE_RUNTIME_PHASE_ORDER = [
   "CartRoguePhase35MosaicDiorama",
   "CartRoguePhase36TraversalVisibility",
   "CartRoguePhase37MosaicColorPass",
-  "CartRoguePhase38ReliableMosaic",
   "CartRoguePhase39VertexColorPipeline",
   "CartRoguePhase42StaticInstanceColorRepair",
   "CartRoguePhase43ArchitectureVertexColors",
