@@ -17,11 +17,19 @@ import {
   cartPhase36NormalSpeedCap,
   cartPhase36PointInStrictGateLane,
 } from "../src/cart/CartRoguePhase36TraversalVisibility";
+import { cartPhase37UsesUnlitMosaic } from "../src/cart/CartRoguePhase37MosaicColorPass";
+import {
+  cartPhase38RoadPalette,
+  cartPhase38RoadTileSize,
+  cartPhase38RoadTileY,
+  cartPhase38UsesInstanceColors,
+} from "../src/cart/CartRoguePhase38ReliableMosaic";
 import { CartArenaSession } from "../src/cart/CartArenaSession";
 import { cartWorldNodeById } from "../src/cart/CartWorldGraph";
 
 const phaseSource = readFileSync(new URL("../src/cart/CartRoguePhase35MosaicDiorama.ts", import.meta.url), "utf8");
 const phase36Source = readFileSync(new URL("../src/cart/CartRoguePhase36TraversalVisibility.ts", import.meta.url), "utf8");
+const phase38Source = readFileSync(new URL("../src/cart/CartRoguePhase38ReliableMosaic.ts", import.meta.url), "utf8");
 const appSource = readFileSync(new URL("../app/CartRogueGamePhase13.tsx", import.meta.url), "utf8");
 const IDLE = { throttle: 0, brake: 0, steer: 0, boost: false } as const;
 const DRIVE = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
@@ -67,6 +75,17 @@ test("Phase 36 lifts the mosaic above the legacy arena floor and strengthens til
   assert.match(phase36Source, /phase35-road-mosaic/);
   assert.match(phase36Source, /instanceColor/);
   assert.match(phase36Source, /phase34-floor-detail/);
+});
+
+test("Phase 38 replaces the unreliable per-instance road colors with fixed-color buckets", () => {
+  assert.equal(cartPhase37UsesUnlitMosaic(), true);
+  assert.equal(cartPhase38UsesInstanceColors(), false);
+  assert.ok(cartPhase38RoadTileSize() >= 2.4);
+  assert.ok(cartPhase38RoadTileY() > 0.07, "reliable mosaic should sit above legacy shaped floor tiles");
+  assert.notDeepEqual(cartPhase38RoadPalette("meadow"), cartPhase38RoadPalette("boss"));
+  assert.match(phase38Source, /oldRoad\.visible = false/);
+  assert.match(phase38Source, /MeshBasicMaterial/);
+  assert.doesNotMatch(phase38Source, /setColorAt|instanceColor/);
 });
 
 test("Phase 36 lowers final non-Turbo speed again", () => {
@@ -145,11 +164,15 @@ test("Phase 36 rejects the old wide Stage 1 gate shortcut through the visible si
   }
 });
 
-test("Phase 36 is loaded after the mosaic layer", () => {
+test("Phase 38 is loaded after all previous mosaic passes", () => {
   const phase34 = appSource.indexOf("CartRoguePhase34FloorDetail");
   const phase35 = appSource.indexOf("CartRoguePhase35MosaicDiorama");
   const phase36 = appSource.indexOf("CartRoguePhase36TraversalVisibility");
+  const phase37 = appSource.indexOf("CartRoguePhase37MosaicColorPass");
+  const phase38 = appSource.indexOf("CartRoguePhase38ReliableMosaic");
   assert.ok(phase34 >= 0);
   assert.ok(phase35 > phase34);
   assert.ok(phase36 > phase35);
+  assert.ok(phase37 > phase36);
+  assert.ok(phase38 > phase37);
 });
