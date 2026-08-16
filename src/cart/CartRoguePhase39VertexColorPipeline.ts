@@ -16,6 +16,8 @@ interface Phase41Demo extends Phase40Demo {
   buildEnemyVehicle(enemy: CartEnemySnapshot): THREE.Group;
 }
 
+type Phase42Demo = Phase39Demo;
+
 interface FaceColorOptions {
   variance?: number;
   topLift?: number;
@@ -36,11 +38,12 @@ const HERO_CART_COLORS = new Set([
 ]);
 
 const ENEMY_EXCLUDED_COLORS = new Set([
-  0x252b31, // hp background
-  0xf05463, // hp fill
-  0x2c333c, // tire
-  0xd9e0de, // wheel hub
-  0x7c858b, // brake disc
+  0x252b31, 0xf05463, 0x2c333c, 0xd9e0de, 0x7c858b,
+]);
+
+const VEGETATION_COLORS = new Set([
+  0xf29ac2, 0xe779aa, 0xf4afd0, 0xffc4dc,
+  0x8bc977, 0x6fb46c, 0x70b56f, 0x8f674f, 0x6f5038,
 ]);
 
 function hash01(value: number): number {
@@ -128,6 +131,7 @@ function colorizeStaticWorld(scene: THREE.Scene): void {
   let colored = 0;
   scene.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
+    if (object.userData.cartPerFaceVertexColor) return;
     if (Array.isArray(object.material) || !(object.material instanceof THREE.MeshStandardMaterial)) return;
     const baseHex = object.material.color.getHex();
     if (!STATIC_WORLD_COLORS.has(baseHex)) return;
@@ -187,6 +191,79 @@ function colorizeEnemyVehicle(group: THREE.Group, enemy: CartEnemySnapshot): voi
   group.userData.phase41VertexColoredMeshes = colored;
 }
 
+function rebuildHeroCanopiesWithoutInstanceColor(scene: THREE.Scene): number {
+  const source = scene.getObjectByName("phase35-hero-tree-canopies");
+  if (!(source instanceof THREE.InstancedMesh) || !source.instanceColor || !source.parent) return 0;
+  const parent = source.parent;
+  const root = new THREE.Group();
+  root.name = "phase42-hero-tree-canopies";
+  const buckets = new Map<string, { color: THREE.Color; matrices: THREE.Matrix4[] }>();
+  const color = new THREE.Color();
+  const matrix = new THREE.Matrix4();
+
+  for (let index = 0; index < source.count; index += 1) {
+    source.getColorAt(index, color);
+    source.getMatrixAt(index, matrix);
+    const key = `${Math.round(color.r * 255)}:${Math.round(color.g * 255)}:${Math.round(color.b * 255)}`;
+    const bucket = buckets.get(key) ?? { color: color.clone(), matrices: [] };
+    bucket.matrices.push(matrix.clone());
+    buckets.set(key, bucket);
+  }
+
+  let bucketIndex = 0;
+  for (const bucket of buckets.values()) {
+    const material = new THREE.MeshStandardMaterial({
+      color: bucket.color,
+      roughness: 0.94,
+      metalness: 0,
+      flatShading: true,
+    });
+    const mesh = new THREE.InstancedMesh(source.geometry, material, bucket.matrices.length);
+    mesh.name = `phase42-canopy-${bucketIndex}`;
+    bucket.matrices.forEach((item, index) => mesh.setMatrixAt(index, item));
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    applyCartPerFaceVertexColor(mesh, {
+      variance: 0.07,
+      topLift: 1.13,
+      sideShade: 0.96,
+      bottomShade: 0.78,
+      hueJitter: 0.018,
+      seed: 300 + bucketIndex,
+    });
+    root.add(mesh);
+    bucketIndex += 1;
+  }
+
+  source.visible = false;
+  parent.add(root);
+  return bucketIndex;
+}
+
+function colorizeVegetation(scene: THREE.Scene): void {
+  const canopyBuckets = rebuildHeroCanopiesWithoutInstanceColor(scene);
+  let colored = 0;
+  scene.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    if (object.userData.cartPerFaceVertexColor) return;
+    if (object instanceof THREE.InstancedMesh && object.instanceColor) return;
+    if (Array.isArray(object.material) || !(object.material instanceof THREE.MeshStandardMaterial)) return;
+    const baseHex = object.material.color.getHex();
+    if (!VEGETATION_COLORS.has(baseHex)) return;
+    if (applyCartPerFaceVertexColor(object, {
+      variance: baseHex === 0x8f674f || baseHex === 0x6f5038 ? 0.055 : 0.08,
+      topLift: 1.12,
+      sideShade: 0.96,
+      bottomShade: 0.8,
+      hueJitter: baseHex === 0x8f674f || baseHex === 0x6f5038 ? 0.008 : 0.024,
+      seed: 400 + colored,
+    })) colored += 1;
+  });
+  scene.userData.phase42VegetationVertexColors = colored;
+  scene.userData.phase42CanopyBuckets = canopyBuckets;
+}
+
 export function installCartRoguePhase39StaticVertexColors(): void {
   const prototype = CartRogueWebGLDemo.prototype as unknown as Phase39Demo;
   const oldWorld = prototype.buildWorld;
@@ -215,6 +292,16 @@ export function installCartRoguePhase41EnemyVertexColors(): void {
   };
 }
 
+export function installCartRoguePhase42VegetationVertexColors(): void {
+  const prototype = CartRogueWebGLDemo.prototype as unknown as Phase42Demo;
+  const oldWorld = prototype.buildWorld;
+  prototype.buildWorld = function phase42World(this: Phase42Demo): void {
+    oldWorld.call(this);
+    colorizeVegetation(this.scene);
+  };
+}
+
 installCartRoguePhase39StaticVertexColors();
 installCartRoguePhase40HeroVertexColors();
 installCartRoguePhase41EnemyVertexColors();
+installCartRoguePhase42VegetationVertexColors();
