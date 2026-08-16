@@ -2,6 +2,12 @@ import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
 import { aliveCartEnemies, type CartEnemyState } from "./CartCombat";
 import {
+  cartTraversalAxisToNext,
+  cartTraversalClamp,
+  cartTraversalRotateToward,
+  cartTraversalSyncHorizontalVelocity,
+} from "./CartTraversalMath";
+import {
   cartWorldNodeById,
   type CartWorldLocation,
   type CartWorldNode,
@@ -17,26 +23,6 @@ interface Phase48Session {
 export const CART_PHASE48_EXIT_TRIGGER_DEPTH = 4.25;
 export const CART_PHASE48_LATERAL_FUNNEL = 4.2;
 export const CART_PHASE48_ENTRY_INSET = 1.45;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function normalizeAngle(angle: number): number {
-  return Math.atan2(Math.sin(angle), Math.cos(angle));
-}
-
-function rotateToward(current: number, target: number, maxStep: number): number {
-  const delta = normalizeAngle(target - current);
-  return normalizeAngle(current + clamp(delta, -maxStep, maxStep));
-}
-
-function axisToNext(from: CartWorldNode, to: CartWorldNode): { axis: "x" | "z"; sign: 1 | -1 } {
-  const dx = to.rect.centerX - from.rect.centerX;
-  const dz = to.rect.centerZ - from.rect.centerZ;
-  if (Math.abs(dz) >= Math.abs(dx)) return { axis: "z", sign: dz >= 0 ? 1 : -1 };
-  return { axis: "x", sign: dx >= 0 ? 1 : -1 };
-}
 
 function isRouteNode(node: CartWorldNode): boolean {
   return node.id.startsWith("route-");
@@ -55,7 +41,7 @@ function distanceOutsideRange(value: number, min: number, max: number): number {
 }
 
 function nearRouteExit(from: CartWorldNode, to: CartWorldNode, x: number, z: number): boolean {
-  const direction = axisToNext(from, to);
+  const direction = cartTraversalAxisToNext(from, to);
   if (direction.axis === "z") {
     const face = from.rect.centerZ + direction.sign * from.rect.halfDepth;
     const longitudinal = direction.sign > 0 ? face - z : z - face;
@@ -89,25 +75,15 @@ function hasExitIntent(session: Phase48Session, from: CartWorldNode, to: CartWor
   return velocityDot > 0.08 || (input.throttle > 0.04 && forwardDot > -0.08);
 }
 
-function syncHorizontalVelocity(session: Phase48Session): void {
-  const forwardX = Math.sin(session.car.heading);
-  const forwardZ = Math.cos(session.car.heading);
-  const rightX = Math.cos(session.car.heading);
-  const rightZ = -Math.sin(session.car.heading);
-  session.car.velocity.x = forwardX * session.car.forwardVelocity + rightX * session.car.lateralVelocity;
-  session.car.velocity.z = forwardZ * session.car.forwardVelocity + rightZ * session.car.lateralVelocity;
-  session.car.speed = Math.hypot(session.car.velocity.x, session.car.velocity.z);
-}
-
 function bridgeClearedRoute(session: Phase48Session, from: CartWorldNode, to: CartWorldNode): void {
-  const direction = axisToNext(from, to);
+  const direction = cartTraversalAxisToNext(from, to);
   const minX = to.rect.centerX - to.rect.halfWidth + CART_PHASE48_ENTRY_INSET;
   const maxX = to.rect.centerX + to.rect.halfWidth - CART_PHASE48_ENTRY_INSET;
   const minZ = to.rect.centerZ - to.rect.halfDepth + CART_PHASE48_ENTRY_INSET;
   const maxZ = to.rect.centerZ + to.rect.halfDepth - CART_PHASE48_ENTRY_INSET;
 
-  let targetX = clamp(session.car.position.x, minX, maxX);
-  let targetZ = clamp(session.car.position.z, minZ, maxZ);
+  let targetX = cartTraversalClamp(session.car.position.x, minX, maxX);
+  let targetZ = cartTraversalClamp(session.car.position.z, minZ, maxZ);
   if (direction.axis === "z") targetZ = direction.sign > 0 ? minZ : maxZ;
   else targetX = direction.sign > 0 ? minX : maxX;
 
@@ -120,10 +96,10 @@ function bridgeClearedRoute(session: Phase48Session, from: CartWorldNode, to: Ca
   };
 
   const desiredHeading = Math.atan2(to.rect.centerX - targetX, to.rect.centerZ - targetZ);
-  session.car.heading = rotateToward(session.car.heading, desiredHeading, 0.38);
+  session.car.heading = cartTraversalRotateToward(session.car.heading, desiredHeading, 0.38);
   session.car.forwardVelocity = Math.max(4.2, Math.abs(session.car.forwardVelocity) * 0.95);
   session.car.lateralVelocity *= 0.28;
-  syncHorizontalVelocity(session);
+  cartTraversalSyncHorizontalVelocity(session.car);
 }
 
 export function cartPhase48TryCompleteClearedRouteExit(

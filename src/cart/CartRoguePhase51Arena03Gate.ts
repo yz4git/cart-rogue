@@ -3,6 +3,10 @@ import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
 import { aliveCartEnemies, type CartEnemyState } from "./CartCombat";
 import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
+import {
+  cartTraversalClamp,
+  cartTraversalSyncHorizontalVelocity,
+} from "./CartTraversalMath";
 import { cartWorldNodeById, type CartWorldLocation } from "./CartWorldGraph";
 
 interface Phase51Session {
@@ -32,20 +36,6 @@ const GATE_LOCKED_COLOR = 0xe95f66;
 const GATE_POST_COLOR = 0xeee6d8;
 const GATE_POST_SHADE = 0xd4caba;
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function syncHorizontalVelocity(session: Phase51Session): void {
-  const forwardX = Math.sin(session.car.heading);
-  const forwardZ = Math.cos(session.car.heading);
-  const rightX = Math.cos(session.car.heading);
-  const rightZ = -Math.sin(session.car.heading);
-  session.car.velocity.x = forwardX * session.car.forwardVelocity + rightX * session.car.lateralVelocity;
-  session.car.velocity.z = forwardZ * session.car.forwardVelocity + rightZ * session.car.lateralVelocity;
-  session.car.speed = Math.hypot(session.car.velocity.x, session.car.velocity.z);
-}
-
 export function cartPhase51Arena03GateLocked(enemies: readonly CartEnemyState[]): boolean {
   return aliveCartEnemies(enemies as CartEnemyState[], "arena-03").length > 0;
 }
@@ -69,7 +59,7 @@ export function cartPhase51TryOpenArena03Exit(session: Phase51Session, input: Ra
 
   const minX = target.rect.centerX - target.rect.halfWidth + 1.45;
   const maxX = target.rect.centerX + target.rect.halfWidth - 1.45;
-  const targetX = clamp(session.car.position.x, minX, maxX);
+  const targetX = cartTraversalClamp(session.car.position.x, minX, maxX);
   const targetZ = Math.max(CART_PHASE51_JUNCTION_ENTRY_Z, target.rect.centerZ - target.rect.halfDepth + 0.45);
 
   session.car.position.x = targetX;
@@ -81,7 +71,7 @@ export function cartPhase51TryOpenArena03Exit(session: Phase51Session, input: Ra
   };
   session.car.forwardVelocity = Math.max(4.2, Math.abs(session.car.forwardVelocity) * 0.96);
   session.car.lateralVelocity *= 0.32;
-  syncHorizontalVelocity(session);
+  cartTraversalSyncHorizontalVelocity(session.car);
   return true;
 }
 

@@ -1,6 +1,12 @@
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
 import {
+  cartTraversalAxisToNext,
+  cartTraversalClamp,
+  cartTraversalRotateToward,
+  cartTraversalSyncHorizontalVelocity,
+} from "./CartTraversalMath";
+import {
   cartWorldNodeById,
   type CartWorldLocation,
   type CartWorldNode,
@@ -15,26 +21,6 @@ interface Phase47Session {
 export const CART_PHASE47_EXIT_TRIGGER_DEPTH = 3.25;
 export const CART_PHASE47_ENTRY_INSET = 2.2;
 export const CART_PHASE47_FORK_COMMIT = 1.35;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function normalizeAngle(angle: number): number {
-  return Math.atan2(Math.sin(angle), Math.cos(angle));
-}
-
-function rotateToward(current: number, target: number, maxStep: number): number {
-  const delta = normalizeAngle(target - current);
-  return normalizeAngle(current + clamp(delta, -maxStep, maxStep));
-}
-
-function axisToNext(from: CartWorldNode, to: CartWorldNode): { axis: "x" | "z"; sign: 1 | -1 } {
-  const dx = to.rect.centerX - from.rect.centerX;
-  const dz = to.rect.centerZ - from.rect.centerZ;
-  if (Math.abs(dz) >= Math.abs(dx)) return { axis: "z", sign: dz >= 0 ? 1 : -1 };
-  return { axis: "x", sign: dx >= 0 ? 1 : -1 };
-}
 
 function nextNodes(node: CartWorldNode): CartWorldNode[] {
   return node.next
@@ -73,7 +59,7 @@ export function cartPhase47SelectTransitTarget(nodeId: string, x: number, headin
 }
 
 function nearOutgoingFace(from: CartWorldNode, to: CartWorldNode, x: number, z: number): boolean {
-  const direction = axisToNext(from, to);
+  const direction = cartTraversalAxisToNext(from, to);
   if (direction.axis === "z") {
     const face = from.rect.centerZ + direction.sign * from.rect.halfDepth;
     const longitudinal = direction.sign > 0 ? face - z : z - face;
@@ -87,7 +73,7 @@ function nearOutgoingFace(from: CartWorldNode, to: CartWorldNode, x: number, z: 
 }
 
 function hasOutgoingIntent(session: Phase47Session, from: CartWorldNode, to: CartWorldNode, input: RallyInputState): boolean {
-  const direction = axisToNext(from, to);
+  const direction = cartTraversalAxisToNext(from, to);
   const nx = direction.axis === "x" ? direction.sign : 0;
   const nz = direction.axis === "z" ? direction.sign : 0;
   const velocityDot = session.car.velocity.x * nx + session.car.velocity.z * nz;
@@ -95,25 +81,15 @@ function hasOutgoingIntent(session: Phase47Session, from: CartWorldNode, to: Car
   return velocityDot > 0.08 || (input.throttle > 0.04 && input.brake < 0.45 && forwardDot > -0.12);
 }
 
-function syncHorizontalVelocity(session: Phase47Session): void {
-  const forwardX = Math.sin(session.car.heading);
-  const forwardZ = Math.cos(session.car.heading);
-  const rightX = Math.cos(session.car.heading);
-  const rightZ = -Math.sin(session.car.heading);
-  session.car.velocity.x = forwardX * session.car.forwardVelocity + rightX * session.car.lateralVelocity;
-  session.car.velocity.z = forwardZ * session.car.forwardVelocity + rightZ * session.car.lateralVelocity;
-  session.car.speed = Math.hypot(session.car.velocity.x, session.car.velocity.z);
-}
-
 function bridgeIntoNextNode(session: Phase47Session, from: CartWorldNode, to: CartWorldNode): void {
-  const direction = axisToNext(from, to);
+  const direction = cartTraversalAxisToNext(from, to);
   const minX = to.rect.centerX - to.rect.halfWidth + CART_PHASE47_ENTRY_INSET;
   const maxX = to.rect.centerX + to.rect.halfWidth - CART_PHASE47_ENTRY_INSET;
   const minZ = to.rect.centerZ - to.rect.halfDepth + CART_PHASE47_ENTRY_INSET;
   const maxZ = to.rect.centerZ + to.rect.halfDepth - CART_PHASE47_ENTRY_INSET;
 
-  let targetX = clamp(session.car.position.x, minX, maxX);
-  let targetZ = clamp(session.car.position.z, minZ, maxZ);
+  let targetX = cartTraversalClamp(session.car.position.x, minX, maxX);
+  let targetZ = cartTraversalClamp(session.car.position.z, minZ, maxZ);
   if (direction.axis === "z") targetZ = direction.sign > 0 ? minZ : maxZ;
   else targetX = direction.sign > 0 ? minX : maxX;
 
@@ -126,10 +102,10 @@ function bridgeIntoNextNode(session: Phase47Session, from: CartWorldNode, to: Ca
   };
 
   const desiredHeading = Math.atan2(to.rect.centerX - targetX, to.rect.centerZ - targetZ);
-  session.car.heading = rotateToward(session.car.heading, desiredHeading, 0.3);
+  session.car.heading = cartTraversalRotateToward(session.car.heading, desiredHeading, 0.3);
   session.car.forwardVelocity = Math.max(3.8, Math.abs(session.car.forwardVelocity) * 0.94);
   session.car.lateralVelocity *= 0.35;
-  syncHorizontalVelocity(session);
+  cartTraversalSyncHorizontalVelocity(session.car);
 }
 
 export function cartPhase47TryCompleteTransitExit(
