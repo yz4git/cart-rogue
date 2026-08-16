@@ -178,6 +178,10 @@ function addFixedColorBucket(root: THREE.Group, entries: readonly PatternTile[],
   mesh.name = `phase46-ground-${stage}-${shade}`;
   mesh.castShadow = false;
   mesh.receiveShadow = false;
+  // A bucket spans several authored rooms hundreds of world units apart. Keep
+  // it out of object-level frustum culling so the current room's instances are
+  // never discarded because of a stale/approximate aggregate bounds sphere.
+  mesh.frustumCulled = false;
   const dummy = new THREE.Object3D();
   entries.forEach((entry, index) => {
     dummy.position.set(entry.x, TILE_Y, entry.z);
@@ -205,6 +209,7 @@ function addWearBucket(root: THREE.Group, entries: readonly WearMark[], stage: C
   mesh.name = `phase46-wear-${stage}`;
   mesh.castShadow = false;
   mesh.receiveShadow = false;
+  mesh.frustumCulled = false;
   const dummy = new THREE.Object3D();
   entries.forEach((entry, index) => {
     dummy.position.set(entry.x, WEAR_Y, entry.z);
