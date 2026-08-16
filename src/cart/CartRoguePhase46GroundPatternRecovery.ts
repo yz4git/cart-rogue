@@ -42,22 +42,22 @@ const WEAR_Y = 0.202;
 
 const STAGES: readonly CartGraphicStage[] = ["meadow", "orchard", "grove", "canyon", "boss"];
 
-// Deliberately stronger than the Phase 38 palette. Every material has a fixed
-// non-white color; no instanceColor/vertex-color path is used on the road.
+// Fixed-color pastel buckets preserve the visible mosaic while keeping the road
+// inside the bright diorama palette. No instanceColor/vertex-color path is used.
 const PALETTES: Readonly<Record<CartGraphicStage, readonly [number, number, number, number, number]>> = {
-  meadow: [0xd4aa5c, 0xb98843, 0xe1bd75, 0xc39751, 0xa97939],
-  orchard: [0xd8a568, 0xbf8652, 0xe6bd83, 0xc88e58, 0xab7041],
-  grove: [0xa18b5a, 0x806d46, 0xb7a16e, 0x6e5d3f, 0x92784f],
-  canyon: [0xb9643e, 0x94492f, 0xd07b4e, 0x7c3b2b, 0xa65335],
-  boss: [0x655a6c, 0x493f50, 0x77667f, 0x3b3540, 0x584b60],
+  meadow: [0xead6a8, 0xdfc690, 0xf3e0b9, 0xe5ce9b, 0xd7bb83],
+  orchard: [0xefcfb1, 0xe4bfa0, 0xf6dfc7, 0xe9c7aa, 0xd9ae8e],
+  grove: [0xc9c6a6, 0xb9b697, 0xd9d6b8, 0xb1ad90, 0xc3bea0],
+  canyon: [0xe4b29a, 0xd39a83, 0xefc4ad, 0xca8e79, 0xdcaa94],
+  boss: [0xaaa0b1, 0x918798, 0xbdb1c4, 0x827985, 0x9e92a5],
 };
 
 const WEAR_COLORS: Readonly<Record<CartGraphicStage, number>> = {
-  meadow: 0x8f6d35,
-  orchard: 0x9c6740,
-  grove: 0x66573b,
-  canyon: 0x703728,
-  boss: 0x302d34,
+  meadow: 0xc4a774,
+  orchard: 0xc39a80,
+  grove: 0x9c987c,
+  canyon: 0xb88472,
+  boss: 0x726978,
 };
 
 export function cartPhase46UsesInstanceColors(): boolean {
@@ -252,7 +252,7 @@ function buildSafeGroundPattern(demo: Phase46Demo): void {
     for (let shade = 0; shade < 5; shade += 1) {
       addFixedColorBucket(root, pattern.tiles.filter((tile) => tile.stage === stage && tile.shade === shade), stage, shade);
     }
-    addWearBucket(root, pattern.wear.filter((mark) => mark.stage === stage), stage);
+    addWearBucket(root, pattern.wear.filter((mark) => mark.stage === stage));
   }
 
   demo.scene.userData.phase46GroundPatternRecovered = true;
