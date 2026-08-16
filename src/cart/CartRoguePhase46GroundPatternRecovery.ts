@@ -252,7 +252,7 @@ function buildSafeGroundPattern(demo: Phase46Demo): void {
     for (let shade = 0; shade < 5; shade += 1) {
       addFixedColorBucket(root, pattern.tiles.filter((tile) => tile.stage === stage && tile.shade === shade), stage, shade);
     }
-    addWearBucket(root, pattern.wear.filter((mark) => mark.stage === stage));
+    addWearBucket(root, pattern.wear.filter((mark) => mark.stage === stage), stage);
   }
 
   demo.scene.userData.phase46GroundPatternRecovered = true;
