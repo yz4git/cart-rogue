@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { CartEnemySnapshot } from "./CartArenaSession";
 import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
 
 interface Phase39Demo {
@@ -11,6 +12,10 @@ interface Phase40Demo extends Phase39Demo {
   buildPlayerVisual(): void;
 }
 
+interface Phase41Demo extends Phase40Demo {
+  buildEnemyVehicle(enemy: CartEnemySnapshot): THREE.Group;
+}
+
 interface FaceColorOptions {
   variance?: number;
   topLift?: number;
@@ -21,26 +26,21 @@ interface FaceColorOptions {
 }
 
 const STATIC_WORLD_COLORS = new Set([
-  0xc8c2b7,
-  0xd8d2c7,
-  0xb7b0a5,
-  0xaad98f,
-  0x82c47d,
-  0x5da96a,
-  0xd4caba,
-  0xe7dfd1,
+  0xc8c2b7, 0xd8d2c7, 0xb7b0a5, 0xaad98f,
+  0x82c47d, 0x5da96a, 0xd4caba, 0xe7dfd1,
 ]);
 
 const HERO_CART_COLORS = new Set([
-  0x42bdb7,
-  0x258d8f,
-  0x73e0d5,
-  0xf4efe7,
-  0x496b79,
-  0x31484c,
-  0xfff5df,
-  0x34434a,
-  0x3b4a51,
+  0x42bdb7, 0x258d8f, 0x73e0d5, 0xf4efe7, 0x496b79,
+  0x31484c, 0xfff5df, 0x34434a, 0x3b4a51,
+]);
+
+const ENEMY_EXCLUDED_COLORS = new Set([
+  0x252b31, // hp background
+  0xf05463, // hp fill
+  0x2c333c, // tire
+  0xd9e0de, // wheel hub
+  0x7c858b, // brake disc
 ]);
 
 function hash01(value: number): number {
@@ -165,6 +165,28 @@ function colorizeHeroCart(playerVisual: THREE.Group): void {
   playerVisual.userData.phase40VertexColoredMeshes = colored;
 }
 
+function colorizeEnemyVehicle(group: THREE.Group, enemy: CartEnemySnapshot): void {
+  let colored = 0;
+  group.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    if (object.name === "hp-fill") return;
+    if (Array.isArray(object.material) || !(object.material instanceof THREE.MeshStandardMaterial)) return;
+    const baseHex = object.material.color.getHex();
+    if (ENEMY_EXCLUDED_COLORS.has(baseHex)) return;
+    if (object.material.emissive.getHex() !== 0x000000 && object.material.emissiveIntensity > 0.5) return;
+    const heavyLike = enemy.kind === "heavy" || enemy.kind === "boss";
+    if (applyCartPerFaceVertexColor(object, {
+      variance: heavyLike ? 0.085 : 0.075,
+      topLift: heavyLike ? 1.13 : 1.15,
+      sideShade: heavyLike ? 0.92 : 0.94,
+      bottomShade: heavyLike ? 0.7 : 0.75,
+      hueJitter: enemy.kind === "boss" ? 0.01 : 0.02,
+      seed: 200 + colored + enemy.id.length * 7,
+    })) colored += 1;
+  });
+  group.userData.phase41VertexColoredMeshes = colored;
+}
+
 export function installCartRoguePhase39StaticVertexColors(): void {
   const prototype = CartRogueWebGLDemo.prototype as unknown as Phase39Demo;
   const oldWorld = prototype.buildWorld;
@@ -183,5 +205,16 @@ export function installCartRoguePhase40HeroVertexColors(): void {
   };
 }
 
+export function installCartRoguePhase41EnemyVertexColors(): void {
+  const prototype = CartRogueWebGLDemo.prototype as unknown as Phase41Demo;
+  const oldEnemy = prototype.buildEnemyVehicle;
+  prototype.buildEnemyVehicle = function phase41Enemy(this: Phase41Demo, enemy: CartEnemySnapshot): THREE.Group {
+    const group = oldEnemy.call(this, enemy);
+    colorizeEnemyVehicle(group, enemy);
+    return group;
+  };
+}
+
 installCartRoguePhase39StaticVertexColors();
 installCartRoguePhase40HeroVertexColors();
+installCartRoguePhase41EnemyVertexColors();
