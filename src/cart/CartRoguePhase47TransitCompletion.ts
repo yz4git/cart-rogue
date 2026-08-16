@@ -1,11 +1,7 @@
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
-import {
-  cartTraversalAxisToNext,
-  cartTraversalClamp,
-  cartTraversalRotateToward,
-  cartTraversalSyncHorizontalVelocity,
-} from "./CartTraversalMath";
+import { cartTraversalBridgeIntoNode } from "./CartTraversalBridge";
+import { cartTraversalAxisToNext } from "./CartTraversalMath";
 import {
   cartWorldNodeById,
   type CartWorldLocation,
@@ -81,33 +77,6 @@ function hasOutgoingIntent(session: Phase47Session, from: CartWorldNode, to: Car
   return velocityDot > 0.08 || (input.throttle > 0.04 && input.brake < 0.45 && forwardDot > -0.12);
 }
 
-function bridgeIntoNextNode(session: Phase47Session, from: CartWorldNode, to: CartWorldNode): void {
-  const direction = cartTraversalAxisToNext(from, to);
-  const minX = to.rect.centerX - to.rect.halfWidth + CART_PHASE47_ENTRY_INSET;
-  const maxX = to.rect.centerX + to.rect.halfWidth - CART_PHASE47_ENTRY_INSET;
-  const minZ = to.rect.centerZ - to.rect.halfDepth + CART_PHASE47_ENTRY_INSET;
-  const maxZ = to.rect.centerZ + to.rect.halfDepth - CART_PHASE47_ENTRY_INSET;
-
-  let targetX = cartTraversalClamp(session.car.position.x, minX, maxX);
-  let targetZ = cartTraversalClamp(session.car.position.z, minZ, maxZ);
-  if (direction.axis === "z") targetZ = direction.sign > 0 ? minZ : maxZ;
-  else targetX = direction.sign > 0 ? minX : maxX;
-
-  session.car.position.x = targetX;
-  session.car.position.z = targetZ;
-  session.location = {
-    node: to,
-    localX: targetX - to.rect.centerX,
-    localZ: targetZ - to.rect.centerZ,
-  };
-
-  const desiredHeading = Math.atan2(to.rect.centerX - targetX, to.rect.centerZ - targetZ);
-  session.car.heading = cartTraversalRotateToward(session.car.heading, desiredHeading, 0.3);
-  session.car.forwardVelocity = Math.max(3.8, Math.abs(session.car.forwardVelocity) * 0.94);
-  session.car.lateralVelocity *= 0.35;
-  cartTraversalSyncHorizontalVelocity(session.car);
-}
-
 export function cartPhase47TryCompleteTransitExit(
   session: Phase47Session,
   from: CartWorldNode,
@@ -120,7 +89,13 @@ export function cartPhase47TryCompleteTransitExit(
   if (!target || !from.next.includes(target.id)) return false;
   if (!nearOutgoingFace(from, target, session.car.position.x, session.car.position.z)) return false;
   if (!hasOutgoingIntent(session, from, target, input)) return false;
-  bridgeIntoNextNode(session, from, target);
+  cartTraversalBridgeIntoNode(session, from, target, {
+    entryInset: CART_PHASE47_ENTRY_INSET,
+    turnMax: 0.3,
+    minForwardSpeed: 3.8,
+    speedRetention: 0.94,
+    lateralRetention: 0.35,
+  });
   return true;
 }
 

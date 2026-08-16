@@ -1,12 +1,8 @@
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
 import { aliveCartEnemies, type CartEnemyState } from "./CartCombat";
-import {
-  cartTraversalAxisToNext,
-  cartTraversalClamp,
-  cartTraversalRotateToward,
-  cartTraversalSyncHorizontalVelocity,
-} from "./CartTraversalMath";
+import { cartTraversalBridgeIntoNode } from "./CartTraversalBridge";
+import { cartTraversalAxisToNext } from "./CartTraversalMath";
 import {
   cartWorldNodeById,
   type CartWorldLocation,
@@ -75,33 +71,6 @@ function hasExitIntent(session: Phase48Session, from: CartWorldNode, to: CartWor
   return velocityDot > 0.08 || (input.throttle > 0.04 && forwardDot > -0.08);
 }
 
-function bridgeClearedRoute(session: Phase48Session, from: CartWorldNode, to: CartWorldNode): void {
-  const direction = cartTraversalAxisToNext(from, to);
-  const minX = to.rect.centerX - to.rect.halfWidth + CART_PHASE48_ENTRY_INSET;
-  const maxX = to.rect.centerX + to.rect.halfWidth - CART_PHASE48_ENTRY_INSET;
-  const minZ = to.rect.centerZ - to.rect.halfDepth + CART_PHASE48_ENTRY_INSET;
-  const maxZ = to.rect.centerZ + to.rect.halfDepth - CART_PHASE48_ENTRY_INSET;
-
-  let targetX = cartTraversalClamp(session.car.position.x, minX, maxX);
-  let targetZ = cartTraversalClamp(session.car.position.z, minZ, maxZ);
-  if (direction.axis === "z") targetZ = direction.sign > 0 ? minZ : maxZ;
-  else targetX = direction.sign > 0 ? minX : maxX;
-
-  session.car.position.x = targetX;
-  session.car.position.z = targetZ;
-  session.location = {
-    node: to,
-    localX: targetX - to.rect.centerX,
-    localZ: targetZ - to.rect.centerZ,
-  };
-
-  const desiredHeading = Math.atan2(to.rect.centerX - targetX, to.rect.centerZ - targetZ);
-  session.car.heading = cartTraversalRotateToward(session.car.heading, desiredHeading, 0.38);
-  session.car.forwardVelocity = Math.max(4.2, Math.abs(session.car.forwardVelocity) * 0.95);
-  session.car.lateralVelocity *= 0.28;
-  cartTraversalSyncHorizontalVelocity(session.car);
-}
-
 export function cartPhase48TryCompleteClearedRouteExit(
   session: Phase48Session,
   from: CartWorldNode,
@@ -113,7 +82,13 @@ export function cartPhase48TryCompleteClearedRouteExit(
   if (!target || !from.next.includes(target.id)) return false;
   if (!nearRouteExit(from, target, session.car.position.x, session.car.position.z)) return false;
   if (!hasExitIntent(session, from, target, input)) return false;
-  bridgeClearedRoute(session, from, target);
+  cartTraversalBridgeIntoNode(session, from, target, {
+    entryInset: CART_PHASE48_ENTRY_INSET,
+    turnMax: 0.38,
+    minForwardSpeed: 4.2,
+    speedRetention: 0.95,
+    lateralRetention: 0.28,
+  });
   return true;
 }
 
