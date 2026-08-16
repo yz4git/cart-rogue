@@ -13,7 +13,6 @@ import {
   CART_PHASE45_EXIT_GUIDE_MS,
   CART_PHASE45_STAGE_CLEAR_GRACE_MS,
   cartPhase45ExitGuideAngle,
-  cartPhase45GroundSanitizesLegacyDetail,
 } from "../src/cart/CartRoguePhase45StabilityGuidance";
 import { CartArenaSession } from "../src/cart/CartArenaSession";
 import { cartWorldNodeById, type CartWorldLocation } from "../src/cart/CartWorldGraph";
@@ -21,6 +20,9 @@ import { cartWorldNodeById, type CartWorldLocation } from "../src/cart/CartWorld
 const DRIVE = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
 const IDLE = { throttle: 0, brake: 0, steer: 0, boost: false } as const;
 const source = readFileSync(new URL("../src/cart/CartRoguePhase45StabilityGuidance.ts", import.meta.url), "utf8");
+const guideSource = readFileSync(new URL("../src/cart/CartExitGuideVisual.ts", import.meta.url), "utf8");
+const guidanceSource = readFileSync(new URL("../src/cart/CartExitGuidance.ts", import.meta.url), "utf8");
+const phase46Source = readFileSync(new URL("../src/cart/CartRoguePhase46GroundPatternRecovery.ts", import.meta.url), "utf8");
 const appSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 
 function forceLocation(session: CartArenaSession, nodeId: string): void {
@@ -33,14 +35,13 @@ function forceLocation(session: CartArenaSession, nodeId: string): void {
   };
 }
 
-test("Phase 45 retires the overlapping white-base legacy floor above the reliable mosaic", () => {
-  assert.equal(cartPhase45GroundSanitizesLegacyDetail(), true);
-  assert.match(source, /phase34-floor-detail/);
-  assert.match(source, /legacyDetail\.visible = false/);
-  assert.match(source, /legacyDetail\.position\.y = -20/);
-  assert.match(source, /phase38-reliable-road-mosaic/);
-  assert.match(source, /material\.polygonOffset = false/);
-  assert.match(source, /phase45GroundSanitized/);
+test("Phase 45 gameplay no longer owns obsolete ground or Three.js rendering", () => {
+  assert.doesNotMatch(source, /from "three"/);
+  assert.doesNotMatch(source, /stabilizeGroundLayers|phase35-road-mosaic|phase38-reliable-road-mosaic|phase34-floor-detail/);
+  assert.match(phase46Source, /phase34-floor-detail/);
+  assert.match(phase46Source, /phase46-safe-ground-pattern/);
+  assert.match(guideSource, /from "three"/);
+  assert.match(guideSource, /phase45-exit-guide/);
 });
 
 test("Phase 45 clear grace outlasts every authored destruction reaction", () => {
@@ -124,7 +125,7 @@ test("Phase 45 defers Stage 1 clear presentation until the final enemy reaction 
   }
 });
 
-test("Phase 45 guide points forward through a fork until the player commits to a side", () => {
+test("exit guidance points forward through a fork until the player commits to a side", () => {
   const straight = cartPhase45ExitGuideAngle({ nodeId: "arena-02", x: 0, z: 116, heading: 0 });
   assert.ok(straight !== null && Math.abs(straight) < 0.01);
 
@@ -134,13 +135,18 @@ test("Phase 45 guide points forward through a fork until the player commits to a
   const committedRight = cartPhase45ExitGuideAngle({ nodeId: "junction-02", x: 10, z: 163, heading: 0 });
   assert.ok(committedRight !== null && committedRight > 0, `right-side commitment should point right, got ${committedRight}`);
   assert.equal(cartPhase45ExitGuideAngle({ nodeId: "boss-01", x: 0, z: 448, heading: 0 }), null);
-  assert.match(source, /phase45-exit-guide/);
-  assert.match(source, /remainingSeconds = CART_PHASE45_EXIT_GUIDE_MS \/ 1000/);
+  assert.match(guidanceSource, /cartExitGuidePointForNode/);
+  assert.match(guideSource, /phase45-exit-guide/);
+  assert.match(guideSource, /remainingSeconds = CART_EXIT_GUIDE_MS \/ 1000/);
 });
 
-test("Phase 45 loads after Phase 44 so the final renderer and traversal guards win", () => {
+test("exit-guide visual is installed after Phase 45 gameplay and before final ground rendering", () => {
   const phase44 = appSource.indexOf("CartRoguePhase44RequestedFixes");
   const phase45 = appSource.indexOf("CartRoguePhase45StabilityGuidance");
+  const guide = appSource.indexOf("CartExitGuideVisual");
+  const phase46 = appSource.indexOf("CartRoguePhase46GroundPatternRecovery");
   assert.ok(phase44 >= 0);
   assert.ok(phase45 > phase44);
+  assert.ok(guide > phase45);
+  assert.ok(phase46 > guide);
 });

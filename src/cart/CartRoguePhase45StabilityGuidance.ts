@@ -1,10 +1,14 @@
-import * as THREE from "three";
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession, type CartArenaSessionSnapshot } from "./CartArenaSession";
 import { cartArenaShapeForNode, projectCartPointInsideArena } from "./CartArenaShapes";
 import type { CartEnemyState } from "./CartCombat";
+import {
+  CART_EXIT_GUIDE_MS,
+  cartExitGuideAngle,
+  cartExitGuidePointForNode,
+  type CartExitGuidePoint,
+} from "./CartExitGuidance";
 import { cartStageClearNumber } from "./CartRoguePhase16Flow";
-import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
 import {
   cartWorldNodeById,
   type CartWorldLocation,
@@ -20,15 +24,6 @@ interface Phase45Session {
   snapshot(): CartArenaSessionSnapshot;
 }
 
-interface Phase45Demo {
-  scene: THREE.Scene;
-  camera: THREE.PerspectiveCamera;
-  session: CartArenaSession;
-  elapsed: number;
-  buildWorld(): void;
-  updateVisuals(delta: number): void;
-}
-
 interface TransitRecoveryState {
   stalledSeconds: number;
 }
@@ -38,22 +33,8 @@ interface ClearGraceState {
   remainingSeconds: number;
 }
 
-interface ExitGuideState {
-  root: THREE.Group;
-  remainingSeconds: number;
-  delaySeconds: number;
-  lastSignal: boolean;
-  lastNodeId: string;
-}
-
-interface GuidePoint {
-  x: number;
-  z: number;
-}
-
 const transitRecovery = new WeakMap<object, TransitRecoveryState>();
 const clearGraceStates = new WeakMap<object, ClearGraceState>();
-const exitGuideStates = new WeakMap<object, ExitGuideState>();
 const TRANSIT_WALL_INSET = 1.55;
 const TRANSIT_WALL_BAND = 0.62;
 const TRANSIT_RELEASE_NUDGE = 0.92;
@@ -63,7 +44,9 @@ const TRANSIT_STALL_SECONDS = 0.2;
 export const CART_PHASE45_STAGE_CLEAR_GRACE_MS = 900;
 /** Boss destruction uses a 0.9s reaction. */
 export const CART_PHASE45_BOSS_CLEAR_GRACE_MS = 1020;
-export const CART_PHASE45_EXIT_GUIDE_MS = 4200;
+/** Compatibility export for existing UI/tests; visual ownership lives in CartExitGuideVisual. */
+export const CART_PHASE45_EXIT_GUIDE_MS = CART_EXIT_GUIDE_MS;
+export const cartPhase45ExitGuideAngle = cartExitGuideAngle;
 
 function normalizeAngle(angle: number): number {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -76,99 +59,6 @@ function clamp(value: number, min: number, max: number): number {
 function rotateToward(current: number, target: number, maxStep: number): number {
   const delta = normalizeAngle(target - current);
   return normalizeAngle(current + clamp(delta, -maxStep, maxStep));
-}
-
-function nextNodes(node: CartWorldNode): CartWorldNode[] {
-  return node.next
-    .map((id) => cartWorldNodeById(id))
-    .filter((candidate): candidate is CartWorldNode => Boolean(candidate));
-}
-
-function guidePointForNode(node: CartWorldNode, x: number): GuidePoint | null {
-  const candidates = nextNodes(node);
-  if (candidates.length === 0) return null;
-  if (candidates.length === 1) {
-    return { x: candidates[0].rect.centerX, z: candidates[0].rect.centerZ };
-  }
-
-  // Before a fork is committed, point down the middle of the route instead of
-  // arbitrarily telling the player to choose left or right. Once the cart has
-  // moved laterally into a branch, follow the nearest authored branch center.
-  const lateralCommit = Math.abs(x - node.rect.centerX) > Math.max(2.2, node.rect.halfWidth * 0.14);
-  if (!lateralCommit) {
-    const sum = candidates.reduce((acc, candidate) => {
-      acc.x += candidate.rect.centerX;
-      acc.z += candidate.rect.centerZ;
-      return acc;
-    }, { x: 0, z: 0 });
-    return { x: sum.x / candidates.length, z: sum.z / candidates.length };
-  }
-
-  let nearest = candidates[0];
-  let nearestDistance = Math.abs(nearest.rect.centerX - x);
-  for (const candidate of candidates.slice(1)) {
-    const distance = Math.abs(candidate.rect.centerX - x);
-    if (distance < nearestDistance) {
-      nearest = candidate;
-      nearestDistance = distance;
-    }
-  }
-  return { x: nearest.rect.centerX, z: nearest.rect.centerZ };
-}
-
-export function cartPhase45ExitGuideAngle(
-  snapshot: Pick<CartArenaSessionSnapshot, "nodeId" | "x" | "z" | "heading">,
-): number | null {
-  const node = cartWorldNodeById(snapshot.nodeId);
-  if (!node) return null;
-  const target = guidePointForNode(node, snapshot.x);
-  if (!target) return null;
-  const dx = target.x - snapshot.x;
-  const dz = target.z - snapshot.z;
-  if (Math.hypot(dx, dz) < 0.25) return 0;
-  return normalizeAngle(Math.atan2(dx, dz) - snapshot.heading);
-}
-
-export function cartPhase45GroundSanitizesLegacyDetail(): boolean {
-  return true;
-}
-
-function stabilizeGroundLayers(scene: THREE.Scene): void {
-  // Phase 34 predates the reliable mosaic. It is an overlapping white-base
-  // InstancedMesh layer that relies on instanceColor and was lifted *above*
-  // the final road in Phase 36. On some mobile WebGL paths that combination can
-  // degrade into a large white horizontal slab. Retire it completely; Phase 38
-  // already supplies the final floor surface and color variation.
-  const legacyDetail = scene.getObjectByName("phase34-floor-detail");
-  if (legacyDetail) {
-    legacyDetail.visible = false;
-    legacyDetail.position.y = -20;
-  }
-
-  const legacyRoad = scene.getObjectByName("phase35-road-mosaic");
-  if (legacyRoad) legacyRoad.visible = false;
-
-  // The Phase 38 road is physically separated from the base floor, so a
-  // polygon offset is unnecessary. Removing it avoids a second mobile depth
-  // precision edge case while keeping the final fixed-color buckets intact.
-  const reliableRoad = scene.getObjectByName("phase38-reliable-road-mosaic");
-  reliableRoad?.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
-    const materials = Array.isArray(object.material) ? object.material : [object.material];
-    for (const material of materials) {
-      if (!(material instanceof THREE.MeshBasicMaterial)) continue;
-      material.polygonOffset = false;
-      material.depthTest = true;
-      material.depthWrite = true;
-      material.transparent = false;
-      material.opacity = 1;
-      material.toneMapped = false;
-      material.needsUpdate = true;
-    }
-    object.renderOrder = 0;
-  });
-
-  scene.userData.phase45GroundSanitized = true;
 }
 
 function syncHorizontalVelocity(session: Phase45Session): void {
@@ -184,7 +74,7 @@ function syncHorizontalVelocity(session: Phase45Session): void {
 function isValidOutgoingMotion(
   session: Phase45Session,
   node: CartWorldNode,
-  target: GuidePoint | null,
+  target: CartExitGuidePoint | null,
   input: RallyInputState,
 ): boolean {
   if (!target) return false;
@@ -240,7 +130,7 @@ function recoverTransitWallTrap(
     return;
   }
 
-  const target = guidePointForNode(node, session.car.position.x);
+  const target = cartExitGuidePointForNode(node, session.car.position.x);
   if (isValidOutgoingMotion(session, node, target, input)) {
     state.stalledSeconds = 0;
     return;
@@ -329,98 +219,6 @@ function containClearGrace(session: Phase45Session, nodeId: string): void {
   syncHorizontalVelocity(session);
 }
 
-function createExitGuide(demo: Phase45Demo): ExitGuideState {
-  const key = demo as unknown as object;
-  const existing = exitGuideStates.get(key);
-  if (existing) return existing;
-
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xffe36e,
-    transparent: true,
-    opacity: 0.96,
-    depthTest: false,
-    depthWrite: false,
-    toneMapped: false,
-  });
-  const accent = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.88,
-    depthTest: false,
-    depthWrite: false,
-    toneMapped: false,
-  });
-  const root = new THREE.Group();
-  root.name = "phase45-exit-guide";
-  root.position.set(0, 0.15, -1.15);
-
-  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.012, 4, 18), accent);
-  halo.renderOrder = 1001;
-  const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.17, 0.018), material);
-  shaft.position.y = 0.025;
-  shaft.renderOrder = 1002;
-  const head = new THREE.Mesh(new THREE.ConeGeometry(0.078, 0.14, 4), material);
-  head.position.y = 0.16;
-  head.rotation.y = Math.PI / 4;
-  head.renderOrder = 1002;
-  root.add(halo, shaft, head);
-  root.visible = false;
-  demo.camera.add(root);
-
-  const created: ExitGuideState = {
-    root,
-    remainingSeconds: 0,
-    delaySeconds: 0,
-    lastSignal: false,
-    lastNodeId: "",
-  };
-  exitGuideStates.set(key, created);
-  return created;
-}
-
-function updateExitGuide(demo: Phase45Demo, delta: number): void {
-  const state = createExitGuide(demo);
-  const snapshot = demo.session.snapshot();
-  if (snapshot.nodeId !== state.lastNodeId) state.lastSignal = false;
-  const clearSignal = snapshot.runComplete
-    || (snapshot.nodeKind !== "boss"
-      && snapshot.enemiesTotal > 0
-      && snapshot.enemiesAlive === 0
-      && !snapshot.gateLocked);
-
-  if (clearSignal && !state.lastSignal) {
-    const angle = cartPhase45ExitGuideAngle(snapshot);
-    if (angle !== null) {
-      state.remainingSeconds = CART_PHASE45_EXIT_GUIDE_MS / 1000;
-      state.delaySeconds = cartStageClearNumber(snapshot.nodeId) === null ? 0.72 : 0;
-    }
-  }
-  state.lastSignal = clearSignal;
-  state.lastNodeId = snapshot.nodeId;
-
-  if (state.delaySeconds > 0) {
-    state.delaySeconds = Math.max(0, state.delaySeconds - delta);
-    state.root.visible = false;
-    return;
-  }
-  if (state.remainingSeconds <= 0) {
-    state.root.visible = false;
-    return;
-  }
-
-  const angle = cartPhase45ExitGuideAngle(snapshot);
-  if (angle === null) {
-    state.root.visible = false;
-    state.remainingSeconds = 0;
-    return;
-  }
-  state.remainingSeconds = Math.max(0, state.remainingSeconds - delta);
-  state.root.visible = state.remainingSeconds > 0;
-  state.root.rotation.z = -angle;
-  const pulse = 1 + Math.sin(demo.elapsed * 7.2) * 0.075;
-  state.root.scale.setScalar(pulse);
-}
-
 export function installCartRoguePhase45StabilityGuidance(): void {
   const sessionPrototype = CartArenaSession.prototype as unknown as Phase45Session;
   const originalStep = sessionPrototype.step;
@@ -476,19 +274,6 @@ export function installCartRoguePhase45StabilityGuidance(): void {
       lastReward: null,
       runComplete: false,
     };
-  };
-
-  const demoPrototype = CartRogueWebGLDemo.prototype as unknown as Phase45Demo;
-  const originalWorld = demoPrototype.buildWorld;
-  const originalUpdate = demoPrototype.updateVisuals;
-  demoPrototype.buildWorld = function phase45StableWorld(this: Phase45Demo): void {
-    originalWorld.call(this);
-    stabilizeGroundLayers(this.scene);
-    createExitGuide(this);
-  };
-  demoPrototype.updateVisuals = function phase45GuidedUpdate(this: Phase45Demo, delta: number): void {
-    originalUpdate.call(this, delta);
-    updateExitGuide(this, delta);
   };
 }
 

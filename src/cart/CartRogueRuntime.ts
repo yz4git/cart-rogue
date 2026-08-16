@@ -35,6 +35,7 @@ import "./CartRoguePhase42StaticInstanceColorRepair";
 import "./CartRoguePhase43ArchitectureVertexColors";
 import "./CartRoguePhase44RequestedFixes";
 import "./CartRoguePhase45StabilityGuidance";
+import "./CartExitGuideVisual";
 import "./CartRoguePhase46GroundPatternRecovery";
 import "./CartRoguePhase47TransitCompletion";
 import "./CartRoguePhase48RouteExitCompletion";
