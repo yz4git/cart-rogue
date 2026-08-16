@@ -31,6 +31,7 @@ import "../src/cart/CartRoguePhase33HandlingCombat";
 import "../src/cart/CartRoguePhase34FloorDetail";
 import "../src/cart/CartRoguePhase35MosaicDiorama";
 import "../src/cart/CartRoguePhase36TraversalVisibility";
+import "../src/cart/CartRoguePhase37MosaicColorPass";
 import CartRogueGame from "./CartRogueGame";
 
 export default function CartRogueGamePhase13() {
