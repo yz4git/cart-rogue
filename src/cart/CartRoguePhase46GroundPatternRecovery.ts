@@ -35,8 +35,10 @@ const states = new WeakMap<object, THREE.Group>();
 const TILE_GEOMETRY = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
 const TILE_SIZE = 2.55;
 const TILE_SCALE = 0.87;
-const TILE_Y = 0.118;
-const WEAR_Y = 0.132;
+// Phase19 reference ground cover sits at y=0.145. Keep the replacement road
+// clearly above that surface without lifting it high enough to look detached.
+const TILE_Y = 0.185;
+const WEAR_Y = 0.202;
 
 const STAGES: readonly CartGraphicStage[] = ["meadow", "orchard", "grove", "canyon", "boss"];
 
