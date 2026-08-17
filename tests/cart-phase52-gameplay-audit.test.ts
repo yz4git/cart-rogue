@@ -109,14 +109,14 @@ test("Phase 52 gameplay audit records motion, Turbo, wall contact, RAM, kills an
   const report = recorder.report(healthyRenderDiagnostics());
   assert.equal(report.ok, true);
   assert.equal(report.sampleCount, 3);
-  assert.equal(report.durationSeconds, 1.5);
+  assert.equal(report.durationSeconds, 0.75, "per-frame audit delta is intentionally clamped to 250ms");
   assert.equal(report.distance, 10);
   assert.equal(report.maxSpeed, 12);
   assert.ok(Math.abs(report.averageSpeed - 22 / 3) < 1e-9);
-  assert.equal(report.turboRequestedSeconds, 0.5);
-  assert.equal(report.turboActiveSeconds, 0.5);
+  assert.equal(report.turboRequestedSeconds, 0.25);
+  assert.equal(report.turboActiveSeconds, 0.25);
   assert.equal(report.turboActivations, 1);
-  assert.equal(report.wallSlideSeconds, 0.5);
+  assert.equal(report.wallSlideSeconds, 0.25);
   assert.equal(report.wallSlideEvents, 1);
   assert.equal(report.ramEvents, 1);
   assert.equal(report.enemyKills, 1);
