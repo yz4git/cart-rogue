@@ -43,6 +43,7 @@ import "./CartRoguePhase48RouteExitCompletion";
 import "./CartRoguePhase49HandlingContact";
 import "./CartRoguePhase50Arena03CenterClearance";
 import "./CartRoguePhase51Arena03Gate";
+import "./CartGameplayAuditRuntime";
 import "./CartRenderAuditRuntime";
 
 /**

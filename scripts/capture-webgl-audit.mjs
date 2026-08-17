@@ -57,6 +57,20 @@ async function readRenderDiagnostics(sessionId) {
   `);
 }
 
+async function readGameplayAudit(sessionId) {
+  return execute(sessionId, `
+    const canvas = document.querySelector('canvas.cart-rogue-canvas');
+    if (!canvas) return null;
+    canvas.dispatchEvent(new Event('cart-render-audit-request'));
+    canvas.dispatchEvent(new Event('cart-gameplay-audit-request'));
+    try {
+      return canvas.dataset.cartGameplayAudit ? JSON.parse(canvas.dataset.cartGameplayAudit) : null;
+    } catch {
+      return { ok: false, issues: ['gameplay audit payload is invalid JSON'] };
+    }
+  `);
+}
+
 async function setAuditKeys(sessionId, down) {
   await execute(sessionId, `
     const type = arguments[0] ? 'keydown' : 'keyup';
@@ -113,17 +127,24 @@ try {
       const stage = document.querySelector('section[aria-label="Cart Rogue game"]');
       const text = document.body.innerText || '';
       const badge = Array.from(document.querySelectorAll('span')).map((el) => el.textContent?.trim()).find((value) => value === 'WEBGL' || value === 'CANVAS') || '';
-      if (!canvas) return { ready: false, badge, stage: Boolean(stage), href: location.href, renderDiagnostics: null };
+      if (!canvas) return { ready: false, badge, stage: Boolean(stage), href: location.href, renderDiagnostics: null, gameplayAudit: null };
       const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
       canvas.dispatchEvent(new Event('cart-render-audit-request'));
+      canvas.dispatchEvent(new Event('cart-gameplay-audit-request'));
       let renderDiagnostics = null;
+      let gameplayAudit = null;
       try {
         renderDiagnostics = canvas.dataset.cartRenderDiagnostics ? JSON.parse(canvas.dataset.cartRenderDiagnostics) : null;
       } catch {
         renderDiagnostics = { ok: false, issues: ['render diagnostics payload is invalid JSON'] };
       }
+      try {
+        gameplayAudit = canvas.dataset.cartGameplayAudit ? JSON.parse(canvas.dataset.cartGameplayAudit) : null;
+      } catch {
+        gameplayAudit = { ok: false, issues: ['gameplay audit payload is invalid JSON'] };
+      }
       return {
-        ready: Boolean(gl) && !gl.isContextLost() && Boolean(stage) && Boolean(renderDiagnostics),
+        ready: Boolean(gl) && !gl.isContextLost() && Boolean(stage) && Boolean(renderDiagnostics) && Boolean(gameplayAudit),
         badge,
         webgl: Boolean(gl),
         contextLost: gl ? gl.isContextLost() : null,
@@ -137,6 +158,7 @@ try {
         clientHeight: canvas.clientHeight,
         href: location.href,
         renderDiagnostics,
+        gameplayAudit,
       };
     `);
     if (state?.ready && state?.badge === "WEBGL" && state?.hasGasHud && state?.hasTurboHud && state?.hasEnemyHud) break;
@@ -155,9 +177,19 @@ try {
   if (!state.renderDiagnostics?.ok) {
     throw new Error(`Cart Rogue render graph audit failed: ${JSON.stringify(state.renderDiagnostics)}`);
   }
+  if (!state.gameplayAudit?.ok) {
+    throw new Error(`Cart Rogue gameplay baseline audit failed: ${JSON.stringify(state.gameplayAudit)}`);
+  }
 
-  // Preserve the normal initial frame as the visual comparison artifact.
+  // Preserve the normal initial frame as the visual comparison artifact and
+  // capture a stable gameplay baseline after enough real frames have elapsed.
   await sleep(600);
+  const gameplayBaseline = await readGameplayAudit(sessionId);
+  if (!gameplayBaseline?.ok || (gameplayBaseline.sampleCount ?? 0) < 5 || (gameplayBaseline.durationSeconds ?? 0) < 0.2) {
+    throw new Error(`Cart Rogue gameplay baseline did not collect enough real frames: ${JSON.stringify(gameplayBaseline)}`);
+  }
+  state.gameplayBaseline = gameplayBaseline;
+
   const screenshot = await request(`/session/${sessionId}/screenshot`, { method: "GET" });
   const pngBase64 = screenshot?.value;
   if (typeof pngBase64 !== "string" || pngBase64.length < 100) {
@@ -170,6 +202,7 @@ try {
   await setAuditKeys(sessionId, true);
   await sleep(520);
   const dynamicTurboDriftDiagnostics = await readRenderDiagnostics(sessionId);
+  const dynamicGameplayAudit = await readGameplayAudit(sessionId);
   await setAuditKeys(sessionId, false);
   if (!dynamicTurboDriftDiagnostics?.ok) {
     throw new Error(`Dynamic Cart Rogue render graph audit failed: ${JSON.stringify(dynamicTurboDriftDiagnostics)}`);
@@ -180,7 +213,15 @@ try {
   if (Math.abs(dynamicTurboDriftDiagnostics.heroPresentationRoll ?? 0) < 0.015) {
     throw new Error(`Turbo drift did not produce visible hero body roll: ${JSON.stringify(dynamicTurboDriftDiagnostics)}`);
   }
+  if (!dynamicGameplayAudit?.ok) {
+    throw new Error(`Dynamic Cart Rogue gameplay audit failed: ${JSON.stringify(dynamicGameplayAudit)}`);
+  }
+  const turboRequestedDelta = (dynamicGameplayAudit.turboRequestedSeconds ?? 0) - (gameplayBaseline.turboRequestedSeconds ?? 0);
+  if (turboRequestedDelta < 0.2) {
+    throw new Error(`Gameplay audit did not observe the real Turbo input: ${JSON.stringify(dynamicGameplayAudit)}`);
+  }
   state.dynamicTurboDriftDiagnostics = dynamicTurboDriftDiagnostics;
+  state.dynamicGameplayAudit = dynamicGameplayAudit;
 
   await mkdir(new URL("../artifacts/webgl-audit/", import.meta.url), { recursive: true });
   await mkdir(new URL(`../${output.split("/").slice(0, -1).join("/")}/`, import.meta.url), { recursive: true }).catch(() => undefined);
