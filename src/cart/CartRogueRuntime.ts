@@ -58,11 +58,15 @@ import "./CartRoguePhase63TurboAimAssist";
 import "./CartRoguePhase64TurboHitStun";
 import "./CartRoguePhase65PerfectCombatVisual";
 import "./CartRoguePhase66TurboChainReward";
+import "./CartRoguePhase67TurboHunt";
+import "./CartRoguePhase67HuntRecoveryBounds";
+import "./CartRoguePhase74TurboHuntPerkMilestones";
+import "./CartRoguePhase78TurboHuntPresentationGuard";
 import "./CartGameplayAuditRuntime";
 import "./CartRenderAuditRuntime";
 
 /**
- * Single bootstrap point for the legacy phase-based runtime.
+ * Single bootstrap point for the phase-based runtime.
  *
  * The import order is behaviorally significant because each phase wraps the
  * previous implementation. Keeping the chain here prevents presentation code
@@ -127,4 +131,8 @@ export const CART_ROGUE_RUNTIME_PHASE_ORDER = [
   "CartRoguePhase64TurboHitStun",
   "CartRoguePhase65PerfectCombatVisual",
   "CartRoguePhase66TurboChainReward",
+  "CartRoguePhase67TurboHunt",
+  "CartRoguePhase67HuntRecoveryBounds",
+  "CartRoguePhase74TurboHuntPerkMilestones",
+  "CartRoguePhase78TurboHuntPresentationGuard",
 ] as const;

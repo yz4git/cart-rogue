@@ -1,0 +1,181 @@
+.hud {
+  position: absolute;
+  inset: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) auto max(12px, env(safe-area-inset-left));
+  z-index: 80;
+  display: grid;
+  grid-template-columns: minmax(150px, 0.85fr) minmax(280px, 1.5fr) minmax(160px, 0.85fr);
+  gap: 10px;
+  align-items: stretch;
+  pointer-events: none;
+  font-family: inherit;
+  color: #f7fbff;
+  text-shadow: 0 1px 2px rgba(11, 23, 32, 0.55);
+}
+
+.card,
+.orderCard,
+.heatCard {
+  border: 1px solid rgba(223, 250, 255, 0.52);
+  background: linear-gradient(180deg, rgba(20, 42, 54, 0.82), rgba(14, 28, 39, 0.7));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), 0 6px 18px rgba(18, 35, 43, .2);
+  backdrop-filter: blur(5px);
+  border-radius: 10px;
+  min-height: 54px;
+}
+
+.card {
+  padding: 8px 11px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.kicker,
+.mini {
+  font-size: 9px;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: .13em;
+  opacity: .78;
+}
+
+.title {
+  margin-top: 3px;
+  font-size: clamp(16px, 2.1vw, 24px);
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: .02em;
+}
+
+.region {
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 800;
+  color: #aeeeff;
+  letter-spacing: .06em;
+}
+
+.orderCard {
+  padding: 7px 12px 8px;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 4px;
+}
+
+.orderHead,
+.heatHead,
+.orderFoot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.orderType {
+  color: #74ecff;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: .14em;
+}
+
+.orderLabel {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: clamp(12px, 1.8vw, 17px);
+  font-weight: 950;
+  letter-spacing: .03em;
+}
+
+.progressTrack,
+.heatTrack {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 5px;
+  border-radius: 99px;
+  background: rgba(231, 247, 250, .16);
+}
+
+.progressTrack i,
+.heatTrack i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #5ee3ff, #bcf7ee);
+  box-shadow: 0 0 12px rgba(95, 231, 255, .72);
+}
+
+.orderFoot {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  opacity: .82;
+}
+
+.heatCard {
+  padding: 7px 11px 8px;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 4px;
+}
+
+.heatHead strong {
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 950;
+  color: #ffd776;
+}
+
+.heatTrack i {
+  background: linear-gradient(90deg, #72e9ff, #ffd66d, #ff866c);
+}
+
+.stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .07em;
+}
+
+.boss {
+  color: #ff9fb2;
+}
+
+@media (max-width: 720px) {
+  .hud {
+    grid-template-columns: 0.8fr 1.45fr 0.8fr;
+    gap: 6px;
+    inset-top: max(6px, env(safe-area-inset-top));
+  }
+
+  .card,
+  .orderCard,
+  .heatCard {
+    border-radius: 7px;
+    min-height: 46px;
+  }
+
+  .card {
+    padding: 6px 8px;
+  }
+
+  .orderCard,
+  .heatCard {
+    padding: 6px 8px;
+  }
+
+  .kicker,
+  .mini,
+  .orderFoot,
+  .stats {
+    font-size: 8px;
+  }
+
+  .region {
+    font-size: 8px;
+  }
+}
