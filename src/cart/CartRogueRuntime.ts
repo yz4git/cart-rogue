@@ -43,6 +43,7 @@ import "./CartRoguePhase48RouteExitCompletion";
 import "./CartRoguePhase49HandlingContact";
 import "./CartRoguePhase50Arena03CenterClearance";
 import "./CartRoguePhase51Arena03Gate";
+import "./CartRoguePhase53Handling2";
 import "./CartGameplayAuditRuntime";
 import "./CartRenderAuditRuntime";
 
@@ -98,4 +99,5 @@ export const CART_ROGUE_RUNTIME_PHASE_ORDER = [
   "CartRoguePhase49HandlingContact",
   "CartRoguePhase50Arena03CenterClearance",
   "CartRoguePhase51Arena03Gate",
+  "CartRoguePhase53Handling2",
 ] as const;
