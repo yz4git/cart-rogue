@@ -202,8 +202,15 @@ try {
     throw new Error(`Turbo Hunt field did not expose its bounded target pool: ${JSON.stringify(state.gameplayAudit)}`);
   }
 
-  await sleep(600);
-  const gameplayBaseline = await readGameplayAudit(sessionId);
+  // Headless Chrome may advance the fixed-step loop much more slowly than wall
+  // clock time. Wait for measured simulation samples, not a guessed 600 ms.
+  let gameplayBaseline = null;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    await sleep(100);
+    const candidate = await readGameplayAudit(sessionId);
+    gameplayBaseline = candidate;
+    if (candidate?.ok && (candidate.sampleCount ?? 0) >= 5 && (candidate.durationSeconds ?? 0) >= 0.2) break;
+  }
   if (!gameplayBaseline?.ok || (gameplayBaseline.sampleCount ?? 0) < 5 || (gameplayBaseline.durationSeconds ?? 0) < 0.2) {
     throw new Error(`Cart Rogue gameplay baseline did not collect enough real frames: ${JSON.stringify(gameplayBaseline)}`);
   }
