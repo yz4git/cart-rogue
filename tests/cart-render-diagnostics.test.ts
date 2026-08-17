@@ -24,14 +24,18 @@ function addAuditCamera(scene: THREE.Scene): void {
   scene.add(camera);
 }
 
-test("render diagnostics recognize one visible final ground and hidden legacy layers", () => {
-  const scene = new THREE.Scene();
-  addAuditCamera(scene);
+function addValidGround(scene: THREE.Scene): void {
   const finalGround = new THREE.Group();
   finalGround.name = "phase46-safe-ground-pattern";
   scene.add(finalGround);
   for (let index = 0; index < 5; index += 1) addBucket(finalGround, `phase46-ground-meadow-${index}`);
   addBucket(finalGround, "phase46-wear-meadow");
+}
+
+test("render diagnostics recognize one visible final ground and hidden legacy layers", () => {
+  const scene = new THREE.Scene();
+  addAuditCamera(scene);
+  addValidGround(scene);
 
   for (const name of ["phase34-floor-detail", "phase35-road-mosaic", "phase38-reliable-road-mosaic"]) {
     const legacy = new THREE.Group();
@@ -55,11 +59,7 @@ test("render diagnostics recognize one visible final ground and hidden legacy la
 test("render diagnostics reject a visible legacy road even if the final ground exists", () => {
   const scene = new THREE.Scene();
   addAuditCamera(scene);
-  const finalGround = new THREE.Group();
-  finalGround.name = "phase46-safe-ground-pattern";
-  scene.add(finalGround);
-  for (let index = 0; index < 5; index += 1) addBucket(finalGround, `phase46-ground-meadow-${index}`);
-  addBucket(finalGround, "phase46-wear-meadow");
+  addValidGround(scene);
 
   const legacy = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial());
   legacy.name = "phase35-road-mosaic";
@@ -68,6 +68,29 @@ test("render diagnostics reject a visible legacy road even if the final ground e
   const diagnostics = collectCartRenderDiagnostics(scene);
   assert.equal(diagnostics.ok, false);
   assert.ok(diagnostics.issues.some((issue) => issue.includes("phase35-road-mosaic")));
+});
+
+test("render diagnostics expose durable Turbo attack visual evidence for sparse headless sampling", () => {
+  const scene = new THREE.Scene();
+  addAuditCamera(scene);
+  addValidGround(scene);
+
+  const attack = new THREE.Group();
+  attack.name = "phase54-turbo-attack-frame";
+  attack.visible = false;
+  attack.userData.cartTurboAttackMode = "idle";
+  attack.userData.cartTurboAttackIntensity = 0;
+  attack.userData.cartTurboAttackSerial = 4;
+  attack.userData.cartTurboAttackObservedAttackSerial = 4;
+  attack.userData.cartTurboAttackPeakIntensity = 0.94;
+  scene.add(attack);
+
+  const diagnostics = collectCartRenderDiagnostics(scene);
+  assert.equal(diagnostics.turboAttackFrame?.exists, true);
+  assert.equal(diagnostics.turboAttackFrame?.visible, false);
+  assert.equal(diagnostics.turboAttackSerial, 4);
+  assert.equal(diagnostics.turboAttackObservedAttackSerial, 4);
+  assert.equal(diagnostics.turboAttackPeakIntensity, 0.94);
 });
 
 test("runtime has one road authority: Phase 35 is roadside-only and Phase 38 is not installed", () => {

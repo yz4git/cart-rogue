@@ -223,21 +223,31 @@ try {
   state.dynamicTurboDriftDiagnostics = dynamicTurboDriftDiagnostics;
   state.dynamicGameplayAudit = dynamicGameplayAudit;
 
-  // Releasing Shift is the offensive commit in Turbo 2.0. Poll immediately so
-  // the short 0.26-0.44s attack envelope is observed even under sparse headless
-  // animation scheduling.
+  // Releasing Shift is the offensive commit in Turbo 2.0. Prefer a live attack
+  // sample, but also accept the presentation latch written only when a real
+  // WebGL update rendered the short attack envelope. This keeps the gameplay
+  // timing at 0.26-0.44s while making sparse headless scheduling observable.
+  const observedSerialBeforeRelease = dynamicTurboDriftDiagnostics.turboAttackObservedAttackSerial ?? 0;
   await setAuditKeys(sessionId, false);
   let releaseTurboAttackDiagnostics = null;
-  for (let attempt = 0; attempt < 12; attempt += 1) {
+  for (let attempt = 0; attempt < 16; attempt += 1) {
     await sleep(35);
     const candidate = await readRenderDiagnostics(sessionId);
-    if (candidate?.turboAttackMode === "attack" && candidate?.turboAttackFrame?.visible === true) {
+    const liveAttack = candidate?.turboAttackMode === "attack"
+      && candidate?.turboAttackFrame?.visible === true
+      && (candidate?.turboAttackIntensity ?? 0) >= 0.5;
+    const latchedAttack = (candidate?.turboAttackObservedAttackSerial ?? 0) > observedSerialBeforeRelease
+      && (candidate?.turboAttackPeakIntensity ?? 0) >= 0.5;
+    if (liveAttack || latchedAttack) {
       releaseTurboAttackDiagnostics = candidate;
       break;
     }
   }
-  if (!releaseTurboAttackDiagnostics
-      || (releaseTurboAttackDiagnostics.turboAttackIntensity ?? 0) < 0.5) {
+  const releasePeak = Math.max(
+    releaseTurboAttackDiagnostics?.turboAttackIntensity ?? 0,
+    releaseTurboAttackDiagnostics?.turboAttackPeakIntensity ?? 0,
+  );
+  if (!releaseTurboAttackDiagnostics || releasePeak < 0.5) {
     throw new Error(`Turbo 2.0 release attack frame was not observed: ${JSON.stringify(releaseTurboAttackDiagnostics)}`);
   }
   state.releaseTurboAttackDiagnostics = releaseTurboAttackDiagnostics;
