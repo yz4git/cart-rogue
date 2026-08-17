@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./cart-rogue-mobile-fix.css";
 
 const isGitHubPagesBuild = process.env.VOXEL_RALLY_PAGES === "1";
 const githubPagesBasePath = isGitHubPagesBuild

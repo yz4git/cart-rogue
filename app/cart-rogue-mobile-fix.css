@@ -1,0 +1,160 @@
+/* Cart Rogue mobile-only layout repair.
+ * Keep this global because the fixes intentionally target the existing
+ * accessible game shell/HUD without changing combat or input components.
+ */
+
+main:has(> section[aria-label="Cart Rogue game"]) {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100svh !important;
+  min-height: 0 !important;
+  max-height: 100svh !important;
+  overflow: hidden !important;
+}
+
+@supports (height: 100dvh) {
+  main:has(> section[aria-label="Cart Rogue game"]) {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+}
+
+section[aria-label="Cart Rogue game"] {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+section[aria-label="Cart Rogue game"] > div:first-child,
+section[aria-label="Cart Rogue game"] canvas.cart-rogue-canvas {
+  max-height: 100% !important;
+}
+
+[aria-label="Turbo Hunt status"] {
+  top: max(5px, env(safe-area-inset-top)) !important;
+  left: 50% !important;
+  right: auto !important;
+  width: min(calc(100% - 24px), 720px) !important;
+  transform: translateX(-50%) !important;
+  grid-template-columns: minmax(108px, .72fr) minmax(260px, 1.6fr) minmax(114px, .74fr) !important;
+  gap: 6px !important;
+  align-items: start !important;
+}
+
+[aria-label="Turbo Hunt status"] > div {
+  min-height: 0 !important;
+  border-radius: 8px !important;
+  background: linear-gradient(180deg, rgba(20, 42, 54, .72), rgba(14, 28, 39, .62)) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:first-child,
+[aria-label="Turbo Hunt status"] > div:last-child {
+  padding: 5px 8px 6px !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:nth-child(2) {
+  padding: 5px 8px 6px !important;
+  gap: 2px !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:first-child > span:first-child {
+  display: none !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:first-child > strong {
+  margin-top: 0 !important;
+  font-size: clamp(13px, 1.7vw, 18px) !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:first-child > span:last-child {
+  margin-top: 2px !important;
+  overflow: hidden !important;
+  font-size: 8px !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:nth-child(2) > div:first-child span,
+[aria-label="Turbo Hunt status"] > div:nth-child(2) > div:first-child strong,
+[aria-label="Turbo Hunt status"] > div:last-child span,
+[aria-label="Turbo Hunt status"] > div:last-child strong {
+  font-size: 8px !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:nth-child(2) > div:nth-child(n+2):not(:last-child) {
+  min-height: 12px !important;
+  padding-top: 1px !important;
+  padding-bottom: 1px !important;
+  font-size: 7px !important;
+  line-height: 1.1 !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:nth-child(2):has(> div:nth-child(5)) > div:nth-child(3) {
+  display: none !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:nth-child(2) > div:last-child > div:first-child,
+[aria-label="Turbo Hunt status"] > div:last-child > div:nth-child(2) {
+  height: 3px !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:nth-child(2) > div:last-child > div:last-child {
+  font-size: 7px !important;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  [aria-label="Turbo Hunt status"] {
+    top: max(3px, env(safe-area-inset-top)) !important;
+    width: min(calc(100% - 48px), 650px) !important;
+    grid-template-columns: 96px minmax(238px, 1fr) 104px !important;
+    gap: 4px !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:first-child,
+  [aria-label="Turbo Hunt status"] > div:last-child {
+    padding: 4px 6px !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:first-child > strong {
+    font-size: 12px !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:first-child > span:last-child {
+    margin-top: 1px !important;
+    font-size: 6.5px !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:nth-child(2) {
+    padding: 3px 6px 4px !important;
+    gap: 1px !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:nth-child(2),
+  [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:last-child > div:last-child {
+    display: none !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:first-child span,
+  [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:first-child strong,
+  [aria-label="Turbo Hunt status"] > div:last-child span,
+  [aria-label="Turbo Hunt status"] > div:last-child strong {
+    font-size: 6.5px !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:nth-child(n+3):not(:last-child) {
+    min-height: 11px !important;
+    padding-top: 1px !important;
+    padding-bottom: 1px !important;
+    font-size: 6.5px !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:last-child > div:first-child,
+  [aria-label="Turbo Hunt status"] > div:last-child > div:nth-child(2) {
+    height: 2px !important;
+  }
+}

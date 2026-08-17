@@ -12,6 +12,7 @@ on:
       - "src/rally/**"
       - "public/**"
       - "scripts/capture-webgl-audit.mjs"
+      - "scripts/capture-iphone-landscape-layout.mjs"
       - "tests/**"
       - "package.json"
       - ".github/workflows/webgl-audit.yml"
@@ -66,6 +67,19 @@ jobs:
             node scripts/capture-webgl-audit.mjs
           test -s artifacts/webgl-audit/cart-rogue-webgl.png
           test -s artifacts/webgl-audit/runtime-state.json
+      - name: Verify iPhone landscape UI fit
+        run: |
+          DRIVER="$(command -v chromedriver || true)"
+          if [ -z "$DRIVER" ] && [ -n "${CHROMEWEBDRIVER:-}" ] && [ -x "$CHROMEWEBDRIVER/chromedriver" ]; then
+            DRIVER="$CHROMEWEBDRIVER/chromedriver"
+          fi
+          WEBDRIVER_BIN="$DRIVER" \
+            AUDIT_URL="http://127.0.0.1:3000/" \
+            IPHONE_AUDIT_OUTPUT="artifacts/webgl-audit/cart-rogue-iphone-landscape.png" \
+            IPHONE_AUDIT_STATE_OUTPUT="artifacts/webgl-audit/iphone-landscape-state.json" \
+            node scripts/capture-iphone-landscape-layout.mjs
+          test -s artifacts/webgl-audit/cart-rogue-iphone-landscape.png
+          test -s artifacts/webgl-audit/iphone-landscape-state.json
           cp /tmp/cart-rogue-server.log artifacts/webgl-audit/server.log
       - name: Upload WebGL audit
         uses: actions/upload-artifact@v4
