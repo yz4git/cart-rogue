@@ -12,6 +12,7 @@ const phase50Source = read("../src/cart/CartRoguePhase50Arena03CenterClearance.t
 const compatibilitySource = read("../src/cart/CartTrackCompatibility.ts");
 const phase51Source = read("../src/cart/CartRoguePhase51Arena03Gate.ts");
 const phase53Source = read("../src/cart/CartRoguePhase53Handling2.ts");
+const phase54Source = read("../src/cart/CartRoguePhase54TurboAttack.ts");
 const gateRulesSource = read("../src/cart/CartArena03GateRules.ts");
 const gateVisualSource = read("../src/cart/CartArena03GateVisual.ts");
 
@@ -22,10 +23,13 @@ test("refactor keeps runtime composition out of the React presentation wrapper",
   const phaseImports = Array.from(runtimeSource.matchAll(/import "\.\/(CartRoguePhase[^"]+)";/g), (match) => match[1]);
   assert.ok(phaseImports.length >= 40, `expected the centralized runtime to own the phase chain, got ${phaseImports.length}`);
   assert.equal(new Set(phaseImports).size, phaseImports.length, "runtime phase imports must not be duplicated");
-  assert.equal(phaseImports.at(-1), "CartRoguePhase53Handling2");
   assert.ok(
     phaseImports.indexOf("CartRoguePhase53Handling2") > phaseImports.indexOf("CartRoguePhase51Arena03Gate"),
-    "Handling 2.0 must remain the final gameplay steering authority after traversal/gate corrections",
+    "Handling 2.0 must stay after traversal/gate corrections",
+  );
+  assert.ok(
+    phaseImports.indexOf("CartRoguePhase54TurboAttack") > phaseImports.indexOf("CartRoguePhase53Handling2"),
+    "Turbo 2.0 must run after final steering shaping",
   );
 });
 
@@ -54,8 +58,11 @@ test("Arena 03 gate bootstrap keeps gameplay rules and Three.js visuals separate
   assert.match(gateVisualSource, /updateGate\("arena-03"/);
 });
 
-test("Handling 2.0 stays presentation-free and delegates shared horizontal velocity math", () => {
+test("Gameplay 2.0 handling and Turbo attack rules stay presentation-free", () => {
   assert.doesNotMatch(phase53Source, /from "three"/);
   assert.match(phase53Source, /CartHandlingProfile/);
   assert.match(phase53Source, /cartTraversalSyncHorizontalVelocity/);
+  assert.doesNotMatch(phase54Source, /from "three"/);
+  assert.match(phase54Source, /getCartTurboCombatState/);
+  assert.match(phase54Source, /cartTraversalSyncHorizontalVelocity/);
 });

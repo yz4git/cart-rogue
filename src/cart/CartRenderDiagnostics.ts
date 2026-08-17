@@ -25,6 +25,9 @@ export interface CartRenderDiagnostics {
   legacyGround: Record<string, CartRenderObjectState>;
   stationaryTurboSkids: CartRenderObjectState;
   stationaryTurboSkidActiveCount: number;
+  turboAttackFrame?: CartRenderObjectState;
+  turboAttackMode?: string | null;
+  turboAttackIntensity?: number;
   exitGuide: CartRenderObjectState;
   compactUndertray: CartRenderObjectState;
   heroPresentationPitch: number | null;
@@ -102,6 +105,17 @@ function heroPresentationRotation(scene: THREE.Scene): { pitch: number | null; r
   };
 }
 
+function turboAttackState(scene: THREE.Scene): { state: CartRenderObjectState; mode: string | null; intensity: number } {
+  const object = scene.getObjectByName("phase54-turbo-attack-frame") ?? null;
+  return {
+    state: { exists: object !== null, visible: isEffectivelyVisible(object) },
+    mode: typeof object?.userData.cartTurboAttackMode === "string" ? object.userData.cartTurboAttackMode : null,
+    intensity: Number.isFinite(object?.userData.cartTurboAttackIntensity)
+      ? Number(object?.userData.cartTurboAttackIntensity)
+      : 0,
+  };
+}
+
 function cameraState(scene: THREE.Scene): CartRenderCameraState {
   let camera: THREE.PerspectiveCamera | null = null;
   scene.traverse((object) => {
@@ -150,6 +164,7 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
   ) as Record<string, CartRenderObjectState>;
   const camera = cameraState(scene);
   const heroRotation = heroPresentationRotation(scene);
+  const turboAttack = turboAttackState(scene);
 
   const issues: string[] = [];
   if (!finalGround.exists) issues.push("final ground root is missing");
@@ -181,6 +196,9 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
     legacyGround,
     stationaryTurboSkids: objectState(scene, "phase44-stationary-turbo-skids"),
     stationaryTurboSkidActiveCount: activeSkidCount(scene),
+    turboAttackFrame: turboAttack.state,
+    turboAttackMode: turboAttack.mode,
+    turboAttackIntensity: turboAttack.intensity,
     exitGuide: objectState(scene, "phase45-exit-guide"),
     compactUndertray: objectState(scene, "phase44-dark-compact-undertray"),
     heroPresentationPitch: heroRotation.pitch,
