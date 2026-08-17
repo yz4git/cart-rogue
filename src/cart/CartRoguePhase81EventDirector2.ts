@@ -43,6 +43,9 @@ interface EventDirectorState extends CartTurboHuntEventSnapshot {
   lastDestructionCount: number;
   lastPerfectSerial: number;
   awardedChainThresholds: Set<number>;
+  overdriveApplied: boolean;
+  preOverdriveMaxSpeed: number;
+  preOverdriveHandling: number;
 }
 
 interface Phase81Session {
@@ -64,6 +67,8 @@ export const CART_TURBO_HUNT_EVENT_SNAPSHOT_EVENT = "cart-turbo-hunt-event-snaps
 export const CART_TURBO_HUNT_EVENT_CHAIN_THRESHOLDS = [4, 8, 12] as const;
 export const CART_TURBO_HUNT_EVENT_CHAIN_CAP = 16;
 export const CART_TURBO_HUNT_EVENT_CHAIN_WINDOW = 3.1;
+export const CART_TURBO_HUNT_OVERDRIVE_MAX_SPEED = 25.6;
+export const CART_TURBO_HUNT_OVERDRIVE_HANDLING_MULTIPLIER = 1.025;
 
 const REGION_EVENT_ROTATION: Readonly<Record<CartTurboHuntRegion, readonly CartTurboHuntEventKind[]>> = {
   "DROP YARD": ["SMASH_ZONE", "CONVOY", "TURBO_RUSH"],
@@ -138,6 +143,9 @@ function internalState(session: CartArenaSession | Phase81Session): EventDirecto
     lastDestructionCount: raw.car.destructionCount,
     lastPerfectSerial: getCartPerfectStrikeState(session as CartArenaSession).perfectSerial,
     awardedChainThresholds: new Set(),
+    overdriveApplied: false,
+    preOverdriveMaxSpeed: raw.car.definition.maxSpeed,
+    preOverdriveHandling: raw.car.definition.handling,
   };
   stateBySession.set(key, created);
   return created;
@@ -398,12 +406,25 @@ function updateChainSignals(session: Phase81Session, state: EventDirectorState):
 
 function updateOverdrive(session: Phase81Session, state: EventDirectorState, delta: number): void {
   state.overdriveSeconds = Math.max(0, state.overdriveSeconds - delta);
-  if (state.overdriveSeconds <= 0) return;
-  session.car.definition.maxSpeed = Math.max(session.car.definition.maxSpeed, 25.6);
-  session.car.definition.handling *= 1.025;
-  session.turboRechargeTimer += delta * 0.36;
-  if (session.car.boostActive) {
-    session.car.boostTimeRemaining = Math.min(3.2, session.car.boostTimeRemaining + delta * 0.055);
+  if (state.overdriveSeconds > 0) {
+    if (!state.overdriveApplied) {
+      state.overdriveApplied = true;
+      state.preOverdriveMaxSpeed = session.car.definition.maxSpeed;
+      state.preOverdriveHandling = session.car.definition.handling;
+    }
+    session.car.definition.maxSpeed = Math.max(state.preOverdriveMaxSpeed, CART_TURBO_HUNT_OVERDRIVE_MAX_SPEED);
+    session.car.definition.handling = state.preOverdriveHandling * CART_TURBO_HUNT_OVERDRIVE_HANDLING_MULTIPLIER;
+    session.turboRechargeTimer += delta * 0.36;
+    if (session.car.boostActive) {
+      session.car.boostTimeRemaining = Math.min(3.2, session.car.boostTimeRemaining + delta * 0.055);
+    }
+    return;
+  }
+
+  if (state.overdriveApplied) {
+    session.car.definition.maxSpeed = state.preOverdriveMaxSpeed;
+    session.car.definition.handling = state.preOverdriveHandling;
+    state.overdriveApplied = false;
   }
 }
 
