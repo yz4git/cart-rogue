@@ -143,13 +143,14 @@ test("live hunt reaches Boss 2.0 fallback and transitions through BREAKOUT and F
   assert.equal(getCartTitanBossState(session).stage, "DOWN");
 });
 
-test("Phases 81-83 stay after the repaired environment and in authored order", () => {
+test("Phases 81-83 stay after the repaired environment and before later hunt evolution", () => {
   const phase80 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase80EnvironmentRichness");
   const phase81 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase81EventDirector2");
   const phase82 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase82ImpactSpeed3");
   const phase83 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase83Boss2");
+  const phase84 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase84ThreatDodge");
   assert.ok(phase81 > phase80);
   assert.ok(phase82 > phase81);
   assert.ok(phase83 > phase82);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase83Boss2");
+  assert.ok(phase84 > phase83);
 });
