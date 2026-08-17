@@ -111,15 +111,16 @@ test("Environment Richness is presentation-only and does not throttle gameplay o
   assert.match(source, /previousBuildWorld\.call\(this\)/);
 });
 
-test("Phase80 stays after Battery 2.0 and before the authored event/impact/boss layers", () => {
+test("Phase80 stays after Battery 2.0 and before the authored event/impact/boss/threat layers", () => {
   const batteryIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase79PerformanceBattery");
   const environmentIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase80EnvironmentRichness");
   const eventsIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase81EventDirector2");
   const impactIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase82ImpactSpeed3");
   const bossIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase83Boss2");
+  const threatIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase84ThreatDodge");
   assert.ok(environmentIndex > batteryIndex);
   assert.ok(eventsIndex > environmentIndex);
   assert.ok(impactIndex > eventsIndex);
   assert.ok(bossIndex > impactIndex);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase83Boss2");
+  assert.ok(threatIndex > bossIndex);
 });

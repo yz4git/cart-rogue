@@ -3,7 +3,7 @@ const BASE_PATH = self.location.pathname
   .replace(/\/$/, "");
 const ROOT = `${BASE_PATH}/`;
 const CACHE_PREFIX = "voxel-rally-";
-const CACHE_VERSION = "v30";
+const CACHE_VERSION = "v31";
 const CACHE = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL = [ROOT, `${BASE_PATH}/manifest.json`, `${BASE_PATH}/favicon.svg`];
 

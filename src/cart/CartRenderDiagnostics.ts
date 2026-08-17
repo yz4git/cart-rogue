@@ -38,6 +38,13 @@ export interface CartRenderDiagnostics {
   titanVisualRoot: CartRenderObjectState;
   titanArmorRing: CartRenderObjectState;
   titanWeakCore: CartRenderObjectState;
+  threatDodgeRoot: CartRenderObjectState;
+  threatLine: CartRenderObjectState;
+  pursuitEventRoot: CartRenderObjectState;
+  dangerZone: CartRenderObjectState;
+  titanPredatorRoot: CartRenderObjectState;
+  titanPredatorRing: CartRenderObjectState;
+  titanCounterRing: CartRenderObjectState;
   stationaryTurboSkids: CartRenderObjectState;
   stationaryTurboSkidActiveCount: number;
   turboAttackFrame?: CartRenderObjectState;
@@ -243,6 +250,13 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
   const titanVisualRoot = objectState(scene, "phase83-titan-visual-root");
   const titanArmorRing = objectState(scene, "phase83-titan-armor-ring");
   const titanWeakCore = objectState(scene, "phase83-titan-weak-core");
+  const threatDodgeRoot = objectState(scene, "phase84-threat-dodge-root");
+  const threatLine = objectState(scene, "phase84-threat-line");
+  const pursuitEventRoot = objectState(scene, "phase85-pursuit-event-root");
+  const dangerZone = objectState(scene, "phase85-danger-zone");
+  const titanPredatorRoot = objectState(scene, "phase86-titan-predator-root");
+  const titanPredatorRing = objectState(scene, "phase86-titan-predator-ring");
+  const titanCounterRing = objectState(scene, "phase86-titan-counter-ring");
   const camera = cameraState(scene);
   const heroRotation = heroPresentationRotation(scene);
   const turboAttack = turboAttackState(scene);
@@ -275,6 +289,13 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
   if (turboHuntWorld && !titanVisualRoot.exists) issues.push("Phase83 Titan visual root is missing");
   if (turboHuntWorld && !titanArmorRing.exists) issues.push("Phase83 Titan armor ring is missing");
   if (turboHuntWorld && !titanWeakCore.exists) issues.push("Phase83 Titan weak core is missing");
+  if (turboHuntWorld && !threatDodgeRoot.exists) issues.push("Phase84 threat/dodge root is missing");
+  if (turboHuntWorld && !threatLine.exists) issues.push("Phase84 threat line is missing");
+  if (turboHuntWorld && !pursuitEventRoot.exists) issues.push("Phase85 pursuit event root is missing");
+  if (turboHuntWorld && !dangerZone.exists) issues.push("Phase85 danger zone is missing");
+  if (turboHuntWorld && !titanPredatorRoot.exists) issues.push("Phase86 Titan Predator root is missing");
+  if (turboHuntWorld && !titanPredatorRing.exists) issues.push("Phase86 Titan Predator ring is missing");
+  if (turboHuntWorld && !titanCounterRing.exists) issues.push("Phase86 Titan counter ring is missing");
   if (!camera.exists || camera.fov === null || camera.y === null) issues.push("perspective chase camera is missing");
   else {
     if (camera.fov < 50 || camera.fov > 66) issues.push(`camera FOV is outside the intended chase range: ${camera.fov}`);
@@ -307,6 +328,13 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
     titanVisualRoot,
     titanArmorRing,
     titanWeakCore,
+    threatDodgeRoot,
+    threatLine,
+    pursuitEventRoot,
+    dangerZone,
+    titanPredatorRoot,
+    titanPredatorRing,
+    titanCounterRing,
     stationaryTurboSkids: objectState(scene, "phase44-stationary-turbo-skids"),
     stationaryTurboSkidActiveCount: activeSkidCount(scene),
     turboAttackFrame: turboAttack.state,
