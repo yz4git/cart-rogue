@@ -9,6 +9,7 @@ import {
 import { CART_ROGUE_RUNTIME_PHASE_ORDER } from "../src/cart/CartRogueRuntime";
 
 const performanceSource = readFileSync(new URL("../src/cart/CartRoguePhase79PerformanceBattery.ts", import.meta.url), "utf8");
+const environmentSource = readFileSync(new URL("../src/cart/CartRoguePhase80EnvironmentRichness.ts", import.meta.url), "utf8");
 const combatSource = readFileSync(new URL("../src/cart/CartCombat.ts", import.meta.url), "utf8");
 const webglSource = readFileSync(new URL("../src/cart/CartRogueWebGLDemo.ts", import.meta.url), "utf8");
 
@@ -57,9 +58,12 @@ test("gameplay quality protections remain intact", () => {
   assert.match(combatSource, /distance > activationDistance/);
 });
 
-test("battery phase installs after Turbo Hunt presentation so it is the final renderer authority", () => {
+test("environment richness does not override battery frame authority", () => {
+  assert.doesNotMatch(environmentSource, /\.updateVisuals\s*=/);
+  assert.doesNotMatch(environmentSource, /requestAnimationFrame|setPixelRatio|shadowMap\.autoUpdate/);
   const phase78 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase78TurboHuntPresentationGuard");
   const phase79 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase79PerformanceBattery");
+  const phase80 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase80EnvironmentRichness");
   assert.ok(phase79 > phase78);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase79PerformanceBattery");
+  assert.ok(phase80 > phase79);
 });
