@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./cart-rogue-mobile-fix.css";
+import CartViewportSync from "./CartViewportSync";
 
 const isGitHubPagesBuild = process.env.VOXEL_RALLY_PAGES === "1";
 const githubPagesBasePath = isGitHubPagesBuild
@@ -36,7 +37,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ja">
-      <body>{children}</body>
+      <body>
+        <CartViewportSync />
+        {children}
+      </body>
     </html>
   );
 }

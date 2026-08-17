@@ -3,16 +3,28 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const layout = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+const viewportSync = readFileSync(new URL("../app/CartViewportSync.tsx", import.meta.url), "utf8");
 const mobileFix = readFileSync(new URL("../app/cart-rogue-mobile-fix.css", import.meta.url), "utf8");
 const legacyGameCss = readFileSync(new URL("../app/CartRogueGame.module.css", import.meta.url), "utf8");
 
-test("iPhone landscape shell overrides legacy vh minimum with the dynamic visual viewport", () => {
+test("iPhone landscape shell follows the measured visual viewport without the iOS fixed-bottom path", () => {
   assert.match(layout, /import "\.\/cart-rogue-mobile-fix\.css"/);
-  assert.match(mobileFix, /height:\s*100svh\s*!important/);
-  assert.match(mobileFix, /@supports\s*\(height:\s*100dvh\)/);
-  assert.match(mobileFix, /height:\s*100dvh\s*!important/);
+  assert.match(layout, /import CartViewportSync from "\.\/CartViewportSync"/);
+  assert.match(layout, /<CartViewportSync\s*\/>/);
+
+  assert.match(viewportSync, /window\.visualViewport/);
+  assert.match(viewportSync, /--cart-visual-viewport-height/);
+  assert.match(viewportSync, /viewport\?\.height\s*\?\?\s*window\.innerHeight/);
+  assert.match(viewportSync, /visualViewport\?\.addEventListener\("resize"/);
+  assert.match(viewportSync, /orientationchange/);
+
+  assert.match(mobileFix, /position:\s*absolute\s*!important/);
+  assert.match(mobileFix, /height:\s*var\(--cart-visual-viewport-height,\s*100lvh\)\s*!important/);
+  assert.match(mobileFix, /bottom:\s*auto\s*!important/);
   assert.match(mobileFix, /min-height:\s*0\s*!important/);
-  assert.match(mobileFix, /position:\s*fixed\s*!important/);
+  assert.match(mobileFix, /max-height:\s*none\s*!important/);
+  assert.doesNotMatch(mobileFix, /position:\s*fixed\s*!important/);
+  assert.doesNotMatch(mobileFix, /height:\s*100dvh\s*!important/);
   assert.match(mobileFix, /section\[aria-label="Cart Rogue game"\]/);
   assert.match(legacyGameCss, /min-height:100vh/);
 });

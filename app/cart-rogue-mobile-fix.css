@@ -1,23 +1,24 @@
 /* Cart Rogue mobile-only layout repair.
  * Keep this global because the fixes intentionally target the existing
  * accessible game shell/HUD without changing combat or input components.
+ *
+ * iOS 26 can paint position:fixed bottom anchoring against the wrong viewport
+ * after browser chrome collapses. Avoid the fixed compositor path entirely:
+ * CartViewportSync measures visualViewport.height and writes an explicit px
+ * height here. 100lvh is only a pre-hydration fallback.
  */
 
 main:has(> section[aria-label="Cart Rogue game"]) {
-  position: fixed !important;
-  inset: 0 !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: auto !important;
   width: 100% !important;
-  height: 100svh !important;
+  height: var(--cart-visual-viewport-height, 100lvh) !important;
   min-height: 0 !important;
-  max-height: 100svh !important;
+  max-height: none !important;
   overflow: hidden !important;
-}
-
-@supports (height: 100dvh) {
-  main:has(> section[aria-label="Cart Rogue game"]) {
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-  }
 }
 
 section[aria-label="Cart Rogue game"] {
