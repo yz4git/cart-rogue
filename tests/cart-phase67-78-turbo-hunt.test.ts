@@ -138,6 +138,7 @@ test("Turbo Hunt presentation, battery, environment, events, impact, boss and th
   const threatIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase84ThreatDodge");
   const pursuitIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase85PursuitEvents");
   const predatorIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase86BossPredator");
+  const pressureIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase87ThreatPressure2");
   assert.ok(huntIndex > phase66Index);
   assert.ok(perkIndex > huntIndex);
   assert.ok(guardIndex > perkIndex);
@@ -149,7 +150,8 @@ test("Turbo Hunt presentation, battery, environment, events, impact, boss and th
   assert.ok(threatIndex > bossIndex);
   assert.ok(pursuitIndex > threatIndex);
   assert.ok(predatorIndex > pursuitIndex);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase86BossPredator");
+  assert.ok(pressureIndex > predatorIndex);
+  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase87ThreatPressure2");
 });
 
 test("design records continuous-field acceptance criteria before implementation", () => {
