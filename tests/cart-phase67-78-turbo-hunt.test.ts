@@ -125,15 +125,17 @@ test("Hunt Orders reuse existing perk drafts at stable non-spatial milestones", 
   assert.equal(cartTurboHuntPerkMilestone(8), 4);
 });
 
-test("Turbo Hunt is installed after the proven combat stack and its presentation guard is last", () => {
+test("Turbo Hunt presentation stays after combat and battery renderer stays after presentation", () => {
   const huntIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase67TurboHunt");
   const phase66Index = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase66TurboChainReward");
   const perkIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase74TurboHuntPerkMilestones");
   const guardIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase78TurboHuntPresentationGuard");
+  const batteryIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase79PerformanceBattery");
   assert.ok(huntIndex > phase66Index);
   assert.ok(perkIndex > huntIndex);
   assert.ok(guardIndex > perkIndex);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase78TurboHuntPresentationGuard");
+  assert.ok(batteryIndex > guardIndex);
+  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase79PerformanceBattery");
 });
 
 test("design records continuous-field acceptance criteria before implementation", () => {
