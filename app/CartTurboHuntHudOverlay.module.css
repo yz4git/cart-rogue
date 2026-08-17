@@ -59,7 +59,7 @@
 .orderCard {
   padding: 7px 12px 8px;
   display: grid;
-  grid-template-rows: auto auto auto auto;
+  grid-auto-rows: auto;
   gap: 3px;
 }
 
@@ -105,6 +105,29 @@
   background: linear-gradient(90deg, rgba(58, 201, 226, .2), rgba(255, 203, 101, .12));
   color: #eafcff;
   box-shadow: inset 2px 0 0 #68ebff;
+}
+
+.threatLine {
+  min-height: 15px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: .09em;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.threatHot {
+  color: #fff1e8;
+  background: linear-gradient(90deg, rgba(255, 67, 73, .26), rgba(255, 159, 72, .2));
+  box-shadow: inset 2px 0 0 #ff6d60, 0 0 10px rgba(255, 74, 67, .14);
+}
+
+.counterHot {
+  color: #efffff;
+  background: linear-gradient(90deg, rgba(70, 224, 239, .24), rgba(255, 220, 105, .19));
+  box-shadow: inset 2px 0 0 #83fbff, 0 0 11px rgba(114, 242, 255, .16);
 }
 
 .progressTrack,
@@ -197,11 +220,13 @@
   .mini,
   .orderFoot,
   .stats,
-  .eventLine {
+  .eventLine,
+  .threatLine {
     font-size: 7px;
   }
 
-  .eventLine {
+  .eventLine,
+  .threatLine {
     min-height: 13px;
     padding: 1px 5px;
   }
