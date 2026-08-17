@@ -121,15 +121,17 @@ test("live FURY enters Predator survive then hands control back through an overh
   assert.equal(boss.weakPointExposed, true);
 });
 
-test("Phases 84-86 stay after Boss 2.0 and preserve the repaired environment ordering", () => {
+test("Phases 84-87 stay after Boss 2.0 and preserve the repaired environment ordering", () => {
   const phase80 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase80EnvironmentRichness");
   const phase83 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase83Boss2");
   const phase84 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase84ThreatDodge");
   const phase85 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase85PursuitEvents");
   const phase86 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase86BossPredator");
+  const phase87 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase87ThreatPressure2");
   assert.ok(phase83 > phase80);
   assert.ok(phase84 > phase83);
   assert.ok(phase85 > phase84);
   assert.ok(phase86 > phase85);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase86BossPredator");
+  assert.ok(phase87 > phase86);
+  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase87ThreatPressure2");
 });
