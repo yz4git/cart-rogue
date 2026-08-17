@@ -30,6 +30,30 @@ interface TitanHudSnapshot {
   vulnerable: boolean;
 }
 
+interface ThreatHudSnapshot {
+  threatActive: boolean;
+  threatKind: "STRIKER" | "TITAN" | null;
+  threatDistance: number;
+  lastDodgeGrade: "NONE" | "DODGE" | "PERFECT";
+  dodgeFlashSeconds: number;
+  counterSeconds: number;
+}
+
+interface PursuitHudSnapshot {
+  active: boolean;
+  kind: "PURSUIT" | "DANGER_ZONE" | "BREAKOUT";
+  label: string;
+  secondsRemaining: number;
+}
+
+interface PredatorHudSnapshot {
+  active: boolean;
+  mode: "HUNT" | "SURVIVE" | "COUNTER";
+  secondsRemaining: number;
+  counterSeconds: number;
+  perfectDodges: number;
+}
+
 const PHASE_LABEL: Record<CartTurboHuntSnapshot["huntPhase"], string> = {
   "drop-in": "DROP IN",
   hunt: "HUNT",
@@ -48,6 +72,9 @@ export default function CartTurboHuntHudOverlay() {
   const [snapshot, setSnapshot] = useState<CartTurboHuntSnapshot | null>(() => getLatestCartTurboHuntSnapshot());
   const [fieldEvent, setFieldEvent] = useState<FieldEventHudSnapshot | null>(null);
   const [titan, setTitan] = useState<TitanHudSnapshot | null>(null);
+  const [threat, setThreat] = useState<ThreatHudSnapshot | null>(null);
+  const [pursuit, setPursuit] = useState<PursuitHudSnapshot | null>(null);
+  const [predator, setPredator] = useState<PredatorHudSnapshot | null>(null);
 
   useEffect(() => {
     const huntHandler = (event: Event) => {
@@ -62,13 +89,31 @@ export default function CartTurboHuntHudOverlay() {
       const detail = (event as CustomEvent<TitanHudSnapshot>).detail;
       if (detail?.stage) setTitan(detail);
     };
+    const threatHandler = (event: Event) => {
+      const detail = (event as CustomEvent<ThreatHudSnapshot>).detail;
+      if (detail) setThreat(detail);
+    };
+    const pursuitHandler = (event: Event) => {
+      const detail = (event as CustomEvent<PursuitHudSnapshot>).detail;
+      if (detail?.kind) setPursuit(detail);
+    };
+    const predatorHandler = (event: Event) => {
+      const detail = (event as CustomEvent<PredatorHudSnapshot>).detail;
+      if (detail?.mode) setPredator(detail);
+    };
     window.addEventListener(CART_TURBO_HUNT_SNAPSHOT_EVENT, huntHandler);
     window.addEventListener("cart-turbo-hunt-event-snapshot", eventHandler);
     window.addEventListener("cart-titan-boss-snapshot", titanHandler);
+    window.addEventListener("cart-threat-dodge-snapshot", threatHandler);
+    window.addEventListener("cart-pursuit-event-snapshot", pursuitHandler);
+    window.addEventListener("cart-titan-predator-snapshot", predatorHandler);
     return () => {
       window.removeEventListener(CART_TURBO_HUNT_SNAPSHOT_EVENT, huntHandler);
       window.removeEventListener("cart-turbo-hunt-event-snapshot", eventHandler);
       window.removeEventListener("cart-titan-boss-snapshot", titanHandler);
+      window.removeEventListener("cart-threat-dodge-snapshot", threatHandler);
+      window.removeEventListener("cart-pursuit-event-snapshot", pursuitHandler);
+      window.removeEventListener("cart-titan-predator-snapshot", predatorHandler);
     };
   }, []);
 
@@ -83,6 +128,22 @@ export default function CartTurboHuntHudOverlay() {
   const titanLabel = titan?.bossActive
     ? `TITAN ${titan.stage}${titan.armorSegments > 0 ? ` · ARMOR ${titan.armorSegments}` : titan.vulnerable ? " · CORE OPEN" : ""}`
     : snapshot.huntBossSpawned ? "TITAN ACTIVE" : phaseLabel;
+
+  let dangerText: string | null = null;
+  let dangerMode: "danger" | "counter" = "danger";
+  if (predator?.active && predator.mode === "SURVIVE") {
+    dangerText = `SURVIVE TITAN · ${predator.secondsRemaining.toFixed(1)}s${predator.perfectDodges > 0 ? ` · PERFECT ×${predator.perfectDodges}` : ""}`;
+  } else if (predator?.active && predator.mode === "COUNTER") {
+    dangerText = `COUNTER WINDOW · ${predator.counterSeconds.toFixed(1)}s · HIT THE CORE`;
+    dangerMode = "counter";
+  } else if (pursuit?.active) {
+    dangerText = `${pursuit.label} · ${pursuit.secondsRemaining.toFixed(1)}s`;
+  } else if ((threat?.dodgeFlashSeconds ?? 0) > 0 && threat?.lastDodgeGrade === "PERFECT") {
+    dangerText = `PERFECT DODGE · COUNTER ${Math.max(0, threat.counterSeconds).toFixed(1)}s`;
+    dangerMode = "counter";
+  } else if (threat?.threatActive) {
+    dangerText = `DANGER · ${threat.threatKind ?? "CHARGE"} CHARGE · ${Math.round(threat.threatDistance)}m`;
+  }
 
   return (
     <>
@@ -108,6 +169,11 @@ export default function CartTurboHuntHudOverlay() {
             <div className={`${styles.eventLine} ${eventActive ? styles.eventActive : ""}`}>
               <span>{eventActive ? `FIELD EVENT · ${eventName(fieldEvent.eventKind)}` : "FIELD EVENT · SHIFTING"}</span>
               <strong>{eventActive ? `${Math.floor(fieldEvent.eventProgress)} / ${fieldEvent.eventTarget}` : "..."}</strong>
+            </div>
+          )}
+          {dangerText && (
+            <div className={`${styles.threatLine} ${dangerMode === "counter" ? styles.counterHot : styles.threatHot}`}>
+              {dangerText}
             </div>
           )}
           <div>
