@@ -71,7 +71,7 @@ export function cartBatteryNextDpr(
   if (frameMsEma >= 18.6 && overloadSeconds >= 1.5) {
     return clamp(safeCurrent - 0.05, min, max);
   }
-  if (frameMsEma <= 14.8 && recoverySeconds >= 5) {
+  if (frameMsEma <= 17.1 && recoverySeconds >= 5) {
     return clamp(safeCurrent + 0.025, min, max);
   }
   return safeCurrent;
@@ -159,7 +159,7 @@ function updateAdaptiveDpr(demo: BatteryDemo, state: BatteryState, delta: number
   if (state.frameMsEma >= 18.6) {
     state.overloadClock += delta;
     state.recoveryClock = 0;
-  } else if (state.frameMsEma <= 14.8) {
+  } else if (state.frameMsEma <= 17.1) {
     state.recoveryClock += delta;
     state.overloadClock = Math.max(0, state.overloadClock - delta * 0.5);
   } else {
