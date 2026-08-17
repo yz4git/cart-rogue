@@ -6,6 +6,8 @@ import { CartArenaSession } from "../src/cart/CartArenaSession";
 import {
   CART_TURBO_HUNT_EVENT_CHAIN_CAP,
   CART_TURBO_HUNT_EVENT_CHAIN_THRESHOLDS,
+  CART_TURBO_HUNT_OVERDRIVE_HANDLING_MULTIPLIER,
+  CART_TURBO_HUNT_OVERDRIVE_MAX_SPEED,
   cartTurboHuntEventKindForRegion,
   getCartTurboHuntEventState,
 } from "../src/cart/CartRoguePhase81EventDirector2";
@@ -60,18 +62,30 @@ test("a live event starts quickly and lays an actionable route inside the giant 
   }
 });
 
-test("x4/x8/x12 chain thresholds culminate in bounded overdrive", () => {
+test("x4/x8/x12 chain thresholds culminate in bounded reversible overdrive", () => {
   assert.deepEqual([...CART_TURBO_HUNT_EVENT_CHAIN_THRESHOLDS], [4, 8, 12]);
   assert.equal(CART_TURBO_HUNT_EVENT_CHAIN_CAP, 16);
   const session = new CartArenaSession();
   enableCartTurboHunt(session);
   for (let index = 0; index < 30; index += 1) session.step(idleInput, 1 / 60);
+  const baseHandling = session.car.definition.handling;
+  const baseMaxSpeed = session.car.definition.maxSpeed;
   session.car.ramCount += 12;
   session.step(idleInput, 1 / 60);
-  const event = getCartTurboHuntEventState(session);
+  let event = getCartTurboHuntEventState(session);
   assert.equal(event.eventChain, 12);
   assert.ok(event.overdriveSeconds > 5.8);
-  assert.ok(session.car.definition.maxSpeed >= 25.5);
+  assert.equal(session.car.definition.maxSpeed, CART_TURBO_HUNT_OVERDRIVE_MAX_SPEED);
+  assert.ok(Math.abs(session.car.definition.handling - baseHandling * CART_TURBO_HUNT_OVERDRIVE_HANDLING_MULTIPLIER) < 1e-9);
+
+  for (let index = 0; index < 180; index += 1) session.step(idleInput, 1 / 60);
+  assert.ok(Math.abs(session.car.definition.handling - baseHandling * CART_TURBO_HUNT_OVERDRIVE_HANDLING_MULTIPLIER) < 1e-9, "handling boost accumulated frame-over-frame");
+
+  for (let index = 0; index < 190; index += 1) session.step(idleInput, 1 / 60);
+  event = getCartTurboHuntEventState(session);
+  assert.equal(event.overdriveSeconds, 0);
+  assert.ok(Math.abs(session.car.definition.handling - baseHandling) < 1e-9);
+  assert.ok(Math.abs(session.car.definition.maxSpeed - baseMaxSpeed) < 1e-9);
 });
 
 test("Impact & Speed 3.0 expands presentation without unbounded FOV or particle counts", () => {
