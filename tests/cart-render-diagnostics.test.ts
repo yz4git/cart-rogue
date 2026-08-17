@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import * as THREE from "three";
 import { collectCartRenderDiagnostics } from "../src/cart/CartRenderDiagnostics";
+import { buildCartEnvironmentRichness } from "../src/cart/CartRoguePhase80EnvironmentRichness";
 
 const phase35Source = readFileSync(new URL("../src/cart/CartRoguePhase35MosaicDiorama.ts", import.meta.url), "utf8");
 const runtimeSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
@@ -68,6 +69,51 @@ test("render diagnostics reject a visible legacy road even if the final ground e
   const diagnostics = collectCartRenderDiagnostics(scene);
   assert.equal(diagnostics.ok, false);
   assert.ok(diagnostics.issues.some((issue) => issue.includes("phase35-road-mosaic")));
+});
+
+test("render diagnostics validate the repaired Phase80 color and layering contract", () => {
+  const scene = new THREE.Scene();
+  addAuditCamera(scene);
+  addValidGround(scene);
+  buildCartEnvironmentRichness(scene);
+
+  const diagnostics = collectCartRenderDiagnostics(scene);
+  assert.equal(diagnostics.ok, true);
+  assert.equal(diagnostics.environmentRichness.visible, true);
+  assert.equal(diagnostics.environmentInstanceColorMeshCount, 0);
+  assert.equal(diagnostics.environmentSafeColorPipeline, "fixed-material-buckets");
+  assert.ok((diagnostics.environmentSurfaceY ?? 0) > 0);
+  assert.ok((diagnostics.environmentRoadRhythmY ?? 0) > (diagnostics.environmentSurfaceY ?? 0));
+  assert.ok(diagnostics.environmentRenderableMeshCount >= 10);
+});
+
+test("render diagnostics reject Phase80 if static instanceColor returns", () => {
+  const scene = new THREE.Scene();
+  addAuditCamera(scene);
+  addValidGround(scene);
+
+  const root = new THREE.Group();
+  root.name = "phase80-environment-richness";
+  root.userData.environmentRichness = {
+    safeColorPipeline: "fixed-material-buckets",
+    surfaceY: 0.006,
+    roadRhythmY: 0.014,
+  };
+  const mesh = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true }),
+    1,
+  );
+  mesh.name = "phase80-regression-probe";
+  mesh.setColorAt(0, new THREE.Color(0x88cc88));
+  root.add(mesh);
+  scene.add(root);
+
+  const diagnostics = collectCartRenderDiagnostics(scene);
+  assert.equal(diagnostics.ok, false);
+  assert.equal(diagnostics.environmentInstanceColorMeshCount, 1);
+  assert.ok(diagnostics.issues.some((issue) => issue.includes("Phase80 contains unsafe instanceColor")));
+  assert.ok(diagnostics.riskyStaticInstanceColorMeshes.some((path) => path.includes("phase80-regression-probe")));
 });
 
 test("render diagnostics expose durable Turbo attack visual evidence for sparse headless sampling", () => {

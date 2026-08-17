@@ -25,6 +25,11 @@ export interface CartRenderDiagnostics {
   legacyGround: Record<string, CartRenderObjectState>;
   environmentRichness: CartRenderObjectState;
   environmentInstancedMeshCount: number;
+  environmentRenderableMeshCount: number;
+  environmentInstanceColorMeshCount: number;
+  environmentSafeColorPipeline: string | null;
+  environmentSurfaceY: number | null;
+  environmentRoadRhythmY: number | null;
   stationaryTurboSkids: CartRenderObjectState;
   stationaryTurboSkidActiveCount: number;
   turboAttackFrame?: CartRenderObjectState;
@@ -51,6 +56,7 @@ const RISKY_STATIC_INSTANCE_ROOTS = new Set([
   "phase19-near-garden-polish",
   "phase19-reference-ground-cover",
   "phase35-mosaic-diorama",
+  "phase80-environment-richness",
 ]);
 
 function isEffectivelyVisible(object: THREE.Object3D | null): boolean {
@@ -110,6 +116,24 @@ function countVisibleInstancedMeshes(root: THREE.Object3D | null): number {
   return count;
 }
 
+function countVisibleRenderableMeshes(root: THREE.Object3D | null): number {
+  if (!root) return 0;
+  let count = 0;
+  root.traverse((object) => {
+    if (object instanceof THREE.Mesh && isEffectivelyVisible(object)) count += 1;
+  });
+  return count;
+}
+
+function countInstanceColorMeshes(root: THREE.Object3D | null): number {
+  if (!root) return 0;
+  let count = 0;
+  root.traverse((object) => {
+    if (object instanceof THREE.InstancedMesh && object.instanceColor) count += 1;
+  });
+  return count;
+}
+
 function heroPresentationRotation(scene: THREE.Scene): { pitch: number | null; roll: number | null } {
   const surface = scene.getObjectByName("phase28-hero-surface");
   const presentation = surface?.parent ?? null;
@@ -122,6 +146,18 @@ function heroPresentationRotation(scene: THREE.Scene): { pitch: number | null; r
 function finiteUserDataNumber(object: THREE.Object3D | null, key: string): number {
   const value = object?.userData[key];
   return Number.isFinite(value) ? Number(value) : 0;
+}
+
+function finiteNestedNumber(object: THREE.Object3D | null, key: string): number | null {
+  const details = object?.userData.environmentRichness as Record<string, unknown> | undefined;
+  const value = details?.[key];
+  return Number.isFinite(value) ? Number(value) : null;
+}
+
+function nestedString(object: THREE.Object3D | null, key: string): string | null {
+  const details = object?.userData.environmentRichness as Record<string, unknown> | undefined;
+  const value = details?.[key];
+  return typeof value === "string" ? value : null;
 }
 
 function turboAttackState(scene: THREE.Scene): {
@@ -192,6 +228,11 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
   const environmentRoot = scene.getObjectByName("phase80-environment-richness") ?? null;
   const environmentRichness = objectState(scene, "phase80-environment-richness");
   const environmentInstancedMeshCount = countVisibleInstancedMeshes(environmentRoot);
+  const environmentRenderableMeshCount = countVisibleRenderableMeshes(environmentRoot);
+  const environmentInstanceColorMeshCount = countInstanceColorMeshes(environmentRoot);
+  const environmentSafeColorPipeline = nestedString(environmentRoot, "safeColorPipeline");
+  const environmentSurfaceY = finiteNestedNumber(environmentRoot, "surfaceY");
+  const environmentRoadRhythmY = finiteNestedNumber(environmentRoot, "roadRhythmY");
   const camera = cameraState(scene);
   const heroRotation = heroPresentationRotation(scene);
   const turboAttack = turboAttackState(scene);
@@ -206,6 +247,18 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
   }
   if (riskyStaticInstanceColorMeshes.length > 0) {
     issues.push(`static instanceColor meshes escaped fixed-color repair: ${riskyStaticInstanceColorMeshes.join(", ")}`);
+  }
+  if (environmentRoot && environmentInstanceColorMeshCount > 0) {
+    issues.push(`Phase80 contains unsafe instanceColor meshes: ${environmentInstanceColorMeshCount}`);
+  }
+  if (environmentRoot && environmentSafeColorPipeline !== "fixed-material-buckets") {
+    issues.push(`Phase80 safe color pipeline is missing: ${environmentSafeColorPipeline ?? "null"}`);
+  }
+  if (environmentRoot && (environmentSurfaceY === null || environmentSurfaceY <= 0)) {
+    issues.push(`Phase80 surface overlay is not above the Turbo Hunt floor: ${environmentSurfaceY}`);
+  }
+  if (environmentRoot && (environmentRoadRhythmY === null || environmentRoadRhythmY <= (environmentSurfaceY ?? 0))) {
+    issues.push(`Phase80 road rhythm is not layered above the surface patches: ${environmentRoadRhythmY}`);
   }
   if (!camera.exists || camera.fov === null || camera.y === null) issues.push("perspective chase camera is missing");
   else {
@@ -226,6 +279,11 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
     legacyGround,
     environmentRichness,
     environmentInstancedMeshCount,
+    environmentRenderableMeshCount,
+    environmentInstanceColorMeshCount,
+    environmentSafeColorPipeline,
+    environmentSurfaceY,
+    environmentRoadRhythmY,
     stationaryTurboSkids: objectState(scene, "phase44-stationary-turbo-skids"),
     stationaryTurboSkidActiveCount: activeSkidCount(scene),
     turboAttackFrame: turboAttack.state,
