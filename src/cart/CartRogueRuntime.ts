@@ -67,6 +67,9 @@ import "./CartRoguePhase80EnvironmentRichness";
 import "./CartRoguePhase81EventDirector2";
 import "./CartRoguePhase82ImpactSpeed3";
 import "./CartRoguePhase83Boss2";
+import "./CartRoguePhase84ThreatDodge";
+import "./CartRoguePhase85PursuitEvents";
+import "./CartRoguePhase86BossPredator";
 import "./CartGameplayAuditRuntime";
 import "./CartRenderAuditRuntime";
 
@@ -145,4 +148,7 @@ export const CART_ROGUE_RUNTIME_PHASE_ORDER = [
   "CartRoguePhase81EventDirector2",
   "CartRoguePhase82ImpactSpeed3",
   "CartRoguePhase83Boss2",
+  "CartRoguePhase84ThreatDodge",
+  "CartRoguePhase85PursuitEvents",
+  "CartRoguePhase86BossPredator",
 ] as const;
