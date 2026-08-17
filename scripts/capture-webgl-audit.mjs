@@ -151,7 +151,10 @@ try {
         cartStage: Boolean(stage),
         hasGasHud: text.includes('GAS'),
         hasTurboHud: text.includes('TURBO'),
-        hasEnemyHud: text.includes('ENEMIES'),
+        hasTurboHuntHud: text.includes('TURBO HUNT'),
+        hasHuntOrderHud: text.includes('HUNT ORDER'),
+        hasHeatHud: text.includes('HEAT'),
+        hasKoHud: text.includes('KO'),
         width: canvas.width,
         height: canvas.height,
         clientWidth: canvas.clientWidth,
@@ -161,15 +164,28 @@ try {
         gameplayAudit,
       };
     `);
-    if (state?.ready && state?.badge === "WEBGL" && state?.hasGasHud && state?.hasTurboHud && state?.hasEnemyHud) break;
+    if (state?.ready
+        && state?.badge === "WEBGL"
+        && state?.hasGasHud
+        && state?.hasTurboHud
+        && state?.hasTurboHuntHud
+        && state?.hasHuntOrderHud
+        && state?.hasHeatHud
+        && state?.hasKoHud) break;
     await sleep(250);
   }
 
   if (!state?.ready || state?.badge !== "WEBGL") {
     throw new Error(`Real Cart Rogue WebGL runtime did not become ready: ${JSON.stringify(state)}`);
   }
-  if (!state?.cartStage || !state?.hasGasHud || !state?.hasTurboHud || !state?.hasEnemyHud) {
-    throw new Error(`Cart Rogue HUD/game shell is incomplete: ${JSON.stringify(state)}`);
+  if (!state?.cartStage
+      || !state?.hasGasHud
+      || !state?.hasTurboHud
+      || !state?.hasTurboHuntHud
+      || !state?.hasHuntOrderHud
+      || !state?.hasHeatHud
+      || !state?.hasKoHud) {
+    throw new Error(`Turbo Hunt HUD/game shell is incomplete: ${JSON.stringify(state)}`);
   }
   if ((state.width ?? 0) <= 0 || (state.height ?? 0) <= 0) {
     throw new Error(`WebGL canvas has invalid backing size: ${JSON.stringify(state)}`);
@@ -179,6 +195,9 @@ try {
   }
   if (!state.gameplayAudit?.ok) {
     throw new Error(`Cart Rogue gameplay baseline audit failed: ${JSON.stringify(state.gameplayAudit)}`);
+  }
+  if (!state.gameplayAudit?.nodes?.["hunt-field"] || (state.gameplayAudit.nodes["hunt-field"].authoredEnemies ?? 0) < 18) {
+    throw new Error(`Turbo Hunt field did not expose its bounded target pool: ${JSON.stringify(state.gameplayAudit)}`);
   }
 
   await sleep(600);
@@ -256,7 +275,7 @@ try {
   await mkdir(new URL(`../${output.split("/").slice(0, -1).join("/")}/`, import.meta.url), { recursive: true }).catch(() => undefined);
   await writeFile(new URL(`../${output}`, import.meta.url), Buffer.from(pngBase64, "base64"));
   await writeFile(new URL(`../${stateOutput}`, import.meta.url), `${JSON.stringify(state, null, 2)}\n`);
-  console.log(`Real Cart Rogue WebGL audit passed: ${JSON.stringify(state)}`);
+  console.log(`Real Cart Rogue Turbo Hunt WebGL audit passed: ${JSON.stringify(state)}`);
 } catch (error) {
   console.error(error);
   if (driverLog) console.error(driverLog);
