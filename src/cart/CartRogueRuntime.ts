@@ -52,6 +52,12 @@ import "./CartRoguePhase57FlowSurge";
 import "./CartRoguePhase58TurboBreakaway";
 import "./CartRoguePhase59TurboStrikeVisual";
 import "./CartRoguePhase60TurboCombatSafety";
+import "./CartRoguePhase61PerfectStrike";
+import "./CartRoguePhase62PerfectShockwave";
+import "./CartRoguePhase63TurboAimAssist";
+import "./CartRoguePhase64TurboHitStun";
+import "./CartRoguePhase65PerfectCombatVisual";
+import "./CartRoguePhase66TurboChainReward";
 import "./CartGameplayAuditRuntime";
 import "./CartRenderAuditRuntime";
 
@@ -115,4 +121,10 @@ export const CART_ROGUE_RUNTIME_PHASE_ORDER = [
   "CartRoguePhase58TurboBreakaway",
   "CartRoguePhase59TurboStrikeVisual",
   "CartRoguePhase60TurboCombatSafety",
+  "CartRoguePhase61PerfectStrike",
+  "CartRoguePhase62PerfectShockwave",
+  "CartRoguePhase63TurboAimAssist",
+  "CartRoguePhase64TurboHitStun",
+  "CartRoguePhase65PerfectCombatVisual",
+  "CartRoguePhase66TurboChainReward",
 ] as const;
