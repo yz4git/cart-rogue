@@ -80,7 +80,7 @@ interface TurboHuntState {
 
 interface MutableHuntSession {
   track: RallyTrack;
-  car: CartArenaSession["car"] & { track: RallyTrack };
+  car: CartArenaSession["car"];
   enemies: CartEnemyState[];
   resources: CartResourcePickupState[];
   obstacles: CartObstacleState[];
@@ -106,7 +106,7 @@ interface HuntWebGLDemo {
   enemyGroups: Map<string, THREE.Group>;
   enemyAlive: Map<string, boolean>;
   buildWorld(): void;
-  buildEnemies(enemies: readonly CartArenaSessionSnapshot["enemies"]): void;
+  buildEnemies(enemies: CartArenaSessionSnapshot["enemies"]): void;
   updateVisuals(delta: number): void;
 }
 
@@ -698,7 +698,7 @@ export function enableCartTurboHunt(session: CartArenaSession): void {
   const oldTrack = raw.track;
   const huntTrack = new RallyTrack(CART_TURBO_HUNT_TRACK);
   raw.track = huntTrack;
-  raw.car.track = huntTrack;
+  (raw.car as unknown as { track: RallyTrack }).track = huntTrack;
   oldTrack.dispose();
   raw.car.reset();
   raw.car.position.x = CART_TURBO_HUNT_FIELD.spawnX;
@@ -889,7 +889,6 @@ function buildHuntVisualWorld(demo: HuntWebGLDemo): HuntVisualState {
   );
   sky.position.set(cx, 36, cz);
   root.add(sky);
-
   demo.scene.add(root);
 
   let firstDirectional = true;
@@ -1057,7 +1056,7 @@ export function installCartRoguePhase67TurboHunt(): void {
   };
 
   const previousBuildEnemies = webglPrototype.buildEnemies;
-  webglPrototype.buildEnemies = function turboHuntBuildEnemies(this: HuntWebGLDemo, enemies: readonly CartArenaSessionSnapshot["enemies"]): void {
+  webglPrototype.buildEnemies = function turboHuntBuildEnemies(this: HuntWebGLDemo, enemies: CartArenaSessionSnapshot["enemies"]): void {
     previousBuildEnemies.call(this, enemies);
     if (!isCartTurboHuntEnabled(this.session)) return;
     for (const enemy of enemies) {
