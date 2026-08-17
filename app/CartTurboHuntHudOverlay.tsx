@@ -10,6 +10,26 @@ import legacyStyles from "./CartRogueGame.module.css";
 import routeStyles from "./CartRunRouteMap.module.css";
 import styles from "./CartTurboHuntHudOverlay.module.css";
 
+interface FieldEventHudSnapshot {
+  eventSerial: number;
+  eventKind: "CONVOY" | "SMASH_ZONE" | "TURBO_RUSH" | "CHAOS_WAVE" | "ELITE_HUNT";
+  eventLabel: string;
+  eventActive: boolean;
+  eventProgress: number;
+  eventTarget: number;
+  eventSecondsRemaining: number;
+  eventChain: number;
+  overdriveSeconds: number;
+}
+
+interface TitanHudSnapshot {
+  bossActive: boolean;
+  stage: "ARMORED" | "BREAKOUT" | "FURY" | "DOWN";
+  armorSegments: number;
+  maxArmorSegments: number;
+  vulnerable: boolean;
+}
+
 const PHASE_LABEL: Record<CartTurboHuntSnapshot["huntPhase"], string> = {
   "drop-in": "DROP IN",
   hunt: "HUNT",
@@ -20,16 +40,36 @@ const PHASE_LABEL: Record<CartTurboHuntSnapshot["huntPhase"], string> = {
   clear: "HUNT CLEAR",
 };
 
+function eventName(kind: FieldEventHudSnapshot["eventKind"]): string {
+  return kind.replaceAll("_", " ");
+}
+
 export default function CartTurboHuntHudOverlay() {
   const [snapshot, setSnapshot] = useState<CartTurboHuntSnapshot | null>(() => getLatestCartTurboHuntSnapshot());
+  const [fieldEvent, setFieldEvent] = useState<FieldEventHudSnapshot | null>(null);
+  const [titan, setTitan] = useState<TitanHudSnapshot | null>(null);
 
   useEffect(() => {
-    const handler = (event: Event) => {
+    const huntHandler = (event: Event) => {
       const detail = (event as CustomEvent<CartTurboHuntSnapshot>).detail;
       if (detail?.gameMode === "turbo-hunt") setSnapshot(detail);
     };
-    window.addEventListener(CART_TURBO_HUNT_SNAPSHOT_EVENT, handler);
-    return () => window.removeEventListener(CART_TURBO_HUNT_SNAPSHOT_EVENT, handler);
+    const eventHandler = (event: Event) => {
+      const detail = (event as CustomEvent<FieldEventHudSnapshot>).detail;
+      if (detail?.eventKind) setFieldEvent(detail);
+    };
+    const titanHandler = (event: Event) => {
+      const detail = (event as CustomEvent<TitanHudSnapshot>).detail;
+      if (detail?.stage) setTitan(detail);
+    };
+    window.addEventListener(CART_TURBO_HUNT_SNAPSHOT_EVENT, huntHandler);
+    window.addEventListener("cart-turbo-hunt-event-snapshot", eventHandler);
+    window.addEventListener("cart-titan-boss-snapshot", titanHandler);
+    return () => {
+      window.removeEventListener(CART_TURBO_HUNT_SNAPSHOT_EVENT, huntHandler);
+      window.removeEventListener("cart-turbo-hunt-event-snapshot", eventHandler);
+      window.removeEventListener("cart-titan-boss-snapshot", titanHandler);
+    };
   }, []);
 
   if (!snapshot) return null;
@@ -37,6 +77,12 @@ export default function CartTurboHuntHudOverlay() {
   const heatPercent = Math.round(snapshot.huntHeat);
   const phaseLabel = PHASE_LABEL[snapshot.huntPhase];
   const target = snapshot.huntTargetEnemyId ? `${Math.round(snapshot.huntTargetDistance)}m` : "SCAN";
+  const eventActive = Boolean(fieldEvent?.eventActive);
+  const chain = fieldEvent?.eventChain ?? 0;
+  const overdrive = fieldEvent?.overdriveSeconds ?? 0;
+  const titanLabel = titan?.bossActive
+    ? `TITAN ${titan.stage}${titan.armorSegments > 0 ? ` · ARMOR ${titan.armorSegments}` : titan.vulnerable ? " · CORE OPEN" : ""}`
+    : snapshot.huntBossSpawned ? "TITAN ACTIVE" : phaseLabel;
 
   return (
     <>
@@ -47,7 +93,9 @@ export default function CartTurboHuntHudOverlay() {
         <div className={styles.card}>
           <span className={styles.kicker}>CART ROGUE</span>
           <strong className={styles.title}>TURBO HUNT</strong>
-          <span className={styles.region}>{snapshot.huntRegion} · {phaseLabel}</span>
+          <span className={styles.region}>
+            {snapshot.huntRegion} · {phaseLabel}{overdrive > 0 ? ` · OVERDRIVE ${overdrive.toFixed(1)}s` : ""}
+          </span>
         </div>
 
         <div className={styles.orderCard}>
@@ -56,10 +104,17 @@ export default function CartTurboHuntHudOverlay() {
             <strong>{Math.floor(snapshot.huntObjectiveProgress)} / {snapshot.huntObjectiveTarget}</strong>
           </div>
           <div className={styles.orderLabel}>{snapshot.huntObjectiveLabel}</div>
+          {fieldEvent && (
+            <div className={`${styles.eventLine} ${eventActive ? styles.eventActive : ""}`}>
+              <span>{eventActive ? `FIELD EVENT · ${eventName(fieldEvent.eventKind)}` : "FIELD EVENT · SHIFTING"}</span>
+              <strong>{eventActive ? `${Math.floor(fieldEvent.eventProgress)} / ${fieldEvent.eventTarget}` : "..."}</strong>
+            </div>
+          )}
           <div>
             <div className={styles.progressTrack}><i style={{ width: `${objectivePercent}%` }} /></div>
             <div className={styles.orderFoot}>
               <span>ORDERS {snapshot.huntOrdersCompleted}</span>
+              <span className={chain >= 12 ? styles.flowHot : undefined}>FLOW ×{chain}</span>
               <span>TARGET {target}</span>
             </div>
           </div>
@@ -73,7 +128,7 @@ export default function CartTurboHuntHudOverlay() {
           <div className={styles.heatTrack}><i style={{ width: `${heatPercent}%` }} /></div>
           <div className={styles.stats}>
             <span>KO {snapshot.huntKills}</span>
-            <span className={snapshot.huntBossSpawned ? styles.boss : undefined}>{snapshot.huntBossSpawned ? "TITAN ACTIVE" : phaseLabel}</span>
+            <span className={snapshot.huntBossSpawned ? styles.boss : undefined}>{titanLabel}</span>
           </div>
         </div>
       </div>

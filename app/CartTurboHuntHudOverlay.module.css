@@ -59,13 +59,14 @@
 .orderCard {
   padding: 7px 12px 8px;
   display: grid;
-  grid-template-rows: auto auto auto;
-  gap: 4px;
+  grid-template-rows: auto auto auto auto;
+  gap: 3px;
 }
 
 .orderHead,
 .heatHead,
-.orderFoot {
+.orderFoot,
+.eventLine {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -86,6 +87,24 @@
   font-size: clamp(12px, 1.8vw, 17px);
   font-weight: 950;
   letter-spacing: .03em;
+}
+
+.eventLine {
+  min-height: 15px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(101, 190, 211, .09);
+  color: rgba(226, 248, 252, .82);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  line-height: 1.2;
+}
+
+.eventActive {
+  background: linear-gradient(90deg, rgba(58, 201, 226, .2), rgba(255, 203, 101, .12));
+  color: #eafcff;
+  box-shadow: inset 2px 0 0 #68ebff;
 }
 
 .progressTrack,
@@ -112,6 +131,12 @@
   font-weight: 800;
   letter-spacing: .06em;
   opacity: .82;
+}
+
+.flowHot {
+  color: #ffd36c;
+  opacity: 1;
+  text-shadow: 0 0 8px rgba(255, 207, 93, .9);
 }
 
 .heatCard {
@@ -165,14 +190,20 @@
 
   .orderCard,
   .heatCard {
-    padding: 6px 8px;
+    padding: 5px 7px;
   }
 
   .kicker,
   .mini,
   .orderFoot,
-  .stats {
-    font-size: 8px;
+  .stats,
+  .eventLine {
+    font-size: 7px;
+  }
+
+  .eventLine {
+    min-height: 13px;
+    padding: 1px 5px;
   }
 
   .region {

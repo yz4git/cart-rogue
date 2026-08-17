@@ -125,19 +125,25 @@ test("Hunt Orders reuse existing perk drafts at stable non-spatial milestones", 
   assert.equal(cartTurboHuntPerkMilestone(8), 4);
 });
 
-test("Turbo Hunt presentation, battery and environment layers preserve runtime order", () => {
+test("Turbo Hunt presentation, battery, environment, events, impact and boss layers preserve runtime order", () => {
   const huntIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase67TurboHunt");
   const phase66Index = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase66TurboChainReward");
   const perkIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase74TurboHuntPerkMilestones");
   const guardIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase78TurboHuntPresentationGuard");
   const batteryIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase79PerformanceBattery");
   const environmentIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase80EnvironmentRichness");
+  const eventsIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase81EventDirector2");
+  const impactIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase82ImpactSpeed3");
+  const bossIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase83Boss2");
   assert.ok(huntIndex > phase66Index);
   assert.ok(perkIndex > huntIndex);
   assert.ok(guardIndex > perkIndex);
   assert.ok(batteryIndex > guardIndex);
   assert.ok(environmentIndex > batteryIndex);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase80EnvironmentRichness");
+  assert.ok(eventsIndex > environmentIndex);
+  assert.ok(impactIndex > eventsIndex);
+  assert.ok(bossIndex > impactIndex);
+  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase83Boss2");
 });
 
 test("design records continuous-field acceptance criteria before implementation", () => {
