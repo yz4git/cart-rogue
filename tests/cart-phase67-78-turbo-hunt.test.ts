@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { CartArenaSession } from "../src/cart/CartArenaSession";
+import { getCartTurboAttackState } from "../src/cart/CartRoguePhase54TurboAttack";
 import {
   cartTurboHuntActiveTargetCount,
   cartTurboHuntPhaseFor,
@@ -82,15 +83,15 @@ test("rocks and pickups are fixed-size field pools rather than corridor rewards"
   assert.ok(pickups.some((pickup) => pickup.kind === "gas"));
 });
 
-test("a live Turbo Hunt session stays gate-free and keeps stationary Turbo pivot steering", () => {
+test("a live Turbo Hunt session stays gate-free and preserves pivot-to-release Turbo attack", () => {
   const session = new CartArenaSession();
   enableCartTurboHunt(session);
   const startHeading = session.car.heading;
-  for (let index = 0; index < 36; index += 1) {
+  for (let index = 0; index < 48; index += 1) {
     session.step({ throttle: 1, brake: 0, steer: 1, boost: true }, 1 / 60);
   }
   const hunt = getCartTurboHuntSnapshot(session);
-  const snapshot = session.snapshot();
+  let snapshot = session.snapshot();
   assert.equal(hunt?.gameMode, "turbo-hunt");
   assert.equal(snapshot.nodeId, "hunt-field");
   assert.equal(snapshot.gateLocked, false);
@@ -98,6 +99,15 @@ test("a live Turbo Hunt session stays gate-free and keeps stationary Turbo pivot
   assert.ok(Math.abs(session.car.heading - startHeading) > 0.15);
   assert.ok(Math.abs(session.car.forwardVelocity) < 0.1);
   assert.equal(snapshot.runComplete, false);
+
+  const chargesBeforeRelease = session.car.boostCharges;
+  session.step({ throttle: 1, brake: 0, steer: 0, boost: false }, 1 / 60);
+  snapshot = session.snapshot();
+  const attack = getCartTurboAttackState(session);
+  assert.equal(attack.mode, "attack");
+  assert.ok(attack.attackSecondsRemaining >= 0.25);
+  assert.equal(snapshot.boostActive, true);
+  assert.ok(session.car.boostCharges < chargesBeforeRelease);
 });
 
 test("Turbo Hunt is installed after the proven combat stack and its presentation guard is last", () => {
