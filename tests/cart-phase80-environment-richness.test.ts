@@ -47,8 +47,6 @@ test("Environment Richness uses fixed-material buckets instead of static instanc
 });
 
 test("Environment Richness ground overlays sit above every Turbo Hunt regional floor", () => {
-  // Phase67's highest regional floor top is just below world Y=0. Keeping the
-  // richness overlay positive prevents the old hidden/z-fighting ground bug.
   assert.ok(CART_ENVIRONMENT_SURFACE_Y > 0);
   assert.ok(CART_ENVIRONMENT_ROAD_RHYTHM_Y > CART_ENVIRONMENT_SURFACE_Y);
   const root = buildCartEnvironmentRichness(new THREE.Scene());
@@ -113,9 +111,15 @@ test("Environment Richness is presentation-only and does not throttle gameplay o
   assert.match(source, /previousBuildWorld\.call\(this\)/);
 });
 
-test("Phase80 runs after Performance & Battery 2.0 and remains the final presentation layer", () => {
+test("Phase80 stays after Battery 2.0 and before the authored event/impact/boss layers", () => {
   const batteryIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase79PerformanceBattery");
   const environmentIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase80EnvironmentRichness");
+  const eventsIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase81EventDirector2");
+  const impactIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase82ImpactSpeed3");
+  const bossIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase83Boss2");
   assert.ok(environmentIndex > batteryIndex);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase80EnvironmentRichness");
+  assert.ok(eventsIndex > environmentIndex);
+  assert.ok(impactIndex > eventsIndex);
+  assert.ok(bossIndex > impactIndex);
+  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase83Boss2");
 });
