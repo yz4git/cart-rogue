@@ -14,7 +14,8 @@ export const CART_ENVIRONMENT_RICHNESS_COUNTS = {
   landmarkRegions: 5,
 } as const;
 
-export const CART_ENVIRONMENT_RICHNESS_DRAW_CALL_BUDGET = 16;
+// Eight instanced layers + one batched landmark-box layer + one floating ring.
+export const CART_ENVIRONMENT_RICHNESS_DRAW_CALL_BUDGET = 10;
 
 interface EnvironmentDemo {
   scene: THREE.Scene;
@@ -22,14 +23,16 @@ interface EnvironmentDemo {
   buildWorld(): void;
 }
 
-interface SurfacePatch {
+interface InstanceEntry {
   x: number;
-  z: number;
-  width: number;
-  depth: number;
-  rotation: number;
-  color: number;
   y: number;
+  z: number;
+  sx: number;
+  sy: number;
+  sz: number;
+  ry: number;
+  rz?: number;
+  color: number;
 }
 
 const installedDemos = new WeakSet<object>();
@@ -39,9 +42,9 @@ function hash01(seed: number): number {
   return value - Math.floor(value);
 }
 
-function material(color = 0xffffff, roughness = 0.9): THREE.MeshStandardMaterial {
+function standardMaterial(roughness = 0.9): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
-    color,
+    color: 0xffffff,
     roughness,
     metalness: 0.015,
     flatShading: true,
@@ -49,17 +52,18 @@ function material(color = 0xffffff, roughness = 0.9): THREE.MeshStandardMaterial
   });
 }
 
-function addInstancedBoxes(
-  root: THREE.Group,
+function finishInstances(mesh: THREE.InstancedMesh): void {
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+}
+
+function addBoxInstances(
+  root: THREE.Object3D,
   name: string,
-  entries: readonly SurfacePatch[],
-  baseHeight: number,
+  entries: readonly InstanceEntry[],
+  roughness = 0.9,
 ): THREE.InstancedMesh {
-  const mesh = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(1, baseHeight, 1),
-    material(),
-    entries.length,
-  );
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), standardMaterial(roughness), entries.length);
   mesh.name = name;
   mesh.castShadow = false;
   mesh.receiveShadow = false;
@@ -67,19 +71,18 @@ function addInstancedBoxes(
   const dummy = new THREE.Object3D();
   entries.forEach((entry, index) => {
     dummy.position.set(entry.x, entry.y, entry.z);
-    dummy.rotation.set(0, entry.rotation, 0);
-    dummy.scale.set(entry.width, 1, entry.depth);
+    dummy.rotation.set(0, entry.ry, entry.rz ?? 0);
+    dummy.scale.set(entry.sx, entry.sy, entry.sz);
     dummy.updateMatrix();
     mesh.setMatrixAt(index, dummy.matrix);
     mesh.setColorAt(index, new THREE.Color(entry.color));
   });
-  mesh.instanceMatrix.needsUpdate = true;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  finishInstances(mesh);
   root.add(mesh);
   return mesh;
 }
 
-function createSurfacePatches(cx: number, cz: number): SurfacePatch[] {
+function createSurfacePatches(cx: number, cz: number): InstanceEntry[] {
   const raw: Array<[number, number, number, number, number, number]> = [
     [-54, -62, 29, 18, -0.16, 0xc4d68f], [-18, -66, 32, 15, 0.08, 0xd2dd9a],
     [23, -63, 34, 17, -0.09, 0xb9d08b], [59, -58, 23, 21, 0.18, 0xd8cf8c],
@@ -92,40 +95,33 @@ function createSurfacePatches(cx: number, cz: number): SurfacePatch[] {
     [21, 73, 30, 16, 0.09, 0xb9a0d3], [57, 71, 27, 17, -0.08, 0xd0b5dc],
   ];
   return raw.map(([x, z, width, depth, rotation, color]) => ({
-    x: cx + x,
-    z: cz + z,
-    width,
-    depth,
-    rotation,
-    color,
-    y: -0.045,
+    x: cx + x, y: -0.043, z: cz + z, sx: width, sy: 0.04, sz: depth, ry: rotation, color,
   }));
 }
 
-function addRoadRhythm(root: THREE.Group, cx: number, cz: number): void {
-  const entries: SurfacePatch[] = [];
+function createRoadRhythm(cx: number, cz: number): InstanceEntry[] {
+  const entries: InstanceEntry[] = [];
   for (let index = 0; index < CART_ENVIRONMENT_RICHNESS_COUNTS.roadRhythm; index += 1) {
     const lane = index % 3;
     const vertical = lane !== 1;
     const offset = (index - CART_ENVIRONMENT_RICHNESS_COUNTS.roadRhythm / 2) * 5.3;
     entries.push({
       x: vertical ? cx + (lane === 0 ? -38 : 38) : cx + offset,
+      y: -0.017,
       z: vertical ? cz + offset : cz + 4,
-      width: vertical ? 0.7 : 4.1,
-      depth: vertical ? 4.2 : 0.64,
-      rotation: lane === 2 ? 0.08 : lane === 0 ? -0.08 : 0,
+      sx: vertical ? 0.7 : 4.1,
+      sy: 0.025,
+      sz: vertical ? 4.2 : 0.64,
+      ry: lane === 2 ? 0.08 : lane === 0 ? -0.08 : 0,
       color: lane === 1 ? 0xf6e6b7 : index % 2 === 0 ? 0xf1d6a2 : 0xe7c88f,
-      y: -0.018,
     });
   }
-  addInstancedBoxes(root, "phase80-road-rhythm", entries, 0.025);
+  return entries;
 }
 
 function addDistantHills(root: THREE.Group, cx: number, cz: number): void {
   const count = CART_ENVIRONMENT_RICHNESS_COUNTS.distantHills;
-  const geometry = new THREE.DodecahedronGeometry(1, 0);
-  const hillMaterial = material();
-  const hills = new THREE.InstancedMesh(geometry, hillMaterial, count);
+  const hills = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), standardMaterial(), count);
   hills.name = "phase80-distant-hills";
   hills.castShadow = false;
   hills.receiveShadow = false;
@@ -144,23 +140,21 @@ function addDistantHills(root: THREE.Group, cx: number, cz: number): void {
     hills.setMatrixAt(index, dummy.matrix);
     hills.setColorAt(index, new THREE.Color(colors[index % colors.length]));
   }
-  hills.instanceMatrix.needsUpdate = true;
-  if (hills.instanceColor) hills.instanceColor.needsUpdate = true;
+  finishInstances(hills);
   root.add(hills);
 }
 
 function addTreeGroves(root: THREE.Group, cx: number, cz: number): void {
   const count = CART_ENVIRONMENT_RICHNESS_COUNTS.trees;
-  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.72, 1, 6), material(0xffffff), count);
-  const crown = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), material(0xffffff), count);
-  trunk.name = "phase80-tree-trunks";
-  crown.name = "phase80-tree-crowns";
-  trunk.castShadow = false;
-  crown.castShadow = false;
-  trunk.receiveShadow = false;
-  crown.receiveShadow = false;
-  trunk.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-  crown.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+  const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.72, 1, 6), standardMaterial(), count);
+  const crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), standardMaterial(), count);
+  trunks.name = "phase80-tree-trunks";
+  crowns.name = "phase80-tree-crowns";
+  for (const mesh of [trunks, crowns]) {
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+  }
   const dummy = new THREE.Object3D();
   const trunkColors = [0x8c6b52, 0x735a48, 0x9b7456];
   const leafColors = [0x6fae6d, 0x7fbe72, 0x5f9f68, 0x91c67b];
@@ -175,25 +169,23 @@ function addTreeGroves(root: THREE.Group, cx: number, cz: number): void {
     dummy.rotation.set(0, hash01(index + 241) * Math.PI, 0);
     dummy.scale.set(0.72 + hash01(index + 249) * 0.42, height, 0.72 + hash01(index + 257) * 0.42);
     dummy.updateMatrix();
-    trunk.setMatrixAt(index, dummy.matrix);
-    trunk.setColorAt(index, new THREE.Color(trunkColors[index % trunkColors.length]));
+    trunks.setMatrixAt(index, dummy.matrix);
+    trunks.setColorAt(index, new THREE.Color(trunkColors[index % trunkColors.length]));
     dummy.position.set(x, height + spread * 0.52, z);
     dummy.rotation.set(hash01(index + 267) * 0.12, hash01(index + 277) * Math.PI, hash01(index + 283) * 0.12);
     dummy.scale.set(spread, spread * (0.8 + hash01(index + 291) * 0.32), spread);
     dummy.updateMatrix();
-    crown.setMatrixAt(index, dummy.matrix);
-    crown.setColorAt(index, new THREE.Color(leafColors[index % leafColors.length]));
+    crowns.setMatrixAt(index, dummy.matrix);
+    crowns.setColorAt(index, new THREE.Color(leafColors[index % leafColors.length]));
   }
-  trunk.instanceMatrix.needsUpdate = true;
-  crown.instanceMatrix.needsUpdate = true;
-  if (trunk.instanceColor) trunk.instanceColor.needsUpdate = true;
-  if (crown.instanceColor) crown.instanceColor.needsUpdate = true;
-  root.add(trunk, crown);
+  finishInstances(trunks);
+  finishInstances(crowns);
+  root.add(trunks, crowns);
 }
 
 function addLowScenery(root: THREE.Group, cx: number, cz: number): void {
   const shrubCount = CART_ENVIRONMENT_RICHNESS_COUNTS.shrubs;
-  const shrubs = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), material(), shrubCount);
+  const shrubs = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), standardMaterial(), shrubCount);
   shrubs.name = "phase80-shrub-clusters";
   shrubs.castShadow = false;
   shrubs.receiveShadow = false;
@@ -203,21 +195,18 @@ function addLowScenery(root: THREE.Group, cx: number, cz: number): void {
   for (let index = 0; index < shrubCount; index += 1) {
     const angle = hash01(index + 317) * Math.PI * 2;
     const radius = 73 + hash01(index + 329) * 20;
-    const x = cx + Math.cos(angle) * radius;
-    const z = cz + Math.sin(angle) * radius;
     const scale = 0.7 + hash01(index + 337) * 1.35;
-    dummy.position.set(x, 0.3 + scale * 0.22, z);
+    dummy.position.set(cx + Math.cos(angle) * radius, 0.3 + scale * 0.22, cz + Math.sin(angle) * radius);
     dummy.rotation.set(0, hash01(index + 347) * Math.PI, 0);
     dummy.scale.set(scale * 1.4, scale * 0.7, scale);
     dummy.updateMatrix();
     shrubs.setMatrixAt(index, dummy.matrix);
     shrubs.setColorAt(index, new THREE.Color(shrubColors[index % shrubColors.length]));
   }
-  shrubs.instanceMatrix.needsUpdate = true;
-  if (shrubs.instanceColor) shrubs.instanceColor.needsUpdate = true;
+  finishInstances(shrubs);
 
   const flowerCount = CART_ENVIRONMENT_RICHNESS_COUNTS.flowerBeds;
-  const flowerBeds = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 0.06, 10), material(), flowerCount);
+  const flowerBeds = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 0.06, 10), standardMaterial(), flowerCount);
   flowerBeds.name = "phase80-flower-beds";
   flowerBeds.castShadow = false;
   flowerBeds.receiveShadow = false;
@@ -226,83 +215,87 @@ function addLowScenery(root: THREE.Group, cx: number, cz: number): void {
   for (let index = 0; index < flowerCount; index += 1) {
     const angle = (index / flowerCount) * Math.PI * 2 + hash01(index + 367) * 0.26;
     const radius = 61 + hash01(index + 373) * 25;
-    const x = cx + Math.cos(angle) * radius;
-    const z = cz + Math.sin(angle) * radius;
     const scale = 1.2 + hash01(index + 389) * 2.1;
-    dummy.position.set(x, 0.015, z);
+    dummy.position.set(cx + Math.cos(angle) * radius, 0.015, cz + Math.sin(angle) * radius);
     dummy.rotation.set(0, hash01(index + 397) * Math.PI, 0);
     dummy.scale.set(scale * 1.8, 1, scale);
     dummy.updateMatrix();
     flowerBeds.setMatrixAt(index, dummy.matrix);
     flowerBeds.setColorAt(index, new THREE.Color(flowerColors[index % flowerColors.length]));
   }
-  flowerBeds.instanceMatrix.needsUpdate = true;
-  if (flowerBeds.instanceColor) flowerBeds.instanceColor.needsUpdate = true;
+  finishInstances(flowerBeds);
   root.add(shrubs, flowerBeds);
 }
 
-function landmarkBox(
-  root: THREE.Object3D,
-  size: [number, number, number],
-  position: [number, number, number],
-  color: number,
-  rotationY = 0,
-): THREE.Mesh {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material(color, 0.76));
-  mesh.position.set(...position);
-  mesh.rotation.y = rotationY;
-  mesh.castShadow = false;
-  mesh.receiveShadow = false;
-  root.add(mesh);
-  return mesh;
+function createBackdropBands(cx: number, cz: number): InstanceEntry[] {
+  const entries: InstanceEntry[] = [];
+  for (let index = 0; index < 24; index += 1) {
+    const angle = (index / 24) * Math.PI * 2;
+    const radius = 105;
+    entries.push({
+      x: cx + Math.cos(angle) * radius,
+      y: 0.08,
+      z: cz + Math.sin(angle) * radius,
+      sx: 8 + (index % 4) * 2.5,
+      sy: 0.18,
+      sz: 2.2,
+      ry: -angle,
+      color: index % 3 === 0 ? 0xd8e2af : index % 3 === 1 ? 0xc8d7a0 : 0xe2ca9a,
+    });
+  }
+  return entries;
 }
 
-function addLandmarks(root: THREE.Group, cx: number, cz: number, hw: number, hd: number): void {
-  const landmarkRoot = new THREE.Group();
-  landmarkRoot.name = "phase80-region-landmarks";
+function createLandmarkBoxes(cx: number, cz: number, hw: number, hd: number): InstanceEntry[] {
+  const entries: InstanceEntry[] = [];
+  const push = (sx: number, sy: number, sz: number, x: number, y: number, z: number, color: number, ry = 0, rz = 0) => {
+    entries.push({ x, y, z, sx, sy, sz, color, ry, rz });
+  };
 
-  // DROP YARD: a monumental gantry just beyond the north edge.
+  // DROP YARD: monumental gantry beyond the north edge.
   const dropZ = cz - hd - 7;
-  landmarkBox(landmarkRoot, [4, 18, 4], [cx - 17, 9, dropZ], 0x5f9f87);
-  landmarkBox(landmarkRoot, [4, 18, 4], [cx + 17, 9, dropZ], 0x5f9f87);
-  landmarkBox(landmarkRoot, [38, 3.2, 4], [cx, 17, dropZ], 0xe8d690);
-  for (const x of [-11, -5.5, 0, 5.5, 11]) landmarkBox(landmarkRoot, [1.2, 5.5, 0.8], [cx + x, 13.2, dropZ + 0.5], 0xf0b48c, x * 0.008);
+  push(4, 18, 4, cx - 17, 9, dropZ, 0x5f9f87);
+  push(4, 18, 4, cx + 17, 9, dropZ, 0x5f9f87);
+  push(38, 3.2, 4, cx, 17, dropZ, 0xe8d690);
+  for (const x of [-11, -5.5, 0, 5.5, 11]) push(1.2, 5.5, 0.8, cx + x, 13.2, dropZ + 0.5, 0xf0b48c, x * 0.008);
 
-  // SMASH GARDEN: giant angular stone teeth outside the west edge.
+  // SMASH GARDEN: giant angular stone teeth beyond the west edge.
   const smashX = cx - hw - 9;
   for (let index = 0; index < 4; index += 1) {
-    const monolith = landmarkBox(
-      landmarkRoot,
-      [7 + index * 1.2, 15 + index * 3.3, 6.5],
-      [smashX - index * 3.2, 7.5 + index * 1.65, cz - 24 + index * 17],
-      index % 2 === 0 ? 0x8e8793 : 0xa29aa3,
-      -0.24 + index * 0.11,
-    );
-    monolith.rotation.z = index % 2 === 0 ? -0.08 : 0.08;
+    push(7 + index * 1.2, 15 + index * 3.3, 6.5, smashX - index * 3.2, 7.5 + index * 1.65, cz - 24 + index * 17,
+      index % 2 === 0 ? 0x8e8793 : 0xa29aa3, -0.24 + index * 0.11, index % 2 === 0 ? -0.08 : 0.08);
   }
 
   // SPRINT LANE: repeated high arches beyond the east edge.
   const sprintX = cx + hw + 8;
   for (let index = 0; index < 5; index += 1) {
     const z = cz - 42 + index * 21;
-    landmarkBox(landmarkRoot, [2, 13, 2], [sprintX - 5.5, 6.5, z], 0x65aeca);
-    landmarkBox(landmarkRoot, [2, 13, 2], [sprintX + 5.5, 6.5, z], 0x65aeca);
-    landmarkBox(landmarkRoot, [13, 1.5, 2], [sprintX, 12.4, z], index % 2 === 0 ? 0xf3d56c : 0xe7b96f);
+    push(2, 13, 2, sprintX - 5.5, 6.5, z, 0x65aeca);
+    push(2, 13, 2, sprintX + 5.5, 6.5, z, 0x65aeca);
+    push(13, 1.5, 2, sprintX, 12.4, z, index % 2 === 0 ? 0xf3d56c : 0xe7b96f);
   }
 
-  // CROWN GROUNDS: tall crown towers beyond the south edge.
+  // CROWN GROUNDS: crown towers beyond the south edge.
   const crownZ = cz + hd + 8;
   for (const side of [-1, 1]) {
     const x = cx + side * 16;
-    landmarkBox(landmarkRoot, [5.2, 24, 5.2], [x, 12, crownZ], 0x9a7dc0);
-    for (const spike of [-1, 0, 1]) {
-      const crown = landmarkBox(landmarkRoot, [1.8, 7 + Math.abs(spike) * 2, 1.8], [x + spike * 3.2, 25.5, crownZ], 0xd8b5e5);
-      crown.rotation.z = spike * 0.12;
-    }
+    push(5.2, 24, 5.2, x, 12, crownZ, 0x9a7dc0);
+    for (const spike of [-1, 0, 1]) push(1.8, 7 + Math.abs(spike) * 2, 1.8, x + spike * 3.2, 25.5, crownZ, 0xd8b5e5, 0, spike * 0.12);
   }
-  landmarkBox(landmarkRoot, [37, 2, 3], [cx, 18.5, crownZ], 0xe9d8ee);
+  push(37, 2, 3, cx, 18.5, crownZ, 0xe9d8ee);
 
-  // CROSSFIRE GARDEN: floating ring and fins overhead, keeping the drive surface unobstructed.
+  // CROSSFIRE GARDEN: fins orbit a floating ring above the drive surface.
+  for (let index = 0; index < 4; index += 1) {
+    const angle = index * Math.PI * 0.5 + Math.PI * 0.25;
+    push(1.2, 7.5, 3.4, cx + Math.cos(angle) * 15, 18.5, cz + Math.sin(angle) * 15, 0xf1ca72, angle);
+  }
+  return entries;
+}
+
+function addLandmarks(root: THREE.Group, cx: number, cz: number, hw: number, hd: number): void {
+  const landmarkRoot = new THREE.Group();
+  landmarkRoot.name = "phase80-region-landmarks";
+  addBoxInstances(landmarkRoot, "phase80-landmark-boxes", createLandmarkBoxes(cx, cz, hw, hd), 0.76);
   const ring = new THREE.Mesh(
     new THREE.TorusGeometry(12, 0.72, 8, 32),
     new THREE.MeshStandardMaterial({ color: 0x66c6bb, roughness: 0.62, metalness: 0.04, flatShading: true, emissive: 0x143d39, emissiveIntensity: 0.22 }),
@@ -313,48 +306,26 @@ function addLandmarks(root: THREE.Group, cx: number, cz: number, hw: number, hd:
   ring.castShadow = false;
   ring.receiveShadow = false;
   landmarkRoot.add(ring);
-  for (let index = 0; index < 4; index += 1) {
-    const angle = index * Math.PI * 0.5 + Math.PI * 0.25;
-    landmarkBox(landmarkRoot, [1.2, 7.5, 3.4], [cx + Math.cos(angle) * 15, 18.5, cz + Math.sin(angle) * 15], 0xf1ca72, angle);
-  }
-
   root.add(landmarkRoot);
-}
-
-function addBackdropBands(root: THREE.Group, cx: number, cz: number): void {
-  const entries: SurfacePatch[] = [];
-  for (let index = 0; index < 24; index += 1) {
-    const angle = (index / 24) * Math.PI * 2;
-    const radius = 105;
-    entries.push({
-      x: cx + Math.cos(angle) * radius,
-      z: cz + Math.sin(angle) * radius,
-      width: 8 + (index % 4) * 2.5,
-      depth: 2.2,
-      rotation: -angle,
-      color: index % 3 === 0 ? 0xd8e2af : index % 3 === 1 ? 0xc8d7a0 : 0xe2ca9a,
-      y: 0.08,
-    });
-  }
-  addInstancedBoxes(root, "phase80-backdrop-bands", entries, 0.18);
 }
 
 export function buildCartEnvironmentRichness(scene: THREE.Scene): THREE.Group {
   const root = new THREE.Group();
   root.name = "phase80-environment-richness";
   const { centerX: cx, centerZ: cz, halfWidth: hw, halfDepth: hd } = CART_TURBO_HUNT_FIELD;
-  addInstancedBoxes(root, "phase80-surface-patches", createSurfacePatches(cx, cz), 0.04);
-  addRoadRhythm(root, cx, cz);
+  addBoxInstances(root, "phase80-surface-patches", createSurfacePatches(cx, cz));
+  addBoxInstances(root, "phase80-road-rhythm", createRoadRhythm(cx, cz), 0.82);
   addLowScenery(root, cx, cz);
   addTreeGroves(root, cx, cz);
   addDistantHills(root, cx, cz);
-  addBackdropBands(root, cx, cz);
+  addBoxInstances(root, "phase80-backdrop-bands", createBackdropBands(cx, cz));
   addLandmarks(root, cx, cz, hw, hd);
   root.userData.environmentRichness = {
     counts: { ...CART_ENVIRONMENT_RICHNESS_COUNTS },
     drawCallBudget: CART_ENVIRONMENT_RICHNESS_DRAW_CALL_BUDGET,
     textureless: true,
     gameplayCollisionChanged: false,
+    staticOnly: true,
   };
   scene.add(root);
   return root;
