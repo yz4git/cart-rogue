@@ -125,7 +125,7 @@ test("Hunt Orders reuse existing perk drafts at stable non-spatial milestones", 
   assert.equal(cartTurboHuntPerkMilestone(8), 4);
 });
 
-test("Turbo Hunt presentation, battery, environment, events, impact and boss layers preserve runtime order", () => {
+test("Turbo Hunt presentation, battery, environment, events, impact, boss and threat layers preserve runtime order", () => {
   const huntIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase67TurboHunt");
   const phase66Index = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase66TurboChainReward");
   const perkIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase74TurboHuntPerkMilestones");
@@ -135,6 +135,9 @@ test("Turbo Hunt presentation, battery, environment, events, impact and boss lay
   const eventsIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase81EventDirector2");
   const impactIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase82ImpactSpeed3");
   const bossIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase83Boss2");
+  const threatIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase84ThreatDodge");
+  const pursuitIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase85PursuitEvents");
+  const predatorIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase86BossPredator");
   assert.ok(huntIndex > phase66Index);
   assert.ok(perkIndex > huntIndex);
   assert.ok(guardIndex > perkIndex);
@@ -143,7 +146,10 @@ test("Turbo Hunt presentation, battery, environment, events, impact and boss lay
   assert.ok(eventsIndex > environmentIndex);
   assert.ok(impactIndex > eventsIndex);
   assert.ok(bossIndex > impactIndex);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase83Boss2");
+  assert.ok(threatIndex > bossIndex);
+  assert.ok(pursuitIndex > threatIndex);
+  assert.ok(predatorIndex > pursuitIndex);
+  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase86BossPredator");
 });
 
 test("design records continuous-field acceptance criteria before implementation", () => {
