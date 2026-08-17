@@ -26,7 +26,7 @@ import {
 } from "../src/cart/CartRoguePhase66TurboChainReward";
 
 const HOLD = { throttle: 0, brake: 0, steer: 0, boost: true } as const;
-const RELEASE = { throttle: 0, brake: 0, steer: 0, boost: false } as const;
+const RELEASE = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
 const visualSource = readFileSync(new URL("../src/cart/CartRoguePhase65PerfectCombatVisual.ts", import.meta.url), "utf8");
 const runtimeSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 
@@ -114,8 +114,9 @@ test("Phases 61-64 turn a precise charged release into assist, perfect bonus, sp
     const { primary, secondary } = preparePerfectStrike(session);
     const primaryHp = primary.hp;
     const secondaryHp = secondary.hp;
-    // Keep targets stationary through the release so the integration fixture
-    // tests the authored combat chain rather than enemy AI/bounds correction.
+    // Keep targets stationary while charging. The release mirrors real driving
+    // input with throttle held so RallyCar actually spends a Turbo charge and
+    // Phase 15 opens the Perfect window before the forward strike resolves.
     for (let frame = 0; frame < 52; frame += 1) session.step(HOLD);
     session.step(RELEASE);
 
