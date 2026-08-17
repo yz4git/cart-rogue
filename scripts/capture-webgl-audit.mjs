@@ -71,13 +71,15 @@ async function readGameplayAudit(sessionId) {
   `);
 }
 
-async function setAuditKeys(sessionId, down) {
+async function setAuditKeys(sessionId, down, keepThrottle = false) {
   await execute(sessionId, `
-    const type = arguments[0] ? 'keydown' : 'keyup';
-    window.dispatchEvent(new KeyboardEvent(type, { key: 'Shift', code: 'ShiftLeft', bubbles: true, cancelable: true }));
-    window.dispatchEvent(new KeyboardEvent(type, { key: 'ArrowRight', code: 'ArrowRight', bubbles: true, cancelable: true }));
+    const driveType = arguments[0] ? 'keydown' : 'keyup';
+    const throttleType = (arguments[0] || arguments[1]) ? 'keydown' : 'keyup';
+    window.dispatchEvent(new KeyboardEvent(driveType, { key: 'Shift', code: 'ShiftLeft', bubbles: true, cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent(driveType, { key: 'ArrowRight', code: 'ArrowRight', bubbles: true, cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent(throttleType, { key: 'ArrowUp', code: 'ArrowUp', bubbles: true, cancelable: true }));
     return true;
-  `, [down]);
+  `, [down, keepThrottle]);
 }
 
 const driver = spawn(driverBin, [`--port=${driverPort}`, "--allowed-origins=*"], {
@@ -216,7 +218,7 @@ try {
   // Headless Chrome can advance rAF simulation much more slowly than wall
   // clock time. Hold the real Turbo input until the gameplay/render runtime
   // itself reports the authored READY state instead of releasing after a
-  // guessed sleep duration.
+  // guessed sleep duration. ArrowUp stays down so release can activate Turbo.
   await setAuditKeys(sessionId, true);
   let dynamicTurboDriftDiagnostics = null;
   for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -247,12 +249,12 @@ try {
   state.dynamicTurboDriftDiagnostics = dynamicTurboDriftDiagnostics;
   state.dynamicGameplayAudit = dynamicGameplayAudit;
 
-  // Releasing Shift is the offensive commit in Turbo 2.0. Prefer a live attack
-  // sample, but also accept the presentation latch written only when a real
-  // WebGL update rendered the short attack envelope. This keeps the gameplay
-  // timing at 0.26-0.44s while making sparse headless scheduling observable.
+  // Releasing Shift is the offensive commit in Turbo 2.0. Keep ArrowUp held
+  // for the release frame because RallyCar intentionally requires throttle to
+  // consume a Turbo stock. Prefer a live attack sample, but also accept the
+  // presentation latch written only after a real WebGL attack frame renders.
   const observedSerialBeforeRelease = dynamicTurboDriftDiagnostics.turboAttackObservedAttackSerial ?? 0;
-  await setAuditKeys(sessionId, false);
+  await setAuditKeys(sessionId, false, true);
   let releaseTurboAttackDiagnostics = null;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     await sleep(35);
@@ -267,6 +269,7 @@ try {
       break;
     }
   }
+  await setAuditKeys(sessionId, false, false);
   const releasePeak = Math.max(
     releaseTurboAttackDiagnostics?.turboAttackIntensity ?? 0,
     releaseTurboAttackDiagnostics?.turboAttackPeakIntensity ?? 0,
