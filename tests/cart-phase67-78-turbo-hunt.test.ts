@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { CART_ROGUE_RUNTIME_PHASE_ORDER } from "../src/cart/CartRogueRuntime";
 import { CartArenaSession } from "../src/cart/CartArenaSession";
 import { getCartTurboAttackState } from "../src/cart/CartRoguePhase54TurboAttack";
 import {
@@ -14,8 +15,8 @@ import {
   enableCartTurboHunt,
   getCartTurboHuntSnapshot,
 } from "../src/cart/CartRoguePhase67TurboHunt";
+import { cartTurboHuntPerkMilestone } from "../src/cart/CartRoguePhase74TurboHuntPerkMilestones";
 import { CART_TURBO_HUNT_FIELD, CART_TURBO_HUNT_TRACK } from "../src/cart/CartTurboHuntTrack";
-import { CART_ROGUE_RUNTIME_PHASE_ORDER } from "../src/cart/CartRogueRuntime";
 
 const design = readFileSync(new URL("../docs/TURBO_HUNT_DESIGN.md", import.meta.url), "utf8");
 
@@ -110,12 +111,23 @@ test("a live Turbo Hunt session stays gate-free and preserves pivot-to-release T
   assert.ok(session.car.boostCharges < chargesBeforeRelease);
 });
 
+test("Hunt Orders reuse existing perk drafts at stable non-spatial milestones", () => {
+  assert.equal(cartTurboHuntPerkMilestone(0), null);
+  assert.equal(cartTurboHuntPerkMilestone(1), null);
+  assert.equal(cartTurboHuntPerkMilestone(2), 2);
+  assert.equal(cartTurboHuntPerkMilestone(3), 2);
+  assert.equal(cartTurboHuntPerkMilestone(4), 4);
+  assert.equal(cartTurboHuntPerkMilestone(8), 4);
+});
+
 test("Turbo Hunt is installed after the proven combat stack and its presentation guard is last", () => {
   const huntIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase67TurboHunt");
   const phase66Index = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase66TurboChainReward");
+  const perkIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase74TurboHuntPerkMilestones");
   const guardIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase78TurboHuntPresentationGuard");
   assert.ok(huntIndex > phase66Index);
-  assert.ok(guardIndex > huntIndex);
+  assert.ok(perkIndex > huntIndex);
+  assert.ok(guardIndex > perkIndex);
   assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase78TurboHuntPresentationGuard");
 });
 
