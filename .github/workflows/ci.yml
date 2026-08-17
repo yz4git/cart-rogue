@@ -27,6 +27,8 @@ jobs:
         run: npm run build
       - name: Turbo Hunt regression
         run: node --import tsx --test tests/cart-phase67-78-turbo-hunt.test.ts
+      - name: Battery performance regression
+        run: node --import tsx --test tests/cart-phase79-performance-battery.test.ts
       - name: Test
         run: npm test
       - name: Lint
