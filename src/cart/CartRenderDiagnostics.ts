@@ -226,6 +226,7 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
     LEGACY_GROUND_NAMES.map((name) => [name, objectState(scene, name)]),
   ) as Record<string, CartRenderObjectState>;
   const environmentRoot = scene.getObjectByName("phase80-environment-richness") ?? null;
+  const turboHuntWorld = scene.getObjectByName("phase67-turbo-hunt-world") ?? null;
   const environmentRichness = objectState(scene, "phase80-environment-richness");
   const environmentInstancedMeshCount = countVisibleInstancedMeshes(environmentRoot);
   const environmentRenderableMeshCount = countVisibleRenderableMeshes(environmentRoot);
@@ -269,11 +270,11 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
   if (environmentRoot && (environmentRoadRhythmY === null || environmentRoadRhythmY <= (environmentSurfaceY ?? 0))) {
     issues.push(`Phase80 road rhythm is not layered above the surface patches: ${environmentRoadRhythmY}`);
   }
-  if (environmentRoot && !impactSpeedRoot.exists) issues.push("Phase82 impact/speed root is missing");
-  if (environmentRoot && !impactSpeedLineState.exists) issues.push("Phase82 speed-line batch is missing");
-  if (environmentRoot && !titanVisualRoot.exists) issues.push("Phase83 Titan visual root is missing");
-  if (environmentRoot && !titanArmorRing.exists) issues.push("Phase83 Titan armor ring is missing");
-  if (environmentRoot && !titanWeakCore.exists) issues.push("Phase83 Titan weak core is missing");
+  if (turboHuntWorld && !impactSpeedRoot.exists) issues.push("Phase82 impact/speed root is missing");
+  if (turboHuntWorld && !impactSpeedLineState.exists) issues.push("Phase82 speed-line batch is missing");
+  if (turboHuntWorld && !titanVisualRoot.exists) issues.push("Phase83 Titan visual root is missing");
+  if (turboHuntWorld && !titanArmorRing.exists) issues.push("Phase83 Titan armor ring is missing");
+  if (turboHuntWorld && !titanWeakCore.exists) issues.push("Phase83 Titan weak core is missing");
   if (!camera.exists || camera.fov === null || camera.y === null) issues.push("perspective chase camera is missing");
   else {
     if (camera.fov < 50 || camera.fov > 66) issues.push(`camera FOV is outside the intended chase range: ${camera.fov}`);
