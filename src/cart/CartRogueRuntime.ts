@@ -59,6 +59,7 @@ import "./CartRoguePhase64TurboHitStun";
 import "./CartRoguePhase65PerfectCombatVisual";
 import "./CartRoguePhase66TurboChainReward";
 import "./CartRoguePhase67TurboHunt";
+import "./CartRoguePhase78TurboHuntPresentationGuard";
 import "./CartGameplayAuditRuntime";
 import "./CartRenderAuditRuntime";
 
@@ -129,4 +130,5 @@ export const CART_ROGUE_RUNTIME_PHASE_ORDER = [
   "CartRoguePhase65PerfectCombatVisual",
   "CartRoguePhase66TurboChainReward",
   "CartRoguePhase67TurboHunt",
+  "CartRoguePhase78TurboHuntPresentationGuard",
 ] as const;
