@@ -11,6 +11,7 @@ const phase48Source = read("../src/cart/CartRoguePhase48RouteExitCompletion.ts")
 const phase50Source = read("../src/cart/CartRoguePhase50Arena03CenterClearance.ts");
 const compatibilitySource = read("../src/cart/CartTrackCompatibility.ts");
 const phase51Source = read("../src/cart/CartRoguePhase51Arena03Gate.ts");
+const phase53Source = read("../src/cart/CartRoguePhase53Handling2.ts");
 const gateRulesSource = read("../src/cart/CartArena03GateRules.ts");
 const gateVisualSource = read("../src/cart/CartArena03GateVisual.ts");
 
@@ -21,7 +22,11 @@ test("refactor keeps runtime composition out of the React presentation wrapper",
   const phaseImports = Array.from(runtimeSource.matchAll(/import "\.\/(CartRoguePhase[^"]+)";/g), (match) => match[1]);
   assert.ok(phaseImports.length >= 40, `expected the centralized runtime to own the phase chain, got ${phaseImports.length}`);
   assert.equal(new Set(phaseImports).size, phaseImports.length, "runtime phase imports must not be duplicated");
-  assert.equal(phaseImports.at(-1), "CartRoguePhase51Arena03Gate");
+  assert.equal(phaseImports.at(-1), "CartRoguePhase53Handling2");
+  assert.ok(
+    phaseImports.indexOf("CartRoguePhase53Handling2") > phaseImports.indexOf("CartRoguePhase51Arena03Gate"),
+    "Handling 2.0 must remain the final gameplay steering authority after traversal/gate corrections",
+  );
 });
 
 test("late traversal phases delegate shared placement and intent calculations", () => {
@@ -47,4 +52,10 @@ test("Arena 03 gate bootstrap keeps gameplay rules and Three.js visuals separate
   assert.doesNotMatch(gateRulesSource, /from "three"/);
   assert.match(gateVisualSource, /from "three"/);
   assert.match(gateVisualSource, /updateGate\("arena-03"/);
+});
+
+test("Handling 2.0 stays presentation-free and delegates shared horizontal velocity math", () => {
+  assert.doesNotMatch(phase53Source, /from "three"/);
+  assert.match(phase53Source, /CartHandlingProfile/);
+  assert.match(phase53Source, /cartTraversalSyncHorizontalVelocity/);
 });
