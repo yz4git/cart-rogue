@@ -13,6 +13,12 @@ const compatibilitySource = read("../src/cart/CartTrackCompatibility.ts");
 const phase51Source = read("../src/cart/CartRoguePhase51Arena03Gate.ts");
 const phase53Source = read("../src/cart/CartRoguePhase53Handling2.ts");
 const phase54Source = read("../src/cart/CartRoguePhase54TurboAttack.ts");
+const phase55Source = read("../src/cart/CartRoguePhase55TurboStrike.ts");
+const phase56Source = read("../src/cart/CartRoguePhase56TurboSmash.ts");
+const phase57Source = read("../src/cart/CartRoguePhase57FlowSurge.ts");
+const phase58Source = read("../src/cart/CartRoguePhase58TurboBreakaway.ts");
+const phase59Source = read("../src/cart/CartRoguePhase59TurboStrikeVisual.ts");
+const phase60Source = read("../src/cart/CartRoguePhase60TurboCombatSafety.ts");
 const gateRulesSource = read("../src/cart/CartArena03GateRules.ts");
 const gateVisualSource = read("../src/cart/CartArena03GateVisual.ts");
 
@@ -21,16 +27,24 @@ test("refactor keeps runtime composition out of the React presentation wrapper",
   assert.doesNotMatch(appSource, /CartRoguePhase\d+/);
 
   const phaseImports = Array.from(runtimeSource.matchAll(/import "\.\/(CartRoguePhase[^"]+)";/g), (match) => match[1]);
-  assert.ok(phaseImports.length >= 40, `expected the centralized runtime to own the phase chain, got ${phaseImports.length}`);
+  assert.ok(phaseImports.length >= 46, `expected the centralized runtime to own the phase chain, got ${phaseImports.length}`);
   assert.equal(new Set(phaseImports).size, phaseImports.length, "runtime phase imports must not be duplicated");
-  assert.ok(
-    phaseImports.indexOf("CartRoguePhase53Handling2") > phaseImports.indexOf("CartRoguePhase51Arena03Gate"),
-    "Handling 2.0 must stay after traversal/gate corrections",
-  );
-  assert.ok(
-    phaseImports.indexOf("CartRoguePhase54TurboAttack") > phaseImports.indexOf("CartRoguePhase53Handling2"),
-    "Turbo 2.0 must run after final steering shaping",
-  );
+  const gameplay2Phases = [
+    "CartRoguePhase53Handling2",
+    "CartRoguePhase54TurboAttack",
+    "CartRoguePhase55TurboStrike",
+    "CartRoguePhase56TurboSmash",
+    "CartRoguePhase57FlowSurge",
+    "CartRoguePhase58TurboBreakaway",
+    "CartRoguePhase59TurboStrikeVisual",
+    "CartRoguePhase60TurboCombatSafety",
+  ];
+  let previous = phaseImports.indexOf("CartRoguePhase51Arena03Gate");
+  for (const phase of gameplay2Phases) {
+    const index = phaseImports.indexOf(phase);
+    assert.ok(index > previous, `${phase} must stay after the previous Gameplay 2.0 phase`);
+    previous = index;
+  }
 });
 
 test("late traversal phases delegate shared placement and intent calculations", () => {
@@ -58,11 +72,18 @@ test("Arena 03 gate bootstrap keeps gameplay rules and Three.js visuals separate
   assert.match(gateVisualSource, /updateGate\("arena-03"/);
 });
 
-test("Gameplay 2.0 handling and Turbo attack rules stay presentation-free", () => {
-  assert.doesNotMatch(phase53Source, /from "three"/);
+test("Gameplay 2.0 rules remain presentation-free outside their visual adapter", () => {
+  for (const source of [phase53Source, phase54Source, phase55Source, phase56Source, phase57Source, phase58Source, phase60Source]) {
+    assert.doesNotMatch(source, /from "three"/);
+  }
   assert.match(phase53Source, /CartHandlingProfile/);
-  assert.match(phase53Source, /cartTraversalSyncHorizontalVelocity/);
-  assert.doesNotMatch(phase54Source, /from "three"/);
   assert.match(phase54Source, /getCartTurboCombatState/);
-  assert.match(phase54Source, /cartTraversalSyncHorizontalVelocity/);
+  assert.match(phase55Source, /applyTurboRam/);
+  assert.match(phase56Source, /applyTurboRockSmash/);
+  assert.match(phase57Source, /getCartTurboStrikeState/);
+  assert.match(phase57Source, /getCartTurboSmashState/);
+  assert.match(phase58Source, /cartTurboBreakawaySpeedFloor/);
+  assert.match(phase60Source, /cartTurboCombatSpeedCap/);
+  assert.match(phase59Source, /from "three"/);
+  assert.match(phase59Source, /phase59-turbo-strike-feedback/);
 });

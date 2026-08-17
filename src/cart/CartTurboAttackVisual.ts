@@ -28,6 +28,8 @@ function buildAttackFrame(demo: Phase54VisualDemo): AttackVisualState {
   root.name = "phase54-turbo-attack-frame";
   root.visible = false;
   root.position.set(0, 0.52, 2.35);
+  root.userData.cartTurboAttackObservedAttackSerial = 0;
+  root.userData.cartTurboAttackPeakIntensity = 0;
 
   const material = new THREE.MeshBasicMaterial({
     color: CHARGE_COLOR,
@@ -78,6 +80,18 @@ function updateAttackFrame(demo: Phase54VisualDemo): void {
   visual.root.userData.cartTurboAttackMode = attack.mode;
   visual.root.userData.cartTurboAttackIntensity = attack.intensity;
   visual.root.userData.cartTurboAttackSerial = attack.serial;
+
+  // Keep durable evidence that the WebGL presentation actually rendered an
+  // attack frame. Headless Chrome can miss the short live envelope between
+  // remote diagnostic polls, while this latch is written only from a real
+  // visual update with attack mode active.
+  if (attack.mode === "attack") {
+    visual.root.userData.cartTurboAttackObservedAttackSerial = attack.serial;
+    visual.root.userData.cartTurboAttackPeakIntensity = Math.max(
+      Number(visual.root.userData.cartTurboAttackPeakIntensity) || 0,
+      attack.intensity,
+    );
+  }
 
   if (attack.mode === "idle" || attack.intensity <= 0.01) {
     visual.root.visible = false;

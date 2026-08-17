@@ -28,6 +28,9 @@ export interface CartRenderDiagnostics {
   turboAttackFrame?: CartRenderObjectState;
   turboAttackMode?: string | null;
   turboAttackIntensity?: number;
+  turboAttackSerial?: number;
+  turboAttackObservedAttackSerial?: number;
+  turboAttackPeakIntensity?: number;
   exitGuide: CartRenderObjectState;
   compactUndertray: CartRenderObjectState;
   heroPresentationPitch: number | null;
@@ -105,14 +108,27 @@ function heroPresentationRotation(scene: THREE.Scene): { pitch: number | null; r
   };
 }
 
-function turboAttackState(scene: THREE.Scene): { state: CartRenderObjectState; mode: string | null; intensity: number } {
+function finiteUserDataNumber(object: THREE.Object3D | null, key: string): number {
+  const value = object?.userData[key];
+  return Number.isFinite(value) ? Number(value) : 0;
+}
+
+function turboAttackState(scene: THREE.Scene): {
+  state: CartRenderObjectState;
+  mode: string | null;
+  intensity: number;
+  serial: number;
+  observedAttackSerial: number;
+  peakIntensity: number;
+} {
   const object = scene.getObjectByName("phase54-turbo-attack-frame") ?? null;
   return {
     state: { exists: object !== null, visible: isEffectivelyVisible(object) },
     mode: typeof object?.userData.cartTurboAttackMode === "string" ? object.userData.cartTurboAttackMode : null,
-    intensity: Number.isFinite(object?.userData.cartTurboAttackIntensity)
-      ? Number(object?.userData.cartTurboAttackIntensity)
-      : 0,
+    intensity: finiteUserDataNumber(object, "cartTurboAttackIntensity"),
+    serial: finiteUserDataNumber(object, "cartTurboAttackSerial"),
+    observedAttackSerial: finiteUserDataNumber(object, "cartTurboAttackObservedAttackSerial"),
+    peakIntensity: finiteUserDataNumber(object, "cartTurboAttackPeakIntensity"),
   };
 }
 
@@ -199,6 +215,9 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
     turboAttackFrame: turboAttack.state,
     turboAttackMode: turboAttack.mode,
     turboAttackIntensity: turboAttack.intensity,
+    turboAttackSerial: turboAttack.serial,
+    turboAttackObservedAttackSerial: turboAttack.observedAttackSerial,
+    turboAttackPeakIntensity: turboAttack.peakIntensity,
     exitGuide: objectState(scene, "phase45-exit-guide"),
     compactUndertray: objectState(scene, "phase44-dark-compact-undertray"),
     heroPresentationPitch: heroRotation.pitch,
