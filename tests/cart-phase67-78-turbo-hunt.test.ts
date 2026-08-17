@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { CartArenaSession } from "../src/cart/CartArenaSession";
 import {
   cartTurboHuntActiveTargetCount,
   cartTurboHuntPhaseFor,
@@ -9,6 +10,8 @@ import {
   createCartTurboHuntEnemyPool,
   createCartTurboHuntObstacles,
   createCartTurboHuntResources,
+  enableCartTurboHunt,
+  getCartTurboHuntSnapshot,
 } from "../src/cart/CartRoguePhase67TurboHunt";
 import { CART_TURBO_HUNT_FIELD, CART_TURBO_HUNT_TRACK } from "../src/cart/CartTurboHuntTrack";
 import { CART_ROGUE_RUNTIME_PHASE_ORDER } from "../src/cart/CartRogueRuntime";
@@ -79,11 +82,31 @@ test("rocks and pickups are fixed-size field pools rather than corridor rewards"
   assert.ok(pickups.some((pickup) => pickup.kind === "gas"));
 });
 
-test("Turbo Hunt is installed after the proven Phase 55-66 combat stack", () => {
+test("a live Turbo Hunt session stays gate-free and keeps stationary Turbo pivot steering", () => {
+  const session = new CartArenaSession();
+  enableCartTurboHunt(session);
+  const startHeading = session.car.heading;
+  for (let index = 0; index < 36; index += 1) {
+    session.step({ throttle: 1, brake: 0, steer: 1, boost: true }, 1 / 60);
+  }
+  const hunt = getCartTurboHuntSnapshot(session);
+  const snapshot = session.snapshot();
+  assert.equal(hunt?.gameMode, "turbo-hunt");
+  assert.equal(snapshot.nodeId, "hunt-field");
+  assert.equal(snapshot.gateLocked, false);
+  assert.ok(snapshot.enemiesAlive >= 6);
+  assert.ok(Math.abs(session.car.heading - startHeading) > 0.15);
+  assert.ok(Math.abs(session.car.forwardVelocity) < 0.1);
+  assert.equal(snapshot.runComplete, false);
+});
+
+test("Turbo Hunt is installed after the proven combat stack and its presentation guard is last", () => {
   const huntIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase67TurboHunt");
   const phase66Index = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase66TurboChainReward");
+  const guardIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase78TurboHuntPresentationGuard");
   assert.ok(huntIndex > phase66Index);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase67TurboHunt");
+  assert.ok(guardIndex > huntIndex);
+  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase78TurboHuntPresentationGuard");
 });
 
 test("design records continuous-field acceptance criteria before implementation", () => {
