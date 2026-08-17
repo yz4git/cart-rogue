@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { CART_ROGUE_RUNTIME_PHASE_ORDER } from "../src/cart/CartRogueRuntime";
 import { CartArenaSession } from "../src/cart/CartArenaSession";
+import { getCartTurboCombatState } from "../src/cart/CartRoguePhase15Turbo";
 import { getCartTurboAttackState } from "../src/cart/CartRoguePhase54TurboAttack";
 import {
   cartTurboHuntActiveTargetCount,
@@ -93,6 +94,7 @@ test("a live Turbo Hunt session stays gate-free and preserves pivot-to-release T
   }
   const hunt = getCartTurboHuntSnapshot(session);
   let snapshot = session.snapshot();
+  const charged = getCartTurboCombatState(session);
   assert.equal(hunt?.gameMode, "turbo-hunt");
   assert.equal(snapshot.nodeId, "hunt-field");
   assert.equal(snapshot.gateLocked, false);
@@ -100,15 +102,18 @@ test("a live Turbo Hunt session stays gate-free and preserves pivot-to-release T
   assert.ok(Math.abs(session.car.heading - startHeading) > 0.15);
   assert.ok(Math.abs(session.car.forwardVelocity) < 0.1);
   assert.equal(snapshot.runComplete, false);
+  assert.equal(charged.held, true);
+  assert.ok(charged.charge >= 0.98, `expected full charge, got ${JSON.stringify(charged)}`);
 
   const chargesBeforeRelease = session.car.boostCharges;
   session.step({ throttle: 1, brake: 0, steer: 0, boost: false }, 1 / 60);
   snapshot = session.snapshot();
+  const released = getCartTurboCombatState(session);
   const attack = getCartTurboAttackState(session);
-  assert.equal(attack.mode, "attack");
+  assert.ok(session.car.boostCharges < chargesBeforeRelease, `release did not spend Turbo: before=${chargesBeforeRelease} after=${session.car.boostCharges} released=${JSON.stringify(released)}`);
+  assert.equal(snapshot.boostActive, true, `release did not activate boost: ${JSON.stringify(released)}`);
+  assert.equal(attack.mode, "attack", `release did not open attack: ${JSON.stringify({ released, attack })}`);
   assert.ok(attack.attackSecondsRemaining >= 0.25);
-  assert.equal(snapshot.boostActive, true);
-  assert.ok(session.car.boostCharges < chargesBeforeRelease);
 });
 
 test("Hunt Orders reuse existing perk drafts at stable non-spatial milestones", () => {
