@@ -35,6 +35,8 @@ jobs:
         run: node --import tsx --test tests/cart-phase81-83-hunt-evolution.test.ts
       - name: Threat and pursuit regression
         run: npm run test:threat
+      - name: iPhone landscape UI regression
+        run: node --import tsx --test tests/cart-iphone-landscape-ui.test.ts
       - name: Test
         run: npm test
       - name: Lint
