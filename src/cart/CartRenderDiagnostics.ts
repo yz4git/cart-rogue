@@ -30,6 +30,14 @@ export interface CartRenderDiagnostics {
   environmentSafeColorPipeline: string | null;
   environmentSurfaceY: number | null;
   environmentRoadRhythmY: number | null;
+  impactSpeedRoot: CartRenderObjectState;
+  impactSpeedLineState: CartRenderObjectState;
+  impactSpeedIntensity: number;
+  impactEventChain: number;
+  impactOverdriveSeconds: number;
+  titanVisualRoot: CartRenderObjectState;
+  titanArmorRing: CartRenderObjectState;
+  titanWeakCore: CartRenderObjectState;
   stationaryTurboSkids: CartRenderObjectState;
   stationaryTurboSkidActiveCount: number;
   turboAttackFrame?: CartRenderObjectState;
@@ -233,6 +241,15 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
   const environmentSafeColorPipeline = nestedString(environmentRoot, "safeColorPipeline");
   const environmentSurfaceY = finiteNestedNumber(environmentRoot, "surfaceY");
   const environmentRoadRhythmY = finiteNestedNumber(environmentRoot, "roadRhythmY");
+  const impactRoot = scene.getObjectByName("phase82-impact-speed-root") ?? null;
+  const impactSpeedRoot = objectState(scene, "phase82-impact-speed-root");
+  const impactSpeedLineState = objectState(scene, "phase82-speed-lines");
+  const impactSpeedIntensity = finiteUserDataNumber(impactRoot, "cartSpeedIntensity");
+  const impactEventChain = finiteUserDataNumber(impactRoot, "cartEventChain");
+  const impactOverdriveSeconds = finiteUserDataNumber(impactRoot, "cartOverdriveSeconds");
+  const titanVisualRoot = objectState(scene, "phase83-titan-visual-root");
+  const titanArmorRing = objectState(scene, "phase83-titan-armor-ring");
+  const titanWeakCore = objectState(scene, "phase83-titan-weak-core");
   const camera = cameraState(scene);
   const heroRotation = heroPresentationRotation(scene);
   const turboAttack = turboAttackState(scene);
@@ -260,6 +277,11 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
   if (environmentRoot && (environmentRoadRhythmY === null || environmentRoadRhythmY <= (environmentSurfaceY ?? 0))) {
     issues.push(`Phase80 road rhythm is not layered above the surface patches: ${environmentRoadRhythmY}`);
   }
+  if (!impactSpeedRoot.exists) issues.push("Phase82 impact/speed root is missing");
+  if (!impactSpeedLineState.exists) issues.push("Phase82 speed-line batch is missing");
+  if (!titanVisualRoot.exists) issues.push("Phase83 Titan visual root is missing");
+  if (!titanArmorRing.exists) issues.push("Phase83 Titan armor ring is missing");
+  if (!titanWeakCore.exists) issues.push("Phase83 Titan weak core is missing");
   if (!camera.exists || camera.fov === null || camera.y === null) issues.push("perspective chase camera is missing");
   else {
     if (camera.fov < 50 || camera.fov > 66) issues.push(`camera FOV is outside the intended chase range: ${camera.fov}`);
@@ -284,6 +306,14 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
     environmentSafeColorPipeline,
     environmentSurfaceY,
     environmentRoadRhythmY,
+    impactSpeedRoot,
+    impactSpeedLineState,
+    impactSpeedIntensity,
+    impactEventChain,
+    impactOverdriveSeconds,
+    titanVisualRoot,
+    titanArmorRing,
+    titanWeakCore,
     stationaryTurboSkids: objectState(scene, "phase44-stationary-turbo-skids"),
     stationaryTurboSkidActiveCount: activeSkidCount(scene),
     turboAttackFrame: turboAttack.state,
