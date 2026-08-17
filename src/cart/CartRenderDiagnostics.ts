@@ -23,6 +23,8 @@ export interface CartRenderDiagnostics {
   finalGroundBucketCount: number;
   finalWearBucketCount: number;
   legacyGround: Record<string, CartRenderObjectState>;
+  environmentRichness: CartRenderObjectState;
+  environmentInstancedMeshCount: number;
   stationaryTurboSkids: CartRenderObjectState;
   stationaryTurboSkidActiveCount: number;
   turboAttackFrame?: CartRenderObjectState;
@@ -97,6 +99,15 @@ function activeSkidCount(scene: THREE.Scene): number {
     if (matrix.elements[13] > -10) active += 1;
   }
   return active;
+}
+
+function countVisibleInstancedMeshes(root: THREE.Object3D | null): number {
+  if (!root) return 0;
+  let count = 0;
+  root.traverse((object) => {
+    if (object instanceof THREE.InstancedMesh && isEffectivelyVisible(object)) count += 1;
+  });
+  return count;
 }
 
 function heroPresentationRotation(scene: THREE.Scene): { pitch: number | null; roll: number | null } {
@@ -178,6 +189,9 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
   const legacyGround = Object.fromEntries(
     LEGACY_GROUND_NAMES.map((name) => [name, objectState(scene, name)]),
   ) as Record<string, CartRenderObjectState>;
+  const environmentRoot = scene.getObjectByName("phase80-environment-richness") ?? null;
+  const environmentRichness = objectState(scene, "phase80-environment-richness");
+  const environmentInstancedMeshCount = countVisibleInstancedMeshes(environmentRoot);
   const camera = cameraState(scene);
   const heroRotation = heroPresentationRotation(scene);
   const turboAttack = turboAttackState(scene);
@@ -210,6 +224,8 @@ export function collectCartRenderDiagnostics(scene: THREE.Scene): CartRenderDiag
     finalGroundBucketCount,
     finalWearBucketCount,
     legacyGround,
+    environmentRichness,
+    environmentInstancedMeshCount,
     stationaryTurboSkids: objectState(scene, "phase44-stationary-turbo-skids"),
     stationaryTurboSkidActiveCount: activeSkidCount(scene),
     turboAttackFrame: turboAttack.state,
