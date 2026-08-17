@@ -198,7 +198,6 @@ try {
   await sleep(900);
   const dynamicTurboDriftDiagnostics = await readRenderDiagnostics(sessionId);
   const dynamicGameplayAudit = await readGameplayAudit(sessionId);
-  await setAuditKeys(sessionId, false);
   if (!dynamicTurboDriftDiagnostics?.ok) {
     throw new Error(`Dynamic Cart Rogue render graph audit failed: ${JSON.stringify(dynamicTurboDriftDiagnostics)}`);
   }
@@ -208,18 +207,40 @@ try {
   if (Math.abs(dynamicTurboDriftDiagnostics.heroPresentationRoll ?? 0) < 0.015) {
     throw new Error(`Turbo drift did not produce visible hero body roll: ${JSON.stringify(dynamicTurboDriftDiagnostics)}`);
   }
+  if (dynamicTurboDriftDiagnostics.turboAttackFrame?.exists !== true
+      || dynamicTurboDriftDiagnostics.turboAttackFrame?.visible !== true
+      || !["charging", "ready"].includes(dynamicTurboDriftDiagnostics.turboAttackMode)
+      || (dynamicTurboDriftDiagnostics.turboAttackIntensity ?? 0) < 0.2) {
+    throw new Error(`Turbo 2.0 charge/ready frame did not become visible: ${JSON.stringify(dynamicTurboDriftDiagnostics)}`);
+  }
   if (!dynamicGameplayAudit?.ok) {
     throw new Error(`Dynamic Cart Rogue gameplay audit failed: ${JSON.stringify(dynamicGameplayAudit)}`);
   }
   const turboRequestedDelta = (dynamicGameplayAudit.turboRequestedSeconds ?? 0) - (gameplayBaseline.turboRequestedSeconds ?? 0);
-  // Dynamic skid + body-roll checks already prove the input reached the runtime.
-  // Headless Chrome can deliver only a few animation samples during the hold, so
-  // two 50ms-equivalent recorder samples are sufficient telemetry confirmation.
   if (turboRequestedDelta < 0.05) {
     throw new Error(`Gameplay audit did not observe the real Turbo input: ${JSON.stringify(dynamicGameplayAudit)}`);
   }
   state.dynamicTurboDriftDiagnostics = dynamicTurboDriftDiagnostics;
   state.dynamicGameplayAudit = dynamicGameplayAudit;
+
+  // Releasing Shift is the offensive commit in Turbo 2.0. Poll immediately so
+  // the short 0.26-0.44s attack envelope is observed even under sparse headless
+  // animation scheduling.
+  await setAuditKeys(sessionId, false);
+  let releaseTurboAttackDiagnostics = null;
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await sleep(35);
+    const candidate = await readRenderDiagnostics(sessionId);
+    if (candidate?.turboAttackMode === "attack" && candidate?.turboAttackFrame?.visible === true) {
+      releaseTurboAttackDiagnostics = candidate;
+      break;
+    }
+  }
+  if (!releaseTurboAttackDiagnostics
+      || (releaseTurboAttackDiagnostics.turboAttackIntensity ?? 0) < 0.5) {
+    throw new Error(`Turbo 2.0 release attack frame was not observed: ${JSON.stringify(releaseTurboAttackDiagnostics)}`);
+  }
+  state.releaseTurboAttackDiagnostics = releaseTurboAttackDiagnostics;
 
   await mkdir(new URL("../artifacts/webgl-audit/", import.meta.url), { recursive: true });
   await mkdir(new URL(`../${output.split("/").slice(0, -1).join("/")}/`, import.meta.url), { recursive: true }).catch(() => undefined);
