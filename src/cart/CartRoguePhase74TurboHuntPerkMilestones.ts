@@ -38,10 +38,11 @@ function stateFor(session: CartArenaSession): PerkMilestoneState {
 }
 
 export function cartTurboHuntPerkMilestone(ordersCompleted: number): number | null {
+  let reached: number | null = null;
   for (const milestone of MILESTONES) {
-    if (ordersCompleted >= milestone) return milestone;
+    if (ordersCompleted >= milestone) reached = milestone;
   }
-  return null;
+  return reached;
 }
 
 function nextUnclaimedMilestone(ordersCompleted: number, offered: ReadonlySet<number>): number | null {
