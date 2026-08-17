@@ -36,7 +36,7 @@ test("field events rotate by region and reuse the bounded Turbo Hunt world", () 
   assert.equal(cartTurboHuntEventKindForRegion("CROSSFIRE GARDEN", 0), "CHAOS_WAVE");
   assert.equal(cartTurboHuntEventKindForRegion("CROWN GROUNDS", 0), "ELITE_HUNT");
   assert.doesNotMatch(phase81Source, /new CartEnemy|enemies\.push|obstacles\.push|resources\.push/);
-  assert.match(phase81Source, /session\.enemies\.filter/);
+  assert.match(phase81Source, /session\.enemies\s*\.filter/);
   assert.match(phase81Source, /session\.obstacles/);
   assert.match(phase81Source, /session\.resources/);
 });
