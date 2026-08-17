@@ -1,0 +1,77 @@
+.shell {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100svh !important;
+  min-height: 0 !important;
+  max-height: 100svh !important;
+  overflow: hidden !important;
+}
+
+@supports (height: 100dvh) {
+  .shell {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+}
+
+.stage {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+.viewport {
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+}
+
+.viewport :global(.cart-rogue-canvas) {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+.bottomHud {
+  bottom: max(4px, env(safe-area-inset-bottom)) !important;
+}
+
+.actions {
+  bottom: max(61px, calc(env(safe-area-inset-bottom) + 51px)) !important;
+}
+
+.steerZone {
+  bottom: 0 !important;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .bottomHud {
+    left: max(8px, env(safe-area-inset-left)) !important;
+    right: max(8px, env(safe-area-inset-right)) !important;
+    bottom: max(3px, env(safe-area-inset-bottom)) !important;
+    gap: 6px !important;
+  }
+
+  .actions {
+    right: max(8px, env(safe-area-inset-right)) !important;
+    bottom: max(58px, calc(env(safe-area-inset-bottom) + 49px)) !important;
+    gap: 7px !important;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 380px) {
+  .bottomHud {
+    bottom: max(2px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .actions {
+    bottom: max(52px, calc(env(safe-area-inset-bottom) + 44px)) !important;
+  }
+}
