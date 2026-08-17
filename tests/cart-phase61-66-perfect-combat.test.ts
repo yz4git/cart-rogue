@@ -55,7 +55,7 @@ function preparePerfectStrike(session: CartArenaSession) {
   primary.x = 0;
   primary.z = 34.2;
   primary.heading = Math.PI;
-  primary.moveSpeed = 2.2;
+  primary.moveSpeed = 0;
 
   const secondary = session.enemies[1];
   secondary.nodeId = "arena-01";
@@ -68,7 +68,7 @@ function preparePerfectStrike(session: CartArenaSession) {
   secondary.x = 4.05;
   secondary.z = 34.15;
   secondary.heading = Math.PI;
-  secondary.moveSpeed = 4.2;
+  secondary.moveSpeed = 0;
   return { primary, secondary };
 }
 
@@ -114,7 +114,12 @@ test("Phases 61-64 turn a precise charged release into assist, perfect bonus, sp
     const { primary, secondary } = preparePerfectStrike(session);
     const primaryHp = primary.hp;
     const secondaryHp = secondary.hp;
+    // Keep the authored targets fixed while the player charges. Restore real
+    // movement speeds only for the release frame so the same integration test
+    // still proves that Phase 64 actively zeros them during hit stun.
     for (let frame = 0; frame < 52; frame += 1) session.step(HOLD);
+    primary.moveSpeed = 2.2;
+    secondary.moveSpeed = 4.2;
     session.step(RELEASE);
 
     const aim = getCartTurboAimAssistState(session);
