@@ -29,8 +29,6 @@ export default function CartTurboHuntHudOverlay() {
       if (detail?.gameMode === "turbo-hunt") setSnapshot(detail);
     };
     window.addEventListener(CART_TURBO_HUNT_SNAPSHOT_EVENT, handler);
-    const latest = getLatestCartTurboHuntSnapshot();
-    if (latest) setSnapshot(latest);
     return () => window.removeEventListener(CART_TURBO_HUNT_SNAPSHOT_EVENT, handler);
   }, []);
 
