@@ -18,8 +18,10 @@ const runtimeSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", im
 function isolate(session: CartArenaSession): void {
   for (const obstacle of session.obstacles) obstacle.destroyed = true;
   for (const enemy of session.enemies) {
-    enemy.alive = false;
+    enemy.alive = true;
     enemy.moveSpeed = 0;
+    enemy.x += 36;
+    enemy.z += 24;
   }
   session.car.position.set(0, session.car.position.y, 28);
   session.car.heading = 0;
