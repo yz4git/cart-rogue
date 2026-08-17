@@ -213,25 +213,30 @@ try {
     throw new Error("ChromeDriver screenshot payload is missing");
   }
 
+  // Headless Chrome can advance rAF simulation much more slowly than wall
+  // clock time. Hold the real Turbo input until the gameplay/render runtime
+  // itself reports the authored READY state instead of releasing after a
+  // guessed sleep duration.
   await setAuditKeys(sessionId, true);
-  await sleep(900);
-  const dynamicTurboDriftDiagnostics = await readRenderDiagnostics(sessionId);
-  const dynamicGameplayAudit = await readGameplayAudit(sessionId);
+  let dynamicTurboDriftDiagnostics = null;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    await sleep(100);
+    const candidate = await readRenderDiagnostics(sessionId);
+    if (candidate?.ok
+        && candidate.turboAttackFrame?.exists === true
+        && candidate.turboAttackFrame?.visible === true
+        && candidate.turboAttackMode === "ready"
+        && (candidate.turboAttackIntensity ?? 0) >= 0.82
+        && (candidate.stationaryTurboSkidActiveCount ?? 0) >= 2
+        && Math.abs(candidate.heroPresentationRoll ?? 0) >= 0.015) {
+      dynamicTurboDriftDiagnostics = candidate;
+      break;
+    }
+  }
   if (!dynamicTurboDriftDiagnostics?.ok) {
-    throw new Error(`Dynamic Cart Rogue render graph audit failed: ${JSON.stringify(dynamicTurboDriftDiagnostics)}`);
+    throw new Error(`Turbo 2.0 did not reach its real READY state in WebGL: ${JSON.stringify(dynamicTurboDriftDiagnostics)}`);
   }
-  if ((dynamicTurboDriftDiagnostics.stationaryTurboSkidActiveCount ?? 0) < 2) {
-    throw new Error(`Turbo drift did not stamp visible skid instances: ${JSON.stringify(dynamicTurboDriftDiagnostics)}`);
-  }
-  if (Math.abs(dynamicTurboDriftDiagnostics.heroPresentationRoll ?? 0) < 0.015) {
-    throw new Error(`Turbo drift did not produce visible hero body roll: ${JSON.stringify(dynamicTurboDriftDiagnostics)}`);
-  }
-  if (dynamicTurboDriftDiagnostics.turboAttackFrame?.exists !== true
-      || dynamicTurboDriftDiagnostics.turboAttackFrame?.visible !== true
-      || !["charging", "ready"].includes(dynamicTurboDriftDiagnostics.turboAttackMode)
-      || (dynamicTurboDriftDiagnostics.turboAttackIntensity ?? 0) < 0.2) {
-    throw new Error(`Turbo 2.0 charge/ready frame did not become visible: ${JSON.stringify(dynamicTurboDriftDiagnostics)}`);
-  }
+  const dynamicGameplayAudit = await readGameplayAudit(sessionId);
   if (!dynamicGameplayAudit?.ok) {
     throw new Error(`Dynamic Cart Rogue gameplay audit failed: ${JSON.stringify(dynamicGameplayAudit)}`);
   }
@@ -249,7 +254,7 @@ try {
   const observedSerialBeforeRelease = dynamicTurboDriftDiagnostics.turboAttackObservedAttackSerial ?? 0;
   await setAuditKeys(sessionId, false);
   let releaseTurboAttackDiagnostics = null;
-  for (let attempt = 0; attempt < 16; attempt += 1) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
     await sleep(35);
     const candidate = await readRenderDiagnostics(sessionId);
     const liveAttack = candidate?.turboAttackMode === "attack"
