@@ -10,6 +10,7 @@ import {
   type CartRaidHazardSpec,
 } from "./CartRoguePhase88RaidHazards";
 import {
+  CART_FORCED_DODGE_CHAIN_LABEL_PREFIX,
   CART_FORCED_DODGE_LABEL_PREFIX,
   CART_FORCED_DODGE_REACTION_BRAKE_THRESHOLD,
   CART_FORCED_DODGE_REACTION_STEER_THRESHOLD,
@@ -47,7 +48,7 @@ export const CART_RAID_PRESSURE_CUTBACK_DELAY = 0.25;
 export const CART_RAID_PRESSURE_CUTBACK_TELEGRAPH = 0.88;
 export const CART_RAID_PRESSURE_SWEEP_DELAY = 0.76;
 export const CART_RAID_PRESSURE_SWEEP_TELEGRAPH = 0.82;
-export const CART_RAID_PRESSURE_CHAIN_LABEL = `${CART_FORCED_DODGE_LABEL_PREFIX} · CHAIN`;
+export const CART_RAID_PRESSURE_CHAIN_LABEL = CART_FORCED_DODGE_CHAIN_LABEL_PREFIX;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -122,8 +123,7 @@ function normalForcedHazard(hazards: readonly CartRaidHazardPublicState[]): Cart
     hazard.source === "FIELD"
     && hazard.phase === "LOCKED"
     && hazard.secondsToFire > 0
-    && hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX)
-    && !hazard.label.startsWith(CART_RAID_PRESSURE_CHAIN_LABEL),
+    && hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX),
   );
 }
 
@@ -145,7 +145,7 @@ function queueReactionChain(session: CartArenaSession, input: RallyInputState, s
   const cutback = queueCartRaidHazard(session, {
     kind: "CIRCLE",
     source: "FIELD",
-    label: `${CART_RAID_PRESSURE_CHAIN_LABEL} CUTBACK`,
+    label: `${CART_RAID_PRESSURE_CHAIN_LABEL} · CUTBACK`,
     x: placement.cutbackX,
     z: placement.cutbackZ,
     radius: 8.7,
@@ -155,7 +155,7 @@ function queueReactionChain(session: CartArenaSession, input: RallyInputState, s
   const sweep = queueCartRaidHazard(session, {
     kind: "LINE",
     source: "FIELD",
-    label: `${CART_RAID_PRESSURE_CHAIN_LABEL} SWEEP`,
+    label: `${CART_RAID_PRESSURE_CHAIN_LABEL} · SWEEP`,
     x: placement.sweepX,
     z: placement.sweepZ,
     heading: placement.sweepHeading,
