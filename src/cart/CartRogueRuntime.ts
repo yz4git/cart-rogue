@@ -79,6 +79,7 @@ import "./CartRoguePhase91DamageFeedback2";
 import "./CartRoguePhase93ForcedDodgeTrajectory2";
 import "./CartRoguePhase94EscapeRhythmDirector2";
 import "./CartRaidEvasionCarry";
+import "./CartRoguePhase96RaidPressure3";
 import "./CartGameplayAuditRuntime";
 import "./CartRenderAuditRuntime";
 
