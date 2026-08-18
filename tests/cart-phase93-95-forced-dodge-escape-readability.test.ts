@@ -4,11 +4,21 @@ import test from "node:test";
 import { CartArenaSession } from "../src/cart/CartArenaSession";
 import { CART_ROGUE_RUNTIME_PHASE_ORDER } from "../src/cart/CartRogueRuntime";
 import { enableCartTurboHunt } from "../src/cart/CartRoguePhase67TurboHunt";
-import { getCartRaidHazardState } from "../src/cart/CartRoguePhase88RaidHazards";
 import {
+  getCartRaidHazardState,
+  queueCartRaidHazard,
+  type CartRaidHazardKind,
+} from "../src/cart/CartRoguePhase88RaidHazards";
+import {
+  CART_FORCED_DODGE_CIRCLE_RADIUS,
+  CART_FORCED_DODGE_CONE_RADIUS,
+  CART_FORCED_DODGE_CROSS_WIDTH,
+  CART_FORCED_DODGE_LINE_WIDTH,
   CART_FORCED_DODGE_LOCK_MAX_SECONDS,
   CART_FORCED_DODGE_LOCK_MIN_SECONDS,
   CART_FORCED_DODGE_LABEL_PREFIX,
+  CART_FORCED_DODGE_REACTION_BRAKE_THRESHOLD,
+  CART_FORCED_DODGE_REACTION_STEER_THRESHOLD,
   cartForcedDodgePredictedPoint,
   getCartForcedDodgeTrajectoryState,
 } from "../src/cart/CartRoguePhase93ForcedDodgeTrajectory2";
@@ -28,7 +38,44 @@ const readabilityCss = readFileSync(new URL("../app/CartCombatReadabilityPass.mo
 const design = readFileSync(new URL("../docs/FORCED_DODGE_ESCAPE_93_95.md", import.meta.url), "utf8");
 
 const driveStraight = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
+const evadeRight = { throttle: 1, brake: 1, steer: 1, boost: false } as const;
+const evadeLeft = { throttle: 1, brake: 1, steer: -1, boost: false } as const;
 const idleInput = { throttle: 0, brake: 0, steer: 0, boost: false } as const;
+
+function queueShape(session: CartArenaSession, kind: CartRaidHazardKind): void {
+  const spec = kind === "LINE"
+    ? { kind, source: "FIELD" as const, label: "TEST LINE", width: 8.6, length: 32, telegraphSeconds: 1.25 }
+    : kind === "CIRCLE"
+      ? { kind, source: "FIELD" as const, label: "TEST CIRCLE", radius: 11.4, telegraphSeconds: 1.25 }
+      : kind === "CROSS"
+        ? { kind, source: "FIELD" as const, label: "TEST CROSS", width: 6.8, length: 36, telegraphSeconds: 1.25 }
+        : kind === "CONE"
+          ? { kind, source: "FIELD" as const, label: "TEST CONE", radius: 25, coneAngle: Math.PI * 0.5, telegraphSeconds: 1.25 }
+          : { kind, source: "FIELD" as const, label: "TEST DONUT", innerRadius: 5.5, outerRadius: 15.4, telegraphSeconds: 1.25 };
+  assert.notEqual(queueCartRaidHazard(session, spec), null);
+}
+
+function runExplicitEvasion(kind: CartRaidHazardKind, steer: -1 | 1): ReturnType<typeof getCartRaidHazardState> {
+  const session = new CartArenaSession();
+  enableCartTurboHunt(session);
+  session.car.forwardVelocity = 14;
+  session.car.speed = 14;
+  queueShape(session, kind);
+
+  // Let Phase93 observe the ordinary FIELD lock and replace it with the
+  // predicted intercept before the player reacts.
+  session.step(driveStraight, 0.05);
+  const forced = getCartForcedDodgeTrajectoryState(session);
+  assert.ok(forced.correctedSerial >= 1, `${kind} did not become a forced lock`);
+
+  const evasion = steer > 0 ? evadeRight : evadeLeft;
+  let raid = getCartRaidHazardState(session);
+  for (let index = 0; index < 32 && raid.hazards.some((hazard) => hazard.source === "FIELD"); index += 1) {
+    session.step(evasion, 0.05);
+    raid = getCartRaidHazardState(session);
+  }
+  return raid;
+}
 
 test("Phase93 predicts the no-new-evasion trajectory ahead of a moving car", () => {
   const session = new CartArenaSession();
@@ -40,8 +87,17 @@ test("Phase93 predicts the no-new-evasion trajectory ahead of a moving car", () 
   const point = cartForcedDodgePredictedPoint(session, driveStraight, 0.9);
   assert.ok(point.travel > 14);
   assert.ok(Math.hypot(point.x - startX, point.z - startZ) > 10);
-  assert.ok(CART_FORCED_DODGE_LOCK_MIN_SECONDS >= 0.7);
+  assert.ok(CART_FORCED_DODGE_LOCK_MIN_SECONDS >= 0.9);
   assert.ok(CART_FORCED_DODGE_LOCK_MAX_SECONDS <= 1.1);
+});
+
+test("forced hazard dimensions punish a centered straight line without consuming the whole escape corridor", () => {
+  assert.ok(CART_FORCED_DODGE_LINE_WIDTH <= 9);
+  assert.ok(CART_FORCED_DODGE_CROSS_WIDTH <= 6.5);
+  assert.ok(CART_FORCED_DODGE_CIRCLE_RADIUS <= 7.5);
+  assert.ok(CART_FORCED_DODGE_CONE_RADIUS <= 20);
+  assert.ok(CART_FORCED_DODGE_REACTION_STEER_THRESHOLD <= 0.45);
+  assert.ok(CART_FORCED_DODGE_REACTION_BRAKE_THRESHOLD <= 0.35);
 });
 
 test("a live FIELD telegraph is replaced once at LOCK with a forced intercept", () => {
@@ -61,6 +117,16 @@ test("passive straight driving is punishable within the opening raid cycle", () 
   for (let index = 0; index < 135; index += 1) session.step(driveStraight, 0.05);
   const raid = getCartRaidHazardState(session);
   assert.ok(raid.hitSerial >= 1, `straight driving should be hit, got ${JSON.stringify(raid)}`);
+});
+
+test("explicit steer plus brake can escape every forced FIELD raid shape from either side", () => {
+  for (const kind of ["LINE", "CIRCLE", "CROSS", "CONE", "DONUT"] as const) {
+    for (const steer of [-1, 1] as const) {
+      const raid = runExplicitEvasion(kind, steer);
+      assert.equal(raid.hitSerial, 0, `${kind} steer ${steer} should be escapable: ${JSON.stringify(raid)}`);
+      assert.ok(raid.clearSerial + raid.perfectDodgeSerial >= 1, `${kind} steer ${steer} should resolve as a dodge`);
+    }
+  }
 });
 
 test("Phase94 begins an unmistakable escape sequence inside the first ten seconds", () => {
@@ -95,6 +161,7 @@ test("Phase94 returns after recovery without allocating new enemies", () => {
 test("Phases 93-95 preserve fixed pools and put danger readability ahead of reward clutter", () => {
   assert.doesNotMatch(phase93Source, /new CartEnemy|enemies\.push|new THREE\.InstancedMesh|setColorAt|instanceColor|TextureLoader/);
   assert.doesNotMatch(phase94Source, /new CartEnemy|enemies\.push|new THREE\.InstancedMesh|setColorAt|instanceColor|TextureLoader/);
+  assert.match(phase93Source, /applyReactionAssist/);
   assert.match(phase94Source, /phase94-escape-rhythm-root/);
   assert.match(readabilitySource, /combo/);
   assert.match(readabilitySource, /ramBanner/);
