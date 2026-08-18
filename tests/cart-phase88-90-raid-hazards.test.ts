@@ -106,7 +106,7 @@ test("Phase88 uses a fixed four-slot pool and refuses an unbounded fifth telegra
   assert.equal(getCartRaidHazardState(session).activeCount, 0);
 });
 
-test("a tracking hazard locks before firing and applies a recoverable hit", () => {
+test("a tracking hazard locks, receives the Phase93 reaction window, then applies a recoverable hit", () => {
   const session = new CartArenaSession();
   enableCartTurboHunt(session);
   const gasBefore = session.gas;
@@ -120,9 +120,11 @@ test("a tracking hazard locks before firing and applies a recoverable hit", () =
   for (let index = 0; index < 14; index += 1) session.step(idleInput, 0.05);
   let state = getCartRaidHazardState(session);
   assert.equal(state.primaryPhase, "LOCKED");
-  assert.ok(state.primarySeconds > 0 && state.primarySeconds <= 0.55);
-  for (let index = 0; index < 11; index += 1) session.step(idleInput, 0.05);
-  state = getCartRaidHazardState(session);
+  assert.ok(state.primarySeconds > 0.5 && state.primarySeconds <= 1.05);
+  for (let index = 0; index < 24 && state.hitSerial === 0; index += 1) {
+    session.step(idleInput, 0.05);
+    state = getCartRaidHazardState(session);
+  }
   assert.equal(state.hitSerial, 1);
   assert.ok(session.gas < gasBefore);
   assert.ok(session.gas >= 0);
