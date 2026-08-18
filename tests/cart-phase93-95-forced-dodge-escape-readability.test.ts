@@ -66,11 +66,21 @@ function runExplicitEvasion(kind: CartRaidHazardKind, steer: -1 | 1): ReturnType
   const forced = getCartForcedDodgeTrajectoryState(session);
   assert.ok(forced.correctedSerial >= 1, `${kind} did not become a forced lock`);
 
-  const evasion = steer > 0 ? evadeRight : evadeLeft;
   let raid = getCartRaidHazardState(session);
-  for (let index = 0; index < 32 && raid.hazards.some((hazard) => hazard.source === "FIELD"); index += 1) {
+  assert.ok(
+    raid.hazards.some((hazard) => hazard.source === "FIELD" && hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX)),
+    `${kind} did not expose the forced first beat`,
+  );
+
+  const evasion = steer > 0 ? evadeRight : evadeLeft;
+  const startingResults = raid.hitSerial + raid.clearSerial;
+  for (let index = 0; index < 32; index += 1) {
     session.step(evasion, 0.05);
     raid = getCartRaidHazardState(session);
+    // Phase97 intentionally continues after this result. Stop at the first
+    // resolved hazard so this historical test still answers its original
+    // question: is the forced first beat itself fairly escapable?
+    if (raid.hitSerial + raid.clearSerial > startingResults) break;
   }
   return raid;
 }
@@ -150,12 +160,12 @@ test("passive straight driving is punishable within the opening raid cycle", () 
   assert.ok(raid.hitSerial >= 1, `straight driving should be hit, got ${JSON.stringify(raid)}`);
 });
 
-test("explicit steer plus brake can escape every forced FIELD raid shape from either side", () => {
+test("explicit steer plus brake can escape the first beat of every forced FIELD raid shape from either side", () => {
   for (const kind of ["LINE", "CIRCLE", "CROSS", "CONE", "DONUT"] as const) {
     for (const steer of [-1, 1] as const) {
       const raid = runExplicitEvasion(kind, steer);
-      assert.equal(raid.hitSerial, 0, `${kind} steer ${steer} should be escapable: ${JSON.stringify(raid)}`);
-      assert.ok(raid.clearSerial + raid.perfectDodgeSerial >= 1, `${kind} steer ${steer} should resolve as a dodge`);
+      assert.equal(raid.hitSerial, 0, `${kind} steer ${steer} first beat should be escapable: ${JSON.stringify(raid)}`);
+      assert.ok(raid.clearSerial + raid.perfectDodgeSerial >= 1, `${kind} steer ${steer} first beat should resolve as a dodge`);
     }
   }
 });

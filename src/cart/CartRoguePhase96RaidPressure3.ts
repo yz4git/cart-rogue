@@ -29,6 +29,7 @@ interface PressureState {
   quietSeconds: number;
   reengageSerial: number;
   armed: boolean;
+  latestReaction: CartRaidPressureReaction | null;
 }
 
 export interface CartRaidPressureChainPlacement {
@@ -38,6 +39,19 @@ export interface CartRaidPressureChainPlacement {
   sweepZ: number;
   sweepHeading: number;
   escapeSide: -1 | 1;
+}
+
+export interface CartRaidPressureReaction {
+  serial: number;
+  forcedHazardId: number;
+  cutbackHazardId: number;
+  anchorX: number;
+  anchorZ: number;
+  anchorHeading: number;
+  initialEscapeSide: -1 | 1;
+  initialSteer: number;
+  startForwardVelocity: number;
+  startLateralVelocity: number;
 }
 
 const stateBySession = new WeakMap<object, PressureState>();
@@ -64,9 +78,15 @@ function stateFor(session: Phase96Session): PressureState {
     quietSeconds: 0,
     reengageSerial: 0,
     armed: false,
+    latestReaction: null,
   };
   stateBySession.set(key, created);
   return created;
+}
+
+export function getCartRaidPressureReaction(session: CartArenaSession): CartRaidPressureReaction | null {
+  const reaction = stateFor(session as unknown as Phase96Session).latestReaction;
+  return reaction ? { ...reaction } : null;
 }
 
 function clampField(x: number, z: number, margin = 8): { x: number; z: number } {
@@ -77,10 +97,11 @@ function clampField(x: number, z: number, margin = 8): { x: number; z: number } 
 }
 
 /**
- * The first successful dodge must not solve the whole attack. The follow-up
- * circle is placed on the side the player just escaped toward, while the
- * diagonal sweep is offset back across the future line. This makes holding one
- * steering direction a losing answer without filling the whole field.
+ * Phase96 owns the first reaction beat only. The cutback is committed as soon
+ * as the player deliberately evades. The historical sweep coordinates remain
+ * available for deterministic regression comparisons, but the live runtime no
+ * longer queues that sweep here; Phase97 re-reads the player's actual escape
+ * before deciding the second beat.
  */
 export function cartRaidPressureChainPlacement(
   x: number,
@@ -135,10 +156,13 @@ function queueReactionChain(session: CartArenaSession, input: RallyInputState, s
   if (!forced || state.chainedHazardIds.has(forced.id) || !deliberateEvasion(input)) return false;
 
   const rawSteer = clamp(input.strafe ?? input.steer, -1, 1);
+  const anchorX = session.car.position.x;
+  const anchorZ = session.car.position.z;
+  const anchorHeading = session.car.heading;
   const placement = cartRaidPressureChainPlacement(
-    session.car.position.x,
-    session.car.position.z,
-    session.car.heading,
+    anchorX,
+    anchorZ,
+    anchorHeading,
     rawSteer,
     state.chainSerial,
   );
@@ -152,21 +176,22 @@ function queueReactionChain(session: CartArenaSession, input: RallyInputState, s
     telegraphSeconds: CART_RAID_PRESSURE_CUTBACK_TELEGRAPH,
     delaySeconds: CART_RAID_PRESSURE_CUTBACK_DELAY,
   });
-  const sweep = queueCartRaidHazard(session, {
-    kind: "LINE",
-    source: "FIELD",
-    label: `${CART_RAID_PRESSURE_CHAIN_LABEL} · SWEEP`,
-    x: placement.sweepX,
-    z: placement.sweepZ,
-    heading: placement.sweepHeading,
-    width: 7.2,
-    length: 32,
-    telegraphSeconds: CART_RAID_PRESSURE_SWEEP_TELEGRAPH,
-    delaySeconds: CART_RAID_PRESSURE_SWEEP_DELAY,
-  });
-  if (cutback === null || sweep === null) return false;
+  if (cutback === null) return false;
+
   state.chainedHazardIds.add(forced.id);
   state.chainSerial += 1;
+  state.latestReaction = {
+    serial: state.chainSerial,
+    forcedHazardId: forced.id,
+    cutbackHazardId: cutback,
+    anchorX,
+    anchorZ,
+    anchorHeading,
+    initialEscapeSide: placement.escapeSide,
+    initialSteer: rawSteer,
+    startForwardVelocity: session.car.forwardVelocity,
+    startLateralVelocity: session.car.lateralVelocity,
+  };
   state.quietSeconds = 0;
   return true;
 }
