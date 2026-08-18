@@ -39,6 +39,7 @@ export const CART_FORCED_DODGE_LOCK_MAX_SECONDS = 1.04;
 export const CART_FORCED_DODGE_FINAL_LOCK_SECONDS = 0.78;
 export const CART_FORCED_DODGE_ACCELERATION = 8.5;
 export const CART_FORCED_DODGE_FIELD_MARGIN = 7;
+export const CART_FORCED_DODGE_PASSIVE_THROTTLE = 0.84;
 
 // The reaction corridor is intentionally narrower than the passive pressure
 // footprint. The instant the player commits to a dodge, the telegraph freezes
@@ -165,6 +166,21 @@ export function cartForcedDodgePredictedPoint(
   return { ...point, travel, lateral };
 }
 
+/**
+ * A forced raid intercept targets the trajectory the car would take if the
+ * player made no NEW avoidance choice. A steer/brake input that arrives in the
+ * same frame as the visible LOCK must therefore never move the target itself.
+ */
+function passivePredictionInput(input: RallyInputState): RallyInputState {
+  return {
+    ...input,
+    throttle: Math.max(CART_FORCED_DODGE_PASSIVE_THROTTLE, input.throttle),
+    brake: 0,
+    steer: 0,
+    strafe: 0,
+  };
+}
+
 type HazardGeometry = Pick<CartRaidHazardPublicState, "width" | "length" | "radius" | "innerRadius" | "outerRadius" | "coneAngle">;
 
 function reactionGeometry(hazard: CartRaidHazardPublicState): HazardGeometry {
@@ -266,8 +282,9 @@ function applyForcedLock(
   state: InternalState,
   hazard: CartRaidHazardPublicState,
 ): void {
-  const spec = correctedSpec(session, hazard, input);
-  const predicted = cartForcedDodgePredictedPoint(session, input, spec.telegraphSeconds ?? CART_FORCED_DODGE_LOCK_MIN_SECONDS);
+  const passiveInput = passivePredictionInput(input);
+  const spec = correctedSpec(session, hazard, passiveInput);
+  const predicted = cartForcedDodgePredictedPoint(session, passiveInput, spec.telegraphSeconds ?? CART_FORCED_DODGE_LOCK_MIN_SECONDS);
   cancelCartRaidHazards(session, "FIELD");
   const id = queueCartRaidHazard(session, spec);
   if (id === null) return;
@@ -303,7 +320,7 @@ function softTrackPassiveLine(
   if (state.reactionCommitted || hazard.secondsToFire <= CART_FORCED_DODGE_FINAL_LOCK_SECONDS) return;
   const remaining = hazard.secondsToFire;
   const geometry = passiveGeometry(hazard);
-  const placement = predictedPlacement(session, hazard, input, remaining, geometry);
+  const placement = predictedPlacement(session, hazard, passivePredictionInput(input), remaining, geometry);
   cancelCartRaidHazards(session, "FIELD");
   const id = queueCartRaidHazard(session, {
     kind: hazard.kind,
