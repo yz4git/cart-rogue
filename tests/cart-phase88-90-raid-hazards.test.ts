@@ -133,8 +133,11 @@ test("a tracking hazard locks, receives the Phase93 reaction window, then applie
 test("leaving a locked AOE in the final window awards raid Perfect Dodge", () => {
   const session = new CartArenaSession();
   enableCartTurboHunt(session);
+  // TITAN source intentionally isolates the Phase88 Perfect Dodge contract from
+  // Phase93, which only re-locks FIELD telegraphs onto the predicted trajectory.
   queueCartRaidHazard(session, {
     kind: "CIRCLE",
+    source: "TITAN",
     label: "PERFECT TEST",
     radius: 7,
     telegraphSeconds: 1.2,
