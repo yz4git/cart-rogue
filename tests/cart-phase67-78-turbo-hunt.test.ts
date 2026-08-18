@@ -125,7 +125,7 @@ test("Hunt Orders reuse existing perk drafts at stable non-spatial milestones", 
   assert.equal(cartTurboHuntPerkMilestone(8), 4);
 });
 
-test("Turbo Hunt presentation, battery, environment, events, impact, boss and threat layers preserve runtime order", () => {
+test("Turbo Hunt presentation through raid hazards preserves runtime order", () => {
   const huntIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase67TurboHunt");
   const phase66Index = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase66TurboChainReward");
   const perkIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase74TurboHuntPerkMilestones");
@@ -139,6 +139,9 @@ test("Turbo Hunt presentation, battery, environment, events, impact, boss and th
   const pursuitIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase85PursuitEvents");
   const predatorIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase86BossPredator");
   const pressureIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase87ThreatPressure2");
+  const raidIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase88RaidHazards");
+  const hazardDirectorIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase89HazardCombatDirector");
+  const raidBossIndex = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase90TitanRaidBoss4");
   assert.ok(huntIndex > phase66Index);
   assert.ok(perkIndex > huntIndex);
   assert.ok(guardIndex > perkIndex);
@@ -151,7 +154,10 @@ test("Turbo Hunt presentation, battery, environment, events, impact, boss and th
   assert.ok(pursuitIndex > threatIndex);
   assert.ok(predatorIndex > pursuitIndex);
   assert.ok(pressureIndex > predatorIndex);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase87ThreatPressure2");
+  assert.ok(raidIndex > pressureIndex);
+  assert.ok(hazardDirectorIndex > raidIndex);
+  assert.ok(raidBossIndex > hazardDirectorIndex);
+  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase90TitanRaidBoss4");
 });
 
 test("design records continuous-field acceptance criteria before implementation", () => {
