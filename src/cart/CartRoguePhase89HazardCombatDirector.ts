@@ -1,5 +1,6 @@
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
+import { cartRaidDonutInterceptLead, cartRaidInterceptLead } from "./CartRaidHazardIntercept";
 import { isCartTurboHuntEnabled } from "./CartRoguePhase67TurboHunt";
 import { getCartTitanBossState } from "./CartRoguePhase83Boss2";
 import { getCartThreatPressureState } from "./CartRoguePhase87ThreatPressure2";
@@ -97,67 +98,83 @@ function broadcast(state: InternalDirectorState): void {
   }
 }
 
+/**
+ * Field patterns now target the predicted forward intercept point rather than
+ * the car's current position. Continuing straight therefore drives into the
+ * locked danger zone; the player has to steer, brake or change line.
+ */
 function queueFieldPattern(session: CartArenaSession, kind: CartRaidHazardKind): boolean {
   if (kind === "LINE") {
+    const telegraphSeconds = 1.32;
+    const followCarSeconds = 0.45;
     return queueCartRaidHazard(session, {
       kind,
       source: "FIELD",
       label: "LINE STRIKE",
-      width: 7.8,
-      length: 34,
-      telegraphSeconds: 1.25,
-      followCarSeconds: 0.58,
-      followForward: 7,
+      width: 8.6,
+      length: 32,
+      telegraphSeconds,
+      followCarSeconds,
+      followForward: cartRaidInterceptLead(session.car, telegraphSeconds, followCarSeconds, 4.5),
       followHeading: true,
     }) !== null;
   }
   if (kind === "CIRCLE") {
+    const telegraphSeconds = 1.5;
+    const followCarSeconds = 0.58;
     return queueCartRaidHazard(session, {
       kind,
       source: "FIELD",
       label: "BLAST CIRCLE",
-      radius: 10.8,
-      telegraphSeconds: 1.48,
-      followCarSeconds: 0.72,
-      followForward: 4,
+      radius: 11.4,
+      telegraphSeconds,
+      followCarSeconds,
+      followForward: cartRaidInterceptLead(session.car, telegraphSeconds, followCarSeconds, 4.4),
     }) !== null;
   }
   if (kind === "CROSS") {
+    const telegraphSeconds = 1.56;
+    const followCarSeconds = 0.55;
     return queueCartRaidHazard(session, {
       kind,
       source: "FIELD",
       label: "CROSS BREAK",
-      width: 6.4,
-      length: 35,
-      telegraphSeconds: 1.58,
-      followCarSeconds: 0.6,
-      followForward: 6,
+      width: 6.8,
+      length: 36,
+      telegraphSeconds,
+      followCarSeconds,
+      followForward: cartRaidInterceptLead(session.car, telegraphSeconds, followCarSeconds, 4.4),
       followHeading: true,
       headingOffset: Math.PI * 0.25,
     }) !== null;
   }
   if (kind === "CONE") {
+    const telegraphSeconds = 1.46;
+    const followCarSeconds = 0.5;
+    const intercept = cartRaidInterceptLead(session.car, telegraphSeconds, followCarSeconds, 3.4);
     return queueCartRaidHazard(session, {
       kind,
       source: "FIELD",
       label: "SWEEP CONE",
-      radius: 23,
+      radius: 25,
       coneAngle: Math.PI * 0.5,
-      telegraphSeconds: 1.45,
-      followCarSeconds: 0.55,
-      followForward: -10,
+      telegraphSeconds,
+      followCarSeconds,
+      followForward: Math.max(2.5, intercept * 0.22),
       followHeading: true,
     }) !== null;
   }
+  const telegraphSeconds = 1.62;
+  const followCarSeconds = 0.58;
   return queueCartRaidHazard(session, {
     kind,
     source: "FIELD",
     label: "DONUT CRUSH",
     innerRadius: 5.5,
-    outerRadius: 15.2,
-    telegraphSeconds: 1.65,
-    followCarSeconds: 0.72,
-    followForward: 8,
+    outerRadius: 15.4,
+    telegraphSeconds,
+    followCarSeconds,
+    followForward: cartRaidDonutInterceptLead(session.car, telegraphSeconds, followCarSeconds),
   }) !== null;
 }
 
