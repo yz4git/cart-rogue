@@ -33,13 +33,23 @@ const stateBySession = new WeakMap<object, InternalState>();
 let latestSnapshot: CartForcedDodgeTrajectorySnapshot | null = null;
 
 export const CART_FORCED_DODGE_TRAJECTORY_EVENT = "cart-forced-dodge-trajectory-snapshot";
-export const CART_FORCED_DODGE_LOCK_MIN_SECONDS = 0.78;
-export const CART_FORCED_DODGE_LOCK_MAX_SECONDS = 0.86;
+export const CART_FORCED_DODGE_LOCK_MIN_SECONDS = 0.94;
+export const CART_FORCED_DODGE_LOCK_MAX_SECONDS = 1.04;
 export const CART_FORCED_DODGE_ACCELERATION = 8.5;
 export const CART_FORCED_DODGE_FIELD_MARGIN = 7;
-export const CART_FORCED_DODGE_LINE_WIDTH = 12.5;
-export const CART_FORCED_DODGE_LINE_LENGTH = 44;
-export const CART_FORCED_DODGE_CROSS_WIDTH = 9.5;
+export const CART_FORCED_DODGE_LINE_WIDTH = 8.8;
+export const CART_FORCED_DODGE_LINE_LENGTH = 42;
+export const CART_FORCED_DODGE_CROSS_WIDTH = 6.4;
+export const CART_FORCED_DODGE_CIRCLE_RADIUS = 7.4;
+export const CART_FORCED_DODGE_CONE_RADIUS = 19;
+export const CART_FORCED_DODGE_CONE_ANGLE = Math.PI * 0.4;
+export const CART_FORCED_DODGE_DONUT_OUTER_RADIUS = 13.2;
+export const CART_FORCED_DODGE_REACTION_STEER_THRESHOLD = 0.42;
+export const CART_FORCED_DODGE_REACTION_BRAKE_THRESHOLD = 0.32;
+export const CART_FORCED_DODGE_REACTION_YAW_RATE = 0.92;
+export const CART_FORCED_DODGE_REACTION_LATERAL_ACCELERATION = 7.5;
+export const CART_FORCED_DODGE_REACTION_EXTRA_BRAKE = 7.5;
+export const CART_FORCED_DODGE_REACTION_MAX_LATERAL_SPEED = 13.5;
 export const CART_FORCED_DODGE_LABEL_PREFIX = "LOCKED INTERCEPT";
 
 function clamp(value: number, min: number, max: number): number {
@@ -146,26 +156,38 @@ function correctedSpec(
   let x = predicted.x;
   let z = predicted.z;
 
-  if (hazard.kind === "DONUT") {
-    const ringMid = (hazard.innerRadius + hazard.outerRadius) * 0.5;
-    x -= Math.sin(heading) * ringMid;
-    z -= Math.cos(heading) * ringMid;
-    ({ x, z } = clampField(x, z));
-  } else if (hazard.kind === "CONE") {
-    const behind = Math.min(5.5, hazard.radius * 0.22);
-    x -= Math.sin(heading) * behind;
-    z -= Math.cos(heading) * behind;
-    ({ x, z } = clampField(x, z));
-  }
-
   const width = hazard.kind === "LINE"
-    ? Math.max(hazard.width, CART_FORCED_DODGE_LINE_WIDTH)
+    ? clamp(hazard.width, 7.6, CART_FORCED_DODGE_LINE_WIDTH)
     : hazard.kind === "CROSS"
-      ? Math.max(hazard.width, CART_FORCED_DODGE_CROSS_WIDTH)
+      ? clamp(hazard.width, 5.6, CART_FORCED_DODGE_CROSS_WIDTH)
       : hazard.width;
   const length = hazard.kind === "LINE" || hazard.kind === "CROSS"
     ? Math.max(hazard.length, CART_FORCED_DODGE_LINE_LENGTH)
     : hazard.length;
+  const radius = hazard.kind === "CIRCLE"
+    ? clamp(hazard.radius, 5.8, CART_FORCED_DODGE_CIRCLE_RADIUS)
+    : hazard.kind === "CONE"
+      ? clamp(hazard.radius, 15.5, CART_FORCED_DODGE_CONE_RADIUS)
+      : hazard.radius;
+  const outerRadius = hazard.kind === "DONUT"
+    ? clamp(hazard.outerRadius, 10.8, CART_FORCED_DODGE_DONUT_OUTER_RADIUS)
+    : hazard.outerRadius;
+  const innerRadius = hazard.kind === "DONUT" ? outerRadius * 0.36 : hazard.innerRadius;
+  const coneAngle = hazard.kind === "CONE"
+    ? Math.min(hazard.coneAngle, CART_FORCED_DODGE_CONE_ANGLE)
+    : hazard.coneAngle;
+
+  if (hazard.kind === "DONUT") {
+    const ringMid = (innerRadius + outerRadius) * 0.5;
+    x -= Math.sin(heading) * ringMid;
+    z -= Math.cos(heading) * ringMid;
+    ({ x, z } = clampField(x, z));
+  } else if (hazard.kind === "CONE") {
+    const behind = Math.min(4.2, radius * 0.22);
+    x -= Math.sin(heading) * behind;
+    z -= Math.cos(heading) * behind;
+    ({ x, z } = clampField(x, z));
+  }
 
   return {
     kind: hazard.kind,
@@ -176,10 +198,10 @@ function correctedSpec(
     heading: hazard.kind === "LINE" || hazard.kind === "CROSS" || hazard.kind === "CONE" ? heading : hazard.heading,
     width,
     length,
-    radius: hazard.radius,
-    innerRadius: hazard.innerRadius,
-    outerRadius: hazard.outerRadius,
-    coneAngle: hazard.coneAngle,
+    radius,
+    innerRadius,
+    outerRadius,
+    coneAngle,
     telegraphSeconds: lockSeconds,
   };
 }
@@ -205,6 +227,47 @@ function applyForcedLock(
   state.active = true;
 }
 
+/**
+ * During a forced FIELD lock, explicit player evasion gets a small arcade assist.
+ * No input means no assist: passive straight driving is still punished. The
+ * assist only amplifies a deliberate steer/brake decision so a readable raid
+ * telegraph is mechanically escapable on a phone-sized control surface.
+ */
+function applyReactionAssist(session: CartArenaSession, input: RallyInputState, delta: number): void {
+  const raid = getCartRaidHazardState(session);
+  const forced = raid.hazards.find((hazard) =>
+    hazard.source === "FIELD"
+    && hazard.phase === "LOCKED"
+    && hazard.secondsToFire > 0
+    && hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX),
+  );
+  if (!forced) return;
+
+  const rawSteer = clamp(input.strafe ?? input.steer, -1, 1);
+  const brake = clamp(input.brake, 0, 1);
+  const steerMagnitude = Math.abs(rawSteer);
+  if (steerMagnitude < CART_FORCED_DODGE_REACTION_STEER_THRESHOLD && brake < CART_FORCED_DODGE_REACTION_BRAKE_THRESHOLD) return;
+
+  // Cart Rogue inverts the raw steering input before RallyCar consumes it.
+  const effectiveSteer = -rawSteer;
+  const urgency = clamp(1 - forced.secondsToFire / Math.max(0.001, forced.telegraphSeconds), 0, 1);
+  const assistScale = 0.72 + urgency * 0.28;
+  if (steerMagnitude >= CART_FORCED_DODGE_REACTION_STEER_THRESHOLD) {
+    session.car.heading += effectiveSteer * CART_FORCED_DODGE_REACTION_YAW_RATE * assistScale * delta;
+    session.car.lateralVelocity = clamp(
+      session.car.lateralVelocity + effectiveSteer * CART_FORCED_DODGE_REACTION_LATERAL_ACCELERATION * assistScale * delta,
+      -CART_FORCED_DODGE_REACTION_MAX_LATERAL_SPEED,
+      CART_FORCED_DODGE_REACTION_MAX_LATERAL_SPEED,
+    );
+  }
+  if (brake >= CART_FORCED_DODGE_REACTION_BRAKE_THRESHOLD && session.car.forwardVelocity > 0) {
+    session.car.forwardVelocity = Math.max(
+      0,
+      session.car.forwardVelocity - CART_FORCED_DODGE_REACTION_EXTRA_BRAKE * brake * assistScale * delta,
+    );
+  }
+}
+
 export function installCartRoguePhase93ForcedDodgeTrajectory2(): void {
   const prototype = CartArenaSession.prototype as unknown as Phase93Session;
   const previousStep = prototype.step;
@@ -213,10 +276,12 @@ export function installCartRoguePhase93ForcedDodgeTrajectory2(): void {
     input: RallyInputState,
     fixedDelta = 1 / 60,
   ): void {
-    previousStep.call(this, input, fixedDelta);
     const session = this as unknown as CartArenaSession;
-    if (!isCartTurboHuntEnabled(session)) return;
     const delta = clamp(fixedDelta, 0, 0.05);
+    if (isCartTurboHuntEnabled(session)) applyReactionAssist(session, input, delta);
+
+    previousStep.call(this, input, fixedDelta);
+    if (!isCartTurboHuntEnabled(session)) return;
     const state = stateFor(this);
     const raid = getCartRaidHazardState(session);
     const fieldHazards = raid.hazards.filter((hazard) => hazard.source === "FIELD");
