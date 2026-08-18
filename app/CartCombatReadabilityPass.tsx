@@ -51,6 +51,13 @@ export default function CartCombatReadabilityPass() {
             font-size: clamp(12px, 2vw, 18px) !important;
             transform: translateX(-50%) scale(${imminent ? ".48" : ".62"}) !important;
           }
+          .${phaseStyles.wallRide} {
+            opacity: ${imminent ? ".06" : ".18"} !important;
+            filter: none !important;
+            font-size: clamp(10px, 1.8vw, 16px) !important;
+            text-shadow: none !important;
+            transform: translateX(-50%) scale(${imminent ? ".48" : ".58"}) !important;
+          }
           .${phaseStyles.rewardBanner} {
             opacity: ${imminent ? ".1" : ".28"} !important;
             font-size: 8px !important;
