@@ -72,6 +72,7 @@ import "./CartRoguePhase85PursuitEvents";
 import "./CartRoguePhase86BossPredator";
 import "./CartRoguePhase87ThreatPressure2";
 import "./CartRoguePhase88RaidHazards";
+import "./CartRoguePhase88RaidHazardVisualAlignment";
 import "./CartRoguePhase89HazardCombatDirector";
 import "./CartRoguePhase90TitanRaidBoss4";
 import "./CartGameplayAuditRuntime";
