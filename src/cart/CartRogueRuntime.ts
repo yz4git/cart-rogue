@@ -78,6 +78,7 @@ import "./CartRoguePhase90TitanRaidBoss4";
 import "./CartRoguePhase91DamageFeedback2";
 import "./CartRoguePhase93ForcedDodgeTrajectory2";
 import "./CartRoguePhase94EscapeRhythmDirector2";
+import "./CartRaidEvasionCarry";
 import "./CartGameplayAuditRuntime";
 import "./CartRenderAuditRuntime";
 
