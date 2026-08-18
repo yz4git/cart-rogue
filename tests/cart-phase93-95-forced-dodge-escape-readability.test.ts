@@ -98,6 +98,7 @@ test("Phases 93-95 preserve fixed pools and put danger readability ahead of rewa
   assert.match(phase94Source, /phase94-escape-rhythm-root/);
   assert.match(readabilitySource, /combo/);
   assert.match(readabilitySource, /ramBanner/);
+  assert.match(readabilitySource, /wallRide/);
   assert.match(readabilitySource, /rewardBanner/);
   assert.match(readabilitySource, /Escape rhythm status/);
   assert.match(readabilityCss, /escapeBadge/);
