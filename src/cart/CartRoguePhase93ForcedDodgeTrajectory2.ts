@@ -34,9 +34,12 @@ let latestSnapshot: CartForcedDodgeTrajectorySnapshot | null = null;
 
 export const CART_FORCED_DODGE_TRAJECTORY_EVENT = "cart-forced-dodge-trajectory-snapshot";
 export const CART_FORCED_DODGE_LOCK_MIN_SECONDS = 0.78;
-export const CART_FORCED_DODGE_LOCK_MAX_SECONDS = 1.05;
+export const CART_FORCED_DODGE_LOCK_MAX_SECONDS = 0.86;
 export const CART_FORCED_DODGE_ACCELERATION = 8.5;
 export const CART_FORCED_DODGE_FIELD_MARGIN = 7;
+export const CART_FORCED_DODGE_LINE_WIDTH = 12.5;
+export const CART_FORCED_DODGE_LINE_LENGTH = 44;
+export const CART_FORCED_DODGE_CROSS_WIDTH = 9.5;
 export const CART_FORCED_DODGE_LABEL_PREFIX = "LOCKED INTERCEPT";
 
 function clamp(value: number, min: number, max: number): number {
@@ -155,6 +158,15 @@ function correctedSpec(
     ({ x, z } = clampField(x, z));
   }
 
+  const width = hazard.kind === "LINE"
+    ? Math.max(hazard.width, CART_FORCED_DODGE_LINE_WIDTH)
+    : hazard.kind === "CROSS"
+      ? Math.max(hazard.width, CART_FORCED_DODGE_CROSS_WIDTH)
+      : hazard.width;
+  const length = hazard.kind === "LINE" || hazard.kind === "CROSS"
+    ? Math.max(hazard.length, CART_FORCED_DODGE_LINE_LENGTH)
+    : hazard.length;
+
   return {
     kind: hazard.kind,
     source: "FIELD",
@@ -162,8 +174,8 @@ function correctedSpec(
     x,
     z,
     heading: hazard.kind === "LINE" || hazard.kind === "CROSS" || hazard.kind === "CONE" ? heading : hazard.heading,
-    width: hazard.width,
-    length: hazard.length,
+    width,
+    length,
     radius: hazard.radius,
     innerRadius: hazard.innerRadius,
     outerRadius: hazard.outerRadius,
