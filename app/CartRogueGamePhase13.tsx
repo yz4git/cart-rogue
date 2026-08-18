@@ -14,7 +14,9 @@ export default function CartRogueGamePhase13() {
   useEffect(() => {
     // Existing WebGL/gameplay audits intentionally exercise the live game
     // immediately. Real players still enter through the title screen.
-    if (navigator.webdriver) setStarted(true);
+    if (!navigator.webdriver) return undefined;
+    const timer = window.setTimeout(() => setStarted(true), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   return <>
