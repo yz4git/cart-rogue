@@ -6,26 +6,33 @@ interface Phase88AlignmentDemo {
   updateVisuals(delta: number): void;
 }
 
+const upgradedWarningMaterials = new WeakSet<THREE.Material>();
+
+function upgradeWarningMaterial(material: THREE.MeshBasicMaterial): void {
+  if (upgradedWarningMaterials.has(material)) return;
+  const hex = material.color.getHex();
+  if (hex === 0xff1238) {
+    material.color.setHex(0xff001e);
+    material.opacity = 0.58;
+  } else if (hex === 0xff2416) {
+    material.color.setHex(0xff1200);
+    material.opacity = 0.72;
+  } else if (hex === 0xffb000) {
+    material.color.setHex(0xffd000);
+    material.opacity = 0.82;
+  } else if (hex === 0xffffff) {
+    material.opacity = 0.94;
+  }
+  material.needsUpdate = true;
+  upgradedWarningMaterials.add(material);
+}
+
 function enforceHighContrastWarningMaterials(scene: THREE.Scene): void {
   const root = scene.getObjectByName("phase88-raid-hazard-root");
-  if (!root || root.userData.highContrastWarning === true) return;
+  if (!root) return;
   root.traverse((object) => {
     if (!(object instanceof THREE.Mesh) || !(object.material instanceof THREE.MeshBasicMaterial)) return;
-    const material = object.material;
-    const hex = material.color.getHex();
-    if (hex === 0xff1238) {
-      material.color.setHex(0xff001e);
-      material.opacity = 0.58;
-    } else if (hex === 0xff2416) {
-      material.color.setHex(0xff1200);
-      material.opacity = 0.72;
-    } else if (hex === 0xffb000) {
-      material.color.setHex(0xffd000);
-      material.opacity = 0.82;
-    } else if (hex === 0xffffff) {
-      material.opacity = 0.94;
-    }
-    material.needsUpdate = true;
+    upgradeWarningMaterial(object.material);
   });
   root.userData.highContrastWarning = true;
   root.userData.warningPalette = "alarm-red-amber-white";
@@ -35,8 +42,8 @@ function enforceHighContrastWarningMaterials(scene: THREE.Scene): void {
  * CircleGeometry sectors are authored around local +X while gameplay heading 0
  * points toward world +Z. Apply the fixed quarter-turn after Phase88 updates
  * its pooled cone meshes so the visible warning exactly matches hit testing.
- * Also upgrade the shared materials once so bright pastel scenery cannot wash
- * the hazard language out on an iPhone display.
+ * Shared warning materials are upgraded on first use, so TRACKING, LOCKED,
+ * IMMINENT and FIRED states all stay readable against the bright scenery.
  */
 export function installCartRoguePhase88RaidHazardVisualAlignment(): void {
   const prototype = CartRogueWebGLDemo.prototype as unknown as Phase88AlignmentDemo;
