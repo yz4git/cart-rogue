@@ -13,6 +13,7 @@ on:
       - "public/**"
       - "scripts/capture-webgl-audit.mjs"
       - "scripts/capture-raid-hazard-audit.mjs"
+      - "scripts/capture-raid-damage-audit.mjs"
       - "scripts/capture-iphone-landscape-layout.mjs"
       - "tests/**"
       - "package.json"
@@ -81,6 +82,19 @@ jobs:
             node scripts/capture-raid-hazard-audit.mjs
           test -s artifacts/webgl-audit/cart-rogue-raid-hazard.png
           test -s artifacts/webgl-audit/raid-hazard-state.json
+      - name: Capture straight-line raid damage feedback
+        run: |
+          DRIVER="$(command -v chromedriver || true)"
+          if [ -z "$DRIVER" ] && [ -n "${CHROMEWEBDRIVER:-}" ] && [ -x "$CHROMEWEBDRIVER/chromedriver" ]; then
+            DRIVER="$CHROMEWEBDRIVER/chromedriver"
+          fi
+          WEBDRIVER_BIN="$DRIVER" \
+            AUDIT_URL="http://127.0.0.1:3000/" \
+            RAID_DAMAGE_AUDIT_OUTPUT="artifacts/webgl-audit/cart-rogue-raid-damage.png" \
+            RAID_DAMAGE_AUDIT_STATE_OUTPUT="artifacts/webgl-audit/raid-damage-state.json" \
+            node scripts/capture-raid-damage-audit.mjs
+          test -s artifacts/webgl-audit/cart-rogue-raid-damage.png
+          test -s artifacts/webgl-audit/raid-damage-state.json
       - name: Verify iPhone landscape UI fit
         run: |
           DRIVER="$(command -v chromedriver || true)"
