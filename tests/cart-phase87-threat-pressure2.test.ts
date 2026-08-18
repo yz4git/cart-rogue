@@ -96,9 +96,15 @@ test("Boss pressure is fast outside counter windows and Phase87 never destroys t
   assert.ok((boss.chargeCooldown ?? 0) >= 3.6);
 });
 
-test("Phase87 is the final gameplay wrapper", () => {
+test("Phase87 remains before the raid hazard wrappers", () => {
   const phase86 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase86BossPredator");
   const phase87 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase87ThreatPressure2");
+  const phase88 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase88RaidHazards");
+  const phase89 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase89HazardCombatDirector");
+  const phase90 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase90TitanRaidBoss4");
   assert.ok(phase87 > phase86);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase87ThreatPressure2");
+  assert.ok(phase88 > phase87);
+  assert.ok(phase89 > phase88);
+  assert.ok(phase90 > phase89);
+  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase90TitanRaidBoss4");
 });

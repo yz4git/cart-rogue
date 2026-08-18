@@ -37,6 +37,8 @@ jobs:
         run: npm run test:threat
       - name: Threat Pressure regression
         run: npm run test:pressure
+      - name: Raid hazard regression
+        run: npm run test:raid
       - name: iPhone landscape UI regression
         run: node --import tsx --test tests/cart-iphone-landscape-ui.test.ts
       - name: Test

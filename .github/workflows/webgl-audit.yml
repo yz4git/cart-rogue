@@ -12,6 +12,7 @@ on:
       - "src/rally/**"
       - "public/**"
       - "scripts/capture-webgl-audit.mjs"
+      - "scripts/capture-raid-hazard-audit.mjs"
       - "scripts/capture-iphone-landscape-layout.mjs"
       - "tests/**"
       - "package.json"
@@ -67,6 +68,19 @@ jobs:
             node scripts/capture-webgl-audit.mjs
           test -s artifacts/webgl-audit/cart-rogue-webgl.png
           test -s artifacts/webgl-audit/runtime-state.json
+      - name: Capture visible raid hazard telegraph
+        run: |
+          DRIVER="$(command -v chromedriver || true)"
+          if [ -z "$DRIVER" ] && [ -n "${CHROMEWEBDRIVER:-}" ] && [ -x "$CHROMEWEBDRIVER/chromedriver" ]; then
+            DRIVER="$CHROMEWEBDRIVER/chromedriver"
+          fi
+          WEBDRIVER_BIN="$DRIVER" \
+            AUDIT_URL="http://127.0.0.1:3000/" \
+            RAID_AUDIT_OUTPUT="artifacts/webgl-audit/cart-rogue-raid-hazard.png" \
+            RAID_AUDIT_STATE_OUTPUT="artifacts/webgl-audit/raid-hazard-state.json" \
+            node scripts/capture-raid-hazard-audit.mjs
+          test -s artifacts/webgl-audit/cart-rogue-raid-hazard.png
+          test -s artifacts/webgl-audit/raid-hazard-state.json
       - name: Verify iPhone landscape UI fit
         run: |
           DRIVER="$(command -v chromedriver || true)"
