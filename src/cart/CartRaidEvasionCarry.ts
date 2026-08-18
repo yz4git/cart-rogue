@@ -62,12 +62,14 @@ function clampToHuntField(session: EvasionCarrySession): void {
  * though, which previously made a correct phone dodge fail in the full game
  * even while the isolated 60 Hz tests passed.
  *
- * This tiny post-physics carry is the bridge: while the same forced telegraph
- * is alive, a committed steering input keeps moving the car laterally at a
- * bounded velocity for at most 0.72 s. It is spread across fixed steps, never
- * teleports the car, stays inside the Hunt field, and disappears immediately
- * when the hazard resolves. No input means no carry, so passive driving remains
- * punishable.
+ * This tiny post-physics carry is the bridge: after the reaction telegraph has
+ * settled for one fixed step, a committed steering input keeps moving the car
+ * laterally at a bounded velocity for at most 0.72 s. Waiting for the stable
+ * forced-hazard id prevents the assist from moving the car in the exact frame
+ * that Phase93 is still replacing/shrinking the telegraph. It is spread across
+ * fixed steps, never teleports the car, stays inside the Hunt field, and
+ * disappears immediately when the hazard resolves. No input means no carry,
+ * so passive driving remains punishable.
  */
 export function installCartRaidEvasionCarry(): void {
   const prototype = CartArenaSession.prototype as unknown as EvasionCarrySession;
@@ -104,6 +106,7 @@ export function installCartRaidEvasionCarry(): void {
         state.hazardId = forced.id;
         state.direction = direction;
         state.seconds = Math.min(CART_RAID_EVASION_CARRY_SECONDS, Math.max(0, forced.secondsToFire));
+        return;
       }
     }
 
