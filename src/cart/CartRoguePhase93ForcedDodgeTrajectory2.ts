@@ -66,6 +66,9 @@ export const CART_FORCED_DODGE_REACTION_YAW_RATE = 0.92;
 export const CART_FORCED_DODGE_REACTION_LATERAL_ACCELERATION = 7.5;
 export const CART_FORCED_DODGE_REACTION_EXTRA_BRAKE = 7.5;
 export const CART_FORCED_DODGE_REACTION_MAX_LATERAL_SPEED = 13.5;
+export const CART_FORCED_DODGE_REACTION_LATERAL_IMPULSE = 8.5;
+export const CART_FORCED_DODGE_REACTION_YAW_KICK = 0.18;
+export const CART_FORCED_DODGE_REACTION_FORWARD_DAMP = 0.82;
 export const CART_FORCED_DODGE_LABEL_PREFIX = "LOCKED INTERCEPT";
 
 function clamp(value: number, min: number, max: number): number {
@@ -324,6 +327,7 @@ function commitReactionWindow(
   session: CartArenaSession,
   state: InternalState,
   hazard: CartRaidHazardPublicState,
+  input: RallyInputState,
 ): void {
   if (state.reactionCommitted) return;
   state.reactionCommitted = true;
@@ -343,6 +347,25 @@ function commitReactionWindow(
   if (id === null) return;
   state.correctedIds.add(id);
   state.correctedHazardId = id;
+
+  // One committed dodge gets a tactile arcade kick. This is velocity/heading
+  // response, not a teleport, and only happens once when the player chooses to
+  // evade. It is shared by keyboard and iPhone touch because both reach the
+  // same RallyInputState path.
+  const rawSteer = clamp(input.strafe ?? input.steer, -1, 1);
+  const brake = clamp(input.brake, 0, 1);
+  const effectiveSteer = -rawSteer;
+  if (Math.abs(rawSteer) >= CART_FORCED_DODGE_REACTION_STEER_THRESHOLD) {
+    session.car.heading += effectiveSteer * CART_FORCED_DODGE_REACTION_YAW_KICK;
+    session.car.lateralVelocity = clamp(
+      session.car.lateralVelocity + effectiveSteer * CART_FORCED_DODGE_REACTION_LATERAL_IMPULSE,
+      -CART_FORCED_DODGE_REACTION_MAX_LATERAL_SPEED,
+      CART_FORCED_DODGE_REACTION_MAX_LATERAL_SPEED,
+    );
+  }
+  if (brake >= CART_FORCED_DODGE_REACTION_BRAKE_THRESHOLD && session.car.forwardVelocity > 0) {
+    session.car.forwardVelocity *= CART_FORCED_DODGE_REACTION_FORWARD_DAMP;
+  }
 }
 
 /**
@@ -404,7 +427,7 @@ export function installCartRoguePhase93ForcedDodgeTrajectory2(): void {
       );
       if (before) {
         if (explicitEvasion(input)) {
-          commitReactionWindow(session, state, before);
+          commitReactionWindow(session, state, before, input);
           applyReactionAssist(session, input, delta);
         } else {
           softTrackPassiveLine(session, input, state, before);
