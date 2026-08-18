@@ -105,49 +105,56 @@ async function runScenario(sessionId, mode, seconds) {
   let direction = 1;
   let lastReactionAt = 0;
 
-  while (Date.now() - started < seconds * 1000) {
-    const now = Date.now();
-    const state = await sample(sessionId);
-    if (!state.ready) throw new Error(`playtest runtime lost: ${JSON.stringify(state)}`);
-    metrics.samples += 1;
-    metrics.durationSeconds = (now - started) / 1000;
-    if (state.hazard) metrics.hazardActiveMs += 55;
-    if (state.hazard && !previousHazard) metrics.hazardEpisodes += 1;
-    if (state.directHit && !previousHit) metrics.hits += 1;
-    if (state.perfect && !previousPerfect) metrics.perfectDodges += 1;
-    if (state.gas !== null) metrics.gasSamples.push(state.gas);
+  // Both scenarios continuously accelerate. The only difference is whether
+  // the reactive run changes line/brakes after a visible AOE LOCK.
+  await key(sessionId, "ArrowUp", true);
+  try {
+    while (Date.now() - started < seconds * 1000) {
+      const now = Date.now();
+      const state = await sample(sessionId);
+      if (!state.ready) throw new Error(`playtest runtime lost: ${JSON.stringify(state)}`);
+      metrics.samples += 1;
+      metrics.durationSeconds = (now - started) / 1000;
+      if (state.hazard) metrics.hazardActiveMs += 55;
+      if (state.hazard && !previousHazard) metrics.hazardEpisodes += 1;
+      if (state.directHit && !previousHit) metrics.hits += 1;
+      if (state.perfect && !previousPerfect) metrics.perfectDodges += 1;
+      if (state.gas !== null) metrics.gasSamples.push(state.gas);
 
-    if (mode === "reactive" && state.locked && now - lastReactionAt > 650) {
-      direction *= -1;
-      steering = direction;
-      await key(sessionId, direction < 0 ? "ArrowLeft" : "ArrowRight", true);
-      steerReleaseAt = now + 920;
-      metrics.steerActions += 1;
-      lastReactionAt = now;
-      if (metrics.steerActions % 2 === 0) {
-        await key(sessionId, "ArrowDown", true);
-        braking = true;
-        brakeReleaseAt = now + 240;
-        metrics.brakeActions += 1;
+      if (mode === "reactive" && state.locked && now - lastReactionAt > 650) {
+        direction *= -1;
+        steering = direction;
+        await key(sessionId, direction < 0 ? "ArrowLeft" : "ArrowRight", true);
+        steerReleaseAt = now + 920;
+        metrics.steerActions += 1;
+        lastReactionAt = now;
+        if (metrics.steerActions % 2 === 0) {
+          await key(sessionId, "ArrowDown", true);
+          braking = true;
+          brakeReleaseAt = now + 240;
+          metrics.brakeActions += 1;
+        }
       }
-    }
-    if (steering !== 0 && now >= steerReleaseAt) {
-      await key(sessionId, steering < 0 ? "ArrowLeft" : "ArrowRight", false);
-      steering = 0;
-    }
-    if (braking && now >= brakeReleaseAt) {
-      await key(sessionId, "ArrowDown", false);
-      braking = false;
-    }
+      if (steering !== 0 && now >= steerReleaseAt) {
+        await key(sessionId, steering < 0 ? "ArrowLeft" : "ArrowRight", false);
+        steering = 0;
+      }
+      if (braking && now >= brakeReleaseAt) {
+        await key(sessionId, "ArrowDown", false);
+        braking = false;
+      }
 
-    previousHazard = state.hazard;
-    previousHit = state.directHit;
-    previousPerfect = state.perfect;
-    await sleep(55);
+      previousHazard = state.hazard;
+      previousHit = state.directHit;
+      previousPerfect = state.perfect;
+      await sleep(55);
+    }
+  } finally {
+    await key(sessionId, "ArrowUp", false);
+    if (steering !== 0) await key(sessionId, steering < 0 ? "ArrowLeft" : "ArrowRight", false);
+    if (braking) await key(sessionId, "ArrowDown", false);
   }
 
-  if (steering !== 0) await key(sessionId, steering < 0 ? "ArrowLeft" : "ArrowRight", false);
-  if (braking) await key(sessionId, "ArrowDown", false);
   metrics.hazardActiveRatio = metrics.durationSeconds > 0 ? metrics.hazardActiveMs / (metrics.durationSeconds * 1000) : 0;
   metrics.startGas = metrics.gasSamples[0] ?? null;
   metrics.endGas = metrics.gasSamples.at(-1) ?? null;
@@ -159,18 +166,23 @@ async function runScenario(sessionId, mode, seconds) {
 async function waitForEscape(sessionId, timeoutSeconds) {
   const started = Date.now();
   let lastState = null;
-  while (Date.now() - started < timeoutSeconds * 1000) {
-    lastState = await sample(sessionId);
-    if (!lastState?.ready) throw new Error(`escape observation runtime lost: ${JSON.stringify(lastState)}`);
-    if (lastState.escape) {
-      return {
-        observed: true,
-        wallSeconds: (Date.now() - started) / 1000,
-        text: lastState.escapeText,
-        textSample: lastState.textSample,
-      };
+  await key(sessionId, "ArrowUp", true);
+  try {
+    while (Date.now() - started < timeoutSeconds * 1000) {
+      lastState = await sample(sessionId);
+      if (!lastState?.ready) throw new Error(`escape observation runtime lost: ${JSON.stringify(lastState)}`);
+      if (lastState.escape) {
+        return {
+          observed: true,
+          wallSeconds: (Date.now() - started) / 1000,
+          text: lastState.escapeText,
+          textSample: lastState.textSample,
+        };
+      }
+      await sleep(75);
     }
-    await sleep(75);
+  } finally {
+    await key(sessionId, "ArrowUp", false);
   }
   return {
     observed: false,
