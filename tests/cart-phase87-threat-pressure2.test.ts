@@ -96,17 +96,21 @@ test("Boss pressure is fast outside counter windows and Phase87 never destroys t
   assert.ok((boss.chargeCooldown ?? 0) >= 3.6);
 });
 
-test("Phase87 remains before the raid hazard and damage feedback wrappers", () => {
+test("Phase87 remains before raid, damage, forced dodge and escape wrappers", () => {
   const phase86 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase86BossPredator");
   const phase87 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase87ThreatPressure2");
   const phase88 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase88RaidHazards");
   const phase89 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase89HazardCombatDirector");
   const phase90 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase90TitanRaidBoss4");
   const phase91 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase91DamageFeedback2");
+  const phase93 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase93ForcedDodgeTrajectory2");
+  const phase94 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase94EscapeRhythmDirector2");
   assert.ok(phase87 > phase86);
   assert.ok(phase88 > phase87);
   assert.ok(phase89 > phase88);
   assert.ok(phase90 > phase89);
   assert.ok(phase91 > phase90);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase91DamageFeedback2");
+  assert.ok(phase93 > phase91);
+  assert.ok(phase94 > phase93);
+  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase94EscapeRhythmDirector2");
 });
