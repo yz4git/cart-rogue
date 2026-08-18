@@ -67,20 +67,20 @@ function runExplicitEvasion(kind: CartRaidHazardKind, steer: -1 | 1): ReturnType
   assert.ok(forced.correctedSerial >= 1, `${kind} did not become a forced lock`);
 
   let raid = getCartRaidHazardState(session);
-  const firstBeat = raid.hazards.find((hazard) =>
-    hazard.source === "FIELD" && hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX),
+  assert.ok(
+    raid.hazards.some((hazard) => hazard.source === "FIELD" && hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX)),
+    `${kind} did not expose the forced first beat`,
   );
-  assert.ok(firstBeat, `${kind} did not expose the forced first beat`);
 
   const evasion = steer > 0 ? evadeRight : evadeLeft;
+  const startingResults = raid.hitSerial + raid.clearSerial;
   for (let index = 0; index < 32; index += 1) {
     session.step(evasion, 0.05);
     raid = getCartRaidHazardState(session);
-    const current = raid.hazards.find((hazard) => hazard.id === firstBeat.id);
-    // Phase97 intentionally continues the sequence after this dodge. Stop at
-    // the first beat's resolution so this legacy Phase93 test measures only
-    // whether the original forced shape remains fairly escapable.
-    if (!current || current.phase === "FIRED") break;
+    // Phase97 intentionally continues after this result. Stop at the first
+    // resolved hazard so this historical test still answers its original
+    // question: is the forced first beat itself fairly escapable?
+    if (raid.hitSerial + raid.clearSerial > startingResults) break;
   }
   return raid;
 }
