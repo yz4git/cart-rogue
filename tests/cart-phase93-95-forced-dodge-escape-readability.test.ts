@@ -115,6 +115,33 @@ test("a live FIELD telegraph is replaced once at LOCK with a forced intercept", 
   );
 });
 
+test("same-frame early dodge input cannot drag the forced target toward the dodge", () => {
+  const session = new CartArenaSession();
+  enableCartTurboHunt(session);
+  session.car.forwardVelocity = 14;
+  session.car.speed = 14;
+  queueShape(session, "LINE");
+
+  // This mirrors the WebGL/UI race: the player sees ordinary LOCK and already
+  // has steer+brake held by the frame Phase93 replaces it with forced LOCK.
+  session.step(evadeRight, 0.05);
+  const forced = getCartForcedDodgeTrajectoryState(session);
+  assert.ok(forced.correctedSerial >= 1, JSON.stringify(forced));
+
+  const straight = cartForcedDodgePredictedPoint(session, driveStraight, forced.lockSeconds);
+  const evading = cartForcedDodgePredictedPoint(session, evadeRight, forced.lockSeconds);
+  const forcedToStraight = Math.hypot(forced.predictedX - straight.x, forced.predictedZ - straight.z);
+  const forcedToEvading = Math.hypot(forced.predictedX - evading.x, forced.predictedZ - evading.z);
+  assert.ok(forcedToStraight < forcedToEvading, JSON.stringify({ forced, straight, evading, forcedToStraight, forcedToEvading }));
+
+  let raid = getCartRaidHazardState(session);
+  for (let index = 0; index < 32 && raid.hazards.some((hazard) => hazard.source === "FIELD"); index += 1) {
+    session.step(evadeRight, 0.05);
+    raid = getCartRaidHazardState(session);
+  }
+  assert.equal(raid.hitSerial, 0, JSON.stringify(raid));
+});
+
 test("passive straight driving is punishable within the opening raid cycle", () => {
   const session = new CartArenaSession();
   enableCartTurboHunt(session);
@@ -167,6 +194,7 @@ test("Phases 93-95 preserve fixed pools and put danger readability ahead of rewa
   assert.doesNotMatch(phase94Source, /new CartEnemy|enemies\.push|new THREE\.InstancedMesh|setColorAt|instanceColor|TextureLoader/);
   assert.match(phase93Source, /applyReactionAssist/);
   assert.match(phase93Source, /softTrackPassiveLine/);
+  assert.match(phase93Source, /passivePredictionInput/);
   assert.match(phase94Source, /phase94-escape-rhythm-root/);
   assert.match(readabilitySource, /combo/);
   assert.match(readabilitySource, /ramBanner/);
