@@ -102,20 +102,22 @@ try {
   }
   if (!ready?.ready) throw new Error(`Raid damage audit runtime did not become ready: ${JSON.stringify(ready)}`);
 
-  // Prove the gameplay request directly: hold a straight accelerating line and
-  // do not steer or brake. Predictive AOEs should intercept this path instead
-  // of allowing the car to pass through safely by doing nothing.
+  // Hold a straight accelerating line and never steer or brake. Phase94 may
+  // intentionally clear FIELD AOE during its 1.6s escape-introduction grace,
+  // so this presentation audit spans that opening and waits for the next
+  // natural forced-intercept hit instead of assuming the first telegraph fires.
   await execute(sessionId, `
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', code: 'ArrowUp', bubbles: true, cancelable: true }));
     return true;
   `);
 
   let state = null;
-  for (let attempt = 0; attempt < 700; attempt += 1) {
+  for (let attempt = 0; attempt < 2600; attempt += 1) {
     state = await execute(sessionId, `
       const canvas = document.querySelector('canvas.cart-rogue-canvas');
       const text = document.body.innerText || '';
       const overlay = document.querySelector('[aria-label="Damage taken"]');
+      const escape = document.querySelector('[aria-label="Escape rhythm status"]');
       if (!canvas) return { ready: false, directHit: false };
       const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
       const directHit = Boolean(overlay) && text.includes('DIRECT HIT') && text.includes('GAS -8%') && text.includes('SPEED -42%');
@@ -124,6 +126,7 @@ try {
         ready: Boolean(gl) && !gl.isContextLost(),
         directHit,
         aoeWarning,
+        escapeActive: Boolean(escape),
         overlayVisible: Boolean(overlay),
         hasGasLoss: text.includes('GAS -8%'),
         hasSpeedLoss: text.includes('SPEED -42%'),
