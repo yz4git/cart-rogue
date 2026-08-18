@@ -21,6 +21,7 @@ export interface CartForcedDodgeTrajectorySnapshot {
 
 interface InternalState extends CartForcedDodgeTrajectorySnapshot {
   correctedIds: Set<number>;
+  reactionCommitted: boolean;
   broadcastClock: number;
 }
 
@@ -35,6 +36,7 @@ let latestSnapshot: CartForcedDodgeTrajectorySnapshot | null = null;
 export const CART_FORCED_DODGE_TRAJECTORY_EVENT = "cart-forced-dodge-trajectory-snapshot";
 export const CART_FORCED_DODGE_LOCK_MIN_SECONDS = 0.94;
 export const CART_FORCED_DODGE_LOCK_MAX_SECONDS = 1.04;
+export const CART_FORCED_DODGE_FINAL_LOCK_SECONDS = 0.78;
 export const CART_FORCED_DODGE_ACCELERATION = 8.5;
 export const CART_FORCED_DODGE_FIELD_MARGIN = 7;
 export const CART_FORCED_DODGE_LINE_WIDTH = 8.8;
@@ -69,6 +71,7 @@ function stateFor(session: CartArenaSession | Phase93Session): InternalState {
     predictedX: 0,
     predictedZ: 0,
     correctedIds: new Set(),
+    reactionCommitted: false,
     broadcastClock: 0,
   };
   stateBySession.set(key, created);
@@ -145,17 +148,9 @@ export function cartForcedDodgePredictedPoint(
   return { ...point, travel, lateral };
 }
 
-function correctedSpec(
-  session: CartArenaSession,
+function hazardGeometry(
   hazard: CartRaidHazardPublicState,
-  input: RallyInputState,
-): Parameters<typeof queueCartRaidHazard>[1] {
-  const lockSeconds = clamp(hazard.secondsToFire, CART_FORCED_DODGE_LOCK_MIN_SECONDS, CART_FORCED_DODGE_LOCK_MAX_SECONDS);
-  const predicted = cartForcedDodgePredictedPoint(session, input, lockSeconds);
-  const heading = session.car.heading;
-  let x = predicted.x;
-  let z = predicted.z;
-
+): Pick<CartRaidHazardPublicState, "width" | "length" | "radius" | "innerRadius" | "outerRadius" | "coneAngle"> {
   const width = hazard.kind === "LINE"
     ? clamp(hazard.width, 7.6, CART_FORCED_DODGE_LINE_WIDTH)
     : hazard.kind === "CROSS"
@@ -176,32 +171,56 @@ function correctedSpec(
   const coneAngle = hazard.kind === "CONE"
     ? Math.min(hazard.coneAngle, CART_FORCED_DODGE_CONE_ANGLE)
     : hazard.coneAngle;
+  return { width, length, radius, innerRadius, outerRadius, coneAngle };
+}
 
+function predictedPlacement(
+  session: CartArenaSession,
+  hazard: CartRaidHazardPublicState,
+  input: RallyInputState,
+  seconds: number,
+): { x: number; z: number; heading: number; predictedX: number; predictedZ: number } {
+  const predicted = cartForcedDodgePredictedPoint(session, input, seconds);
+  const heading = session.car.heading;
+  const geometry = hazardGeometry(hazard);
+  let x = predicted.x;
+  let z = predicted.z;
   if (hazard.kind === "DONUT") {
-    const ringMid = (innerRadius + outerRadius) * 0.5;
+    const ringMid = (geometry.innerRadius + geometry.outerRadius) * 0.5;
     x -= Math.sin(heading) * ringMid;
     z -= Math.cos(heading) * ringMid;
     ({ x, z } = clampField(x, z));
   } else if (hazard.kind === "CONE") {
-    const behind = Math.min(4.2, radius * 0.22);
+    const behind = Math.min(4.2, geometry.radius * 0.22);
     x -= Math.sin(heading) * behind;
     z -= Math.cos(heading) * behind;
     ({ x, z } = clampField(x, z));
   }
+  return {
+    x,
+    z,
+    heading: hazard.kind === "LINE" || hazard.kind === "CROSS" || hazard.kind === "CONE" ? heading : hazard.heading,
+    predictedX: predicted.x,
+    predictedZ: predicted.z,
+  };
+}
 
+function correctedSpec(
+  session: CartArenaSession,
+  hazard: CartRaidHazardPublicState,
+  input: RallyInputState,
+): Parameters<typeof queueCartRaidHazard>[1] {
+  const lockSeconds = clamp(hazard.secondsToFire, CART_FORCED_DODGE_LOCK_MIN_SECONDS, CART_FORCED_DODGE_LOCK_MAX_SECONDS);
+  const placement = predictedPlacement(session, hazard, input, lockSeconds);
+  const geometry = hazardGeometry(hazard);
   return {
     kind: hazard.kind,
     source: "FIELD",
     label: `${CART_FORCED_DODGE_LABEL_PREFIX} · ${hazard.label}`,
-    x,
-    z,
-    heading: hazard.kind === "LINE" || hazard.kind === "CROSS" || hazard.kind === "CONE" ? heading : hazard.heading,
-    width,
-    length,
-    radius,
-    innerRadius,
-    outerRadius,
-    coneAngle,
+    x: placement.x,
+    z: placement.z,
+    heading: placement.heading,
+    ...geometry,
     telegraphSeconds: lockSeconds,
   };
 }
@@ -224,7 +243,49 @@ function applyForcedLock(
   state.lockSeconds = spec.telegraphSeconds ?? CART_FORCED_DODGE_LOCK_MIN_SECONDS;
   state.predictedX = predicted.x;
   state.predictedZ = predicted.z;
+  state.reactionCommitted = false;
   state.active = true;
+}
+
+function explicitEvasion(input: RallyInputState): boolean {
+  const steerMagnitude = Math.abs(clamp(input.strafe ?? input.steer, -1, 1));
+  const brake = clamp(input.brake, 0, 1);
+  return steerMagnitude >= CART_FORCED_DODGE_REACTION_STEER_THRESHOLD
+    || brake >= CART_FORCED_DODGE_REACTION_BRAKE_THRESHOLD;
+}
+
+/**
+ * Before the player makes an explicit dodge choice, keep a forced hazard on
+ * the latest no-new-evasion trajectory. Requeueing uses the same fixed pool
+ * and preserves the remaining countdown. As soon as the player steers/brakes,
+ * or the final readable reaction window begins, the hazard is frozen.
+ */
+function softTrackPassiveLine(
+  session: CartArenaSession,
+  input: RallyInputState,
+  state: InternalState,
+  hazard: CartRaidHazardPublicState,
+): void {
+  if (state.reactionCommitted || hazard.secondsToFire <= CART_FORCED_DODGE_FINAL_LOCK_SECONDS) return;
+  const remaining = hazard.secondsToFire;
+  const placement = predictedPlacement(session, hazard, input, remaining);
+  const geometry = hazardGeometry(hazard);
+  cancelCartRaidHazards(session, "FIELD");
+  const id = queueCartRaidHazard(session, {
+    kind: hazard.kind,
+    source: "FIELD",
+    label: hazard.label,
+    x: placement.x,
+    z: placement.z,
+    heading: placement.heading,
+    ...geometry,
+    telegraphSeconds: remaining,
+  });
+  if (id === null) return;
+  state.correctedIds.add(id);
+  state.correctedHazardId = id;
+  state.predictedX = placement.predictedX;
+  state.predictedZ = placement.predictedZ;
 }
 
 /**
@@ -241,13 +302,11 @@ function applyReactionAssist(session: CartArenaSession, input: RallyInputState, 
     && hazard.secondsToFire > 0
     && hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX),
   );
-  if (!forced) return;
+  if (!forced || !explicitEvasion(input)) return;
 
   const rawSteer = clamp(input.strafe ?? input.steer, -1, 1);
   const brake = clamp(input.brake, 0, 1);
   const steerMagnitude = Math.abs(rawSteer);
-  if (steerMagnitude < CART_FORCED_DODGE_REACTION_STEER_THRESHOLD && brake < CART_FORCED_DODGE_REACTION_BRAKE_THRESHOLD) return;
-
   // Cart Rogue inverts the raw steering input before RallyCar consumes it.
   const effectiveSteer = -rawSteer;
   const urgency = clamp(1 - forced.secondsToFire / Math.max(0.001, forced.telegraphSeconds), 0, 1);
@@ -278,11 +337,26 @@ export function installCartRoguePhase93ForcedDodgeTrajectory2(): void {
   ): void {
     const session = this as unknown as CartArenaSession;
     const delta = clamp(fixedDelta, 0, 0.05);
-    if (isCartTurboHuntEnabled(session)) applyReactionAssist(session, input, delta);
+    const state = stateFor(this);
+
+    if (isCartTurboHuntEnabled(session)) {
+      const before = getCartRaidHazardState(session).hazards.find((hazard) =>
+        hazard.source === "FIELD"
+        && hazard.phase === "LOCKED"
+        && hazard.secondsToFire > 0
+        && hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX),
+      );
+      if (before) {
+        if (explicitEvasion(input)) state.reactionCommitted = true;
+        else softTrackPassiveLine(session, input, state, before);
+        if (state.reactionCommitted) applyReactionAssist(session, input, delta);
+      } else {
+        state.reactionCommitted = false;
+      }
+    }
 
     previousStep.call(this, input, fixedDelta);
     if (!isCartTurboHuntEnabled(session)) return;
-    const state = stateFor(this);
     const raid = getCartRaidHazardState(session);
     const fieldHazards = raid.hazards.filter((hazard) => hazard.source === "FIELD");
     state.active = fieldHazards.some((hazard) => hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX));
