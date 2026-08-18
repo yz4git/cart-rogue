@@ -63,7 +63,7 @@ async function sample(sessionId) {
     return {
       ready: Boolean(canvas) && text.includes('TURBO HUNT'),
       hazard: /AOE (TRACKING|LOCKED|FIRING|IMPACT)/.test(text),
-      locked: text.includes('AOE LOCKED'),
+      locked: text.includes('AOE LOCKED') && text.includes('LOCKED INTERCEPT'),
       firing: text.includes('AOE FIRING'),
       directHit: Boolean(damage) && text.includes('DIRECT HIT'),
       perfect: text.includes('PERFECT AOE DODGE'),
@@ -88,76 +88,82 @@ function createMetrics(label) {
     perfectDodges: 0,
     steerActions: 0,
     brakeActions: 0,
+    reactionsCompleted: 0,
+    escapeEpisodes: 0,
+    firstEscapeSeconds: null,
     gasSamples: [],
   };
 }
 
-async function runScenario(sessionId, mode, seconds) {
+async function runScenario(sessionId, mode, maxSeconds) {
   const metrics = createMetrics(mode);
   const started = Date.now();
   let previousHazard = false;
   let previousHit = false;
   let previousPerfect = false;
-  let steering = 0;
-  let steerReleaseAt = 0;
-  let brakeReleaseAt = 0;
-  let braking = false;
-  let direction = 1;
-  let lastReactionAt = 0;
+  let previousEscape = false;
+  let reactionActive = false;
+  let reactionDirection = 1;
+  let currentState = null;
 
-  // Both scenarios continuously accelerate. The reactive run deliberately
-  // changes line AND briefly brakes at each AOE LOCK; the passive run does
-  // neither. This models the clear driving decision the game is supposed to teach.
-  await key(sessionId, "ArrowUp", true);
+  // Cart Rogue auto-accelerates in the live runtime. The passive run never
+  // changes line. The reactive run starts a full steering + brake maneuver
+  // only after the Phase93 LOCKED INTERCEPT is visibly committed, and holds it
+  // until that AOE resolves. This is event-driven rather than wall-clock-driven
+  // so headless SwiftShader speed cannot shorten the actual gameplay reaction.
   try {
-    while (Date.now() - started < seconds * 1000) {
-      const now = Date.now();
-      const state = await sample(sessionId);
-      if (!state.ready) throw new Error(`playtest runtime lost: ${JSON.stringify(state)}`);
+    while (Date.now() - started < maxSeconds * 1000) {
+      currentState = await sample(sessionId);
+      if (!currentState.ready) throw new Error(`playtest runtime lost: ${JSON.stringify(currentState)}`);
       metrics.samples += 1;
-      metrics.durationSeconds = (now - started) / 1000;
-      if (state.hazard) metrics.hazardActiveMs += 55;
-      if (state.hazard && !previousHazard) metrics.hazardEpisodes += 1;
-      if (state.directHit && !previousHit) metrics.hits += 1;
-      if (state.perfect && !previousPerfect) metrics.perfectDodges += 1;
-      if (state.gas !== null) metrics.gasSamples.push(state.gas);
+      metrics.durationSeconds = (Date.now() - started) / 1000;
+      if (currentState.hazard) metrics.hazardActiveMs += 65;
+      if (currentState.hazard && !previousHazard) metrics.hazardEpisodes += 1;
+      if (currentState.directHit && !previousHit) metrics.hits += 1;
+      if (currentState.perfect && !previousPerfect) metrics.perfectDodges += 1;
+      if (currentState.escape && !previousEscape) {
+        metrics.escapeEpisodes += 1;
+        if (metrics.firstEscapeSeconds === null) metrics.firstEscapeSeconds = metrics.durationSeconds;
+      }
+      if (currentState.gas !== null) metrics.gasSamples.push(currentState.gas);
 
-      if (mode === "reactive" && state.locked && now - lastReactionAt > 650) {
-        direction *= -1;
-        steering = direction;
-        await key(sessionId, direction < 0 ? "ArrowLeft" : "ArrowRight", true);
+      if (mode === "reactive" && currentState.locked && !reactionActive) {
+        reactionDirection *= -1;
+        await key(sessionId, reactionDirection < 0 ? "ArrowLeft" : "ArrowRight", true);
         await key(sessionId, "ArrowDown", true);
-        braking = true;
-        steerReleaseAt = now + 980;
-        brakeReleaseAt = now + 390;
+        reactionActive = true;
         metrics.steerActions += 1;
         metrics.brakeActions += 1;
-        lastReactionAt = now;
-      }
-      if (steering !== 0 && now >= steerReleaseAt) {
-        await key(sessionId, steering < 0 ? "ArrowLeft" : "ArrowRight", false);
-        steering = 0;
-      }
-      if (braking && now >= brakeReleaseAt) {
-        await key(sessionId, "ArrowDown", false);
-        braking = false;
       }
 
-      previousHazard = state.hazard;
-      previousHit = state.directHit;
-      previousPerfect = state.perfect;
-      await sleep(55);
+      if (reactionActive && (currentState.directHit || currentState.perfect || (!currentState.hazard && previousHazard))) {
+        await key(sessionId, reactionDirection < 0 ? "ArrowLeft" : "ArrowRight", false);
+        await key(sessionId, "ArrowDown", false);
+        reactionActive = false;
+        metrics.reactionsCompleted += 1;
+      }
+
+      previousHazard = currentState.hazard;
+      previousHit = currentState.directHit;
+      previousPerfect = currentState.perfect;
+      previousEscape = currentState.escape;
+
+      if (mode === "passive" && metrics.hits >= 1) break;
+      if (mode === "reactive" && metrics.reactionsCompleted >= 2 && !currentState.hazard && !reactionActive) break;
+      await sleep(65);
     }
   } finally {
-    await key(sessionId, "ArrowUp", false);
-    if (steering !== 0) await key(sessionId, steering < 0 ? "ArrowLeft" : "ArrowRight", false);
-    if (braking) await key(sessionId, "ArrowDown", false);
+    if (reactionActive) {
+      await key(sessionId, reactionDirection < 0 ? "ArrowLeft" : "ArrowRight", false);
+      await key(sessionId, "ArrowDown", false);
+    }
   }
 
   metrics.hazardActiveRatio = metrics.durationSeconds > 0 ? metrics.hazardActiveMs / (metrics.durationSeconds * 1000) : 0;
   metrics.startGas = metrics.gasSamples[0] ?? null;
   metrics.endGas = metrics.gasSamples.at(-1) ?? null;
   metrics.minGas = metrics.gasSamples.length ? Math.min(...metrics.gasSamples) : null;
+  metrics.lastState = currentState;
   delete metrics.gasSamples;
   return metrics;
 }
@@ -165,23 +171,18 @@ async function runScenario(sessionId, mode, seconds) {
 async function waitForEscape(sessionId, timeoutSeconds) {
   const started = Date.now();
   let lastState = null;
-  await key(sessionId, "ArrowUp", true);
-  try {
-    while (Date.now() - started < timeoutSeconds * 1000) {
-      lastState = await sample(sessionId);
-      if (!lastState?.ready) throw new Error(`escape observation runtime lost: ${JSON.stringify(lastState)}`);
-      if (lastState.escape) {
-        return {
-          observed: true,
-          wallSeconds: (Date.now() - started) / 1000,
-          text: lastState.escapeText,
-          textSample: lastState.textSample,
-        };
-      }
-      await sleep(75);
+  while (Date.now() - started < timeoutSeconds * 1000) {
+    lastState = await sample(sessionId);
+    if (!lastState?.ready) throw new Error(`escape observation runtime lost: ${JSON.stringify(lastState)}`);
+    if (lastState.escape) {
+      return {
+        observed: true,
+        wallSeconds: (Date.now() - started) / 1000,
+        text: lastState.escapeText,
+        textSample: lastState.textSample,
+      };
     }
-  } finally {
-    await key(sessionId, "ArrowUp", false);
+    await sleep(75);
   }
   return {
     observed: false,
@@ -240,15 +241,23 @@ try {
   }
 
   await fresh();
-  const passive = await runScenario(sessionId, "passive-straight", 21);
+  const passive = await runScenario(sessionId, "passive", 110);
   await fresh();
-  const reactive = await runScenario(sessionId, "reactive-steer-brake", 21);
+  const reactive = await runScenario(sessionId, "reactive", 110);
 
-  // Headless SwiftShader can advance gameplay fixed steps much slower than wall
-  // clock time. Unit regression fixes ESCAPE at 6.2 game seconds; this separate
-  // production check only proves that the real WebGL/React presentation appears.
-  await fresh();
-  const escapeObservation = await waitForEscape(sessionId, 90);
+  let escapeObservation = null;
+  if (passive.escapeEpisodes > 0 || reactive.escapeEpisodes > 0) {
+    const source = passive.escapeEpisodes > 0 ? passive : reactive;
+    escapeObservation = {
+      observed: true,
+      wallSeconds: source.firstEscapeSeconds,
+      text: "ESCAPE rendered during gameplay comparison",
+      textSample: source.lastState?.textSample ?? [],
+    };
+  } else {
+    await fresh();
+    escapeObservation = await waitForEscape(sessionId, 90);
+  }
   const finalState = await sample(sessionId);
 
   const summary = {
@@ -258,7 +267,8 @@ try {
     escapeObservation,
     acceptance: {
       passiveWasPunished: passive.hits >= 1,
-      reactiveUsedEvasion: reactive.steerActions >= 2 && reactive.brakeActions >= 2,
+      reactiveUsedEvasion: reactive.steerActions >= 2 && reactive.brakeActions >= 2 && reactive.reactionsCompleted >= 2,
+      reactiveAvoidedForcedHits: reactive.hits === 0,
       reactiveImprovedOverPassive: reactive.hits < passive.hits,
       escapeRendered: escapeObservation.observed,
     },
