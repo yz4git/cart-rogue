@@ -71,6 +71,10 @@ export const CART_FORCED_DODGE_REACTION_LATERAL_IMPULSE = 8.5;
 export const CART_FORCED_DODGE_REACTION_YAW_KICK = 0.18;
 export const CART_FORCED_DODGE_REACTION_FORWARD_DAMP = 0.82;
 export const CART_FORCED_DODGE_LABEL_PREFIX = "LOCKED INTERCEPT";
+// Phase96 followups are already authored around the player's chosen escape
+// side. They deliberately skip Phase93's re-aim/reaction-assist path so the
+// second and third decisions must be handled with ordinary vehicle control.
+export const CART_FORCED_DODGE_CHAIN_LABEL_PREFIX = "CHAIN INTERCEPT";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -464,6 +468,7 @@ export function installCartRoguePhase93ForcedDodgeTrajectory2(): void {
       hazard.phase === "LOCKED"
       && hazard.secondsToFire > 0.35
       && !hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX)
+      && !hazard.label.startsWith(CART_FORCED_DODGE_CHAIN_LABEL_PREFIX)
       && !state.correctedIds.has(hazard.id),
     );
     if (candidate) {
