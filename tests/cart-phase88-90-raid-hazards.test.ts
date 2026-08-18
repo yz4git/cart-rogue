@@ -202,17 +202,19 @@ test("raid visuals use warning colors and no unsafe ground/color pipeline", () =
   assert.doesNotMatch(phase90Source, /enemies\.push|new CartEnemy|instanceColor|setColorAt|TextureLoader/);
 });
 
-test("runtime and design keep raid hazards after Threat Pressure and preserve Phase80 safety contract", () => {
+test("runtime and design keep raid hazards before damage feedback and preserve Phase80 safety contract", () => {
   const phase80 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase80EnvironmentRichness");
   const phase87 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase87ThreatPressure2");
   const phase88 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase88RaidHazards");
   const phase89 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase89HazardCombatDirector");
   const phase90 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase90TitanRaidBoss4");
+  const phase91 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase91DamageFeedback2");
   assert.ok(phase87 > phase80);
   assert.ok(phase88 > phase87);
   assert.ok(phase89 > phase88);
   assert.ok(phase90 > phase89);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase90TitanRaidBoss4");
+  assert.ok(phase91 > phase90);
+  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase91DamageFeedback2");
   assert.match(design, /dedicated visual layer above the ground/);
   assert.match(design, /Fixed pool of at most four simultaneous hazard slots/);
   assert.match(design, /COUNTER windows cancel Titan hazards/);

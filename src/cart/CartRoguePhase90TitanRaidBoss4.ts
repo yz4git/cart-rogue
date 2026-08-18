@@ -1,6 +1,7 @@
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
 import type { CartEnemyState } from "./CartCombat";
+import { cartRaidDonutInterceptLead, cartRaidInterceptLead } from "./CartRaidHazardIntercept";
 import { isCartTurboHuntEnabled } from "./CartRoguePhase67TurboHunt";
 import { getCartTitanBossState, type CartTitanStage } from "./CartRoguePhase83Boss2";
 import { getCartTitanPredatorState } from "./CartRoguePhase86BossPredator";
@@ -169,68 +170,87 @@ function queueTitanSlam(session: CartArenaSession, boss: CartEnemyState): boolea
 }
 
 function queueCrossCrush(session: CartArenaSession): boolean {
+  const telegraphSeconds = 1.5;
+  const followCarSeconds = 0.54;
   return queueCartRaidHazard(session, {
     kind: "CROSS",
     source: "TITAN",
     label: "CROSS CRUSH",
     width: 7,
     length: 40,
-    telegraphSeconds: 1.5,
-    followCarSeconds: 0.58,
+    telegraphSeconds,
+    followCarSeconds,
+    followForward: cartRaidInterceptLead(session.car, telegraphSeconds, followCarSeconds, 4.8),
     followHeading: true,
     headingOffset: Math.PI * 0.25,
   }) !== null;
 }
 
 function queueHuntingBlast(session: CartArenaSession): boolean {
+  const firstTelegraph = 1.05;
+  const firstFollow = 0.52;
+  const secondTelegraph = 1.02;
+  const secondFollow = 0.5;
+  const thirdTelegraph = 1.0;
+  const thirdFollow = 0.48;
   const first = queueCartRaidHazard(session, {
     kind: "CIRCLE",
     source: "TITAN",
     label: "HUNTING BLAST 1/3",
-    radius: 9.2,
-    telegraphSeconds: 1.05,
-    followCarSeconds: 0.52,
+    radius: 9.6,
+    telegraphSeconds: firstTelegraph,
+    followCarSeconds: firstFollow,
+    followForward: cartRaidInterceptLead(session.car, firstTelegraph, firstFollow, 3.6),
   });
   const second = queueCartRaidHazard(session, {
     kind: "CIRCLE",
     source: "TITAN",
     label: "HUNTING BLAST 2/3",
-    radius: 9.2,
-    telegraphSeconds: 1.02,
-    followCarSeconds: 0.5,
+    radius: 9.6,
+    telegraphSeconds: secondTelegraph,
+    followCarSeconds: secondFollow,
+    followForward: cartRaidInterceptLead(session.car, secondTelegraph, secondFollow, 4.2),
     delaySeconds: 0.72,
   });
   const third = queueCartRaidHazard(session, {
     kind: "CIRCLE",
     source: "TITAN",
     label: "HUNTING BLAST 3/3",
-    radius: 9.2,
-    telegraphSeconds: 1.0,
-    followCarSeconds: 0.48,
+    radius: 9.6,
+    telegraphSeconds: thirdTelegraph,
+    followCarSeconds: thirdFollow,
+    followForward: cartRaidInterceptLead(session.car, thirdTelegraph, thirdFollow, 4.8),
     delaySeconds: 1.42,
   });
   return first !== null && second !== null && third !== null;
 }
 
 function queueFuryRaid(session: CartArenaSession): boolean {
+  const lineTelegraph = 1.02;
+  const lineFollow = 0.42;
+  const circleTelegraph = 1.02;
+  const circleFollow = 0.45;
+  const donutTelegraph = 1.08;
+  const donutFollow = 0.48;
   const line = queueCartRaidHazard(session, {
     kind: "LINE",
     source: "TITAN",
     label: "FURY LINE",
-    width: 7.2,
+    width: 7.6,
     length: 36,
-    telegraphSeconds: 1.02,
-    followCarSeconds: 0.42,
-    followForward: 5,
+    telegraphSeconds: lineTelegraph,
+    followCarSeconds: lineFollow,
+    followForward: cartRaidInterceptLead(session.car, lineTelegraph, lineFollow, 4.6),
     followHeading: true,
   });
   const circle = queueCartRaidHazard(session, {
     kind: "CIRCLE",
     source: "TITAN",
     label: "FURY BLAST",
-    radius: 10.2,
-    telegraphSeconds: 1.02,
-    followCarSeconds: 0.45,
+    radius: 10.5,
+    telegraphSeconds: circleTelegraph,
+    followCarSeconds: circleFollow,
+    followForward: cartRaidInterceptLead(session.car, circleTelegraph, circleFollow, 4.4),
     delaySeconds: 0.7,
   });
   const donut = queueCartRaidHazard(session, {
@@ -239,24 +259,26 @@ function queueFuryRaid(session: CartArenaSession): boolean {
     label: "FURY DONUT",
     innerRadius: 5.4,
     outerRadius: 15,
-    telegraphSeconds: 1.08,
-    followCarSeconds: 0.48,
-    followForward: 8,
+    telegraphSeconds: donutTelegraph,
+    followCarSeconds: donutFollow,
+    followForward: cartRaidDonutInterceptLead(session.car, donutTelegraph, donutFollow),
     delaySeconds: 1.4,
   });
   return line !== null && circle !== null && donut !== null;
 }
 
 function queueDonutCrush(session: CartArenaSession): boolean {
+  const telegraphSeconds = 1.42;
+  const followCarSeconds = 0.58;
   return queueCartRaidHazard(session, {
     kind: "DONUT",
     source: "TITAN",
     label: "TITAN DONUT CRUSH",
     innerRadius: 5.4,
     outerRadius: 15,
-    telegraphSeconds: 1.42,
-    followCarSeconds: 0.58,
-    followForward: 8,
+    telegraphSeconds,
+    followCarSeconds,
+    followForward: cartRaidDonutInterceptLead(session.car, telegraphSeconds, followCarSeconds),
   }) !== null;
 }
 
@@ -279,7 +301,7 @@ function beginPattern(session: CartArenaSession, raw: Phase90Session, state: Int
   state.pattern = pattern;
   state.patternLabel = labelFor(pattern);
   state.cooldownSeconds = intervalFor(state.stage);
-  setReward(raw, `${state.patternLabel} · WATCH THE GROUND`, 1.7);
+  setReward(raw, `${state.patternLabel} · INTERCEPT AHEAD`, 1.7);
 }
 
 function resetRaid(session: CartArenaSession, state: InternalRaidBossState): void {
