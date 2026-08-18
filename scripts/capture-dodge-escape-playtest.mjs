@@ -86,9 +86,6 @@ function createMetrics(label) {
     hazardActiveMs: 0,
     hits: 0,
     perfectDodges: 0,
-    escapeEpisodes: 0,
-    firstEscapeSeconds: null,
-    escapeActiveMs: 0,
     steerActions: 0,
     brakeActions: 0,
     gasSamples: [],
@@ -101,7 +98,6 @@ async function runScenario(sessionId, mode, seconds) {
   let previousHazard = false;
   let previousHit = false;
   let previousPerfect = false;
-  let previousEscape = false;
   let steering = 0;
   let steerReleaseAt = 0;
   let brakeReleaseAt = 0;
@@ -119,13 +115,6 @@ async function runScenario(sessionId, mode, seconds) {
     if (state.hazard && !previousHazard) metrics.hazardEpisodes += 1;
     if (state.directHit && !previousHit) metrics.hits += 1;
     if (state.perfect && !previousPerfect) metrics.perfectDodges += 1;
-    if (state.escape) {
-      metrics.escapeActiveMs += 55;
-      if (!previousEscape) {
-        metrics.escapeEpisodes += 1;
-        if (metrics.firstEscapeSeconds === null) metrics.firstEscapeSeconds = (now - started) / 1000;
-      }
-    }
     if (state.gas !== null) metrics.gasSamples.push(state.gas);
 
     if (mode === "reactive" && state.locked && now - lastReactionAt > 650) {
@@ -154,19 +143,41 @@ async function runScenario(sessionId, mode, seconds) {
     previousHazard = state.hazard;
     previousHit = state.directHit;
     previousPerfect = state.perfect;
-    previousEscape = state.escape;
     await sleep(55);
   }
 
   if (steering !== 0) await key(sessionId, steering < 0 ? "ArrowLeft" : "ArrowRight", false);
   if (braking) await key(sessionId, "ArrowDown", false);
   metrics.hazardActiveRatio = metrics.durationSeconds > 0 ? metrics.hazardActiveMs / (metrics.durationSeconds * 1000) : 0;
-  metrics.escapeActiveRatio = metrics.durationSeconds > 0 ? metrics.escapeActiveMs / (metrics.durationSeconds * 1000) : 0;
   metrics.startGas = metrics.gasSamples[0] ?? null;
   metrics.endGas = metrics.gasSamples.at(-1) ?? null;
   metrics.minGas = metrics.gasSamples.length ? Math.min(...metrics.gasSamples) : null;
   delete metrics.gasSamples;
   return metrics;
+}
+
+async function waitForEscape(sessionId, timeoutSeconds) {
+  const started = Date.now();
+  let lastState = null;
+  while (Date.now() - started < timeoutSeconds * 1000) {
+    lastState = await sample(sessionId);
+    if (!lastState?.ready) throw new Error(`escape observation runtime lost: ${JSON.stringify(lastState)}`);
+    if (lastState.escape) {
+      return {
+        observed: true,
+        wallSeconds: (Date.now() - started) / 1000,
+        text: lastState.escapeText,
+        textSample: lastState.textSample,
+      };
+    }
+    await sleep(75);
+  }
+  return {
+    observed: false,
+    wallSeconds: (Date.now() - started) / 1000,
+    text: lastState?.escapeText ?? "",
+    textSample: lastState?.textSample ?? [],
+  };
 }
 
 const driver = spawn(driverBin, [`--port=${driverPort}`, "--allowed-origins=*"], {
@@ -221,18 +232,24 @@ try {
   const passive = await runScenario(sessionId, "passive-straight", 21);
   await fresh();
   const reactive = await runScenario(sessionId, "reactive", 21);
+
+  // Headless SwiftShader can advance gameplay fixed steps much slower than wall
+  // clock time. Unit regression fixes ESCAPE at 6.2 game seconds; this separate
+  // production check only proves that the real WebGL/React presentation appears.
+  await fresh();
+  const escapeObservation = await waitForEscape(sessionId, 90);
   const finalState = await sample(sessionId);
 
   const summary = {
     viewport: { width: finalState.width, height: finalState.height },
     passive,
     reactive,
+    escapeObservation,
     acceptance: {
       passiveWasPunished: passive.hits >= 1,
-      passiveEscapeVisibleEarly: passive.firstEscapeSeconds !== null && passive.firstEscapeSeconds <= 10,
-      reactiveEscapeVisibleEarly: reactive.firstEscapeSeconds !== null && reactive.firstEscapeSeconds <= 10,
       reactiveUsedEvasion: reactive.steerActions >= 2,
       reactiveNoWorseThanPassive: reactive.hits <= passive.hits,
+      escapeRendered: escapeObservation.observed,
     },
     finalTextSample: finalState.textSample,
   };
