@@ -3,6 +3,7 @@ import { CartArenaSession } from "./CartArenaSession";
 import { isCartTurboHuntEnabled } from "./CartRoguePhase67TurboHunt";
 import { getCartTitanBossState } from "./CartRoguePhase83Boss2";
 import { getCartRaidHazardState, queueCartRaidHazard } from "./CartRoguePhase88RaidHazards";
+import { CART_FORCED_DODGE_CHAIN_LABEL_PREFIX } from "./CartRoguePhase93ForcedDodgeTrajectory2";
 import { getCartEscapeRhythmState } from "./CartRoguePhase94EscapeRhythmDirector2";
 import {
   CART_RAID_PRESSURE_SWEEP_TELEGRAPH,
@@ -69,7 +70,11 @@ export interface CartRaidCounterreadSnapshot {
 
 const stateBySession = new WeakMap<object, CounterreadState>();
 
-export const CART_RAID_COUNTERREAD_LABEL = "COUNTERREAD";
+// Counterread is a deliberate second beat of the already-locked forced-dodge
+// sequence. Keeping the established chain prefix is behaviorally important:
+// Phase93 skips this prefix so the follow-up is not mistaken for a fresh
+// ordinary FIELD attack and re-aimed again.
+export const CART_RAID_COUNTERREAD_LABEL = `${CART_FORCED_DODGE_CHAIN_LABEL_PREFIX} · COUNTERREAD`;
 export const CART_RAID_COUNTERREAD_SAMPLE_SECONDS = 0.38;
 export const CART_RAID_COUNTERREAD_DELAY_SECONDS = 0.36;
 export const CART_RAID_COUNTERREAD_TELEGRAPH_SECONDS = CART_RAID_PRESSURE_SWEEP_TELEGRAPH;
