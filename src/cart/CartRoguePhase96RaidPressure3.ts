@@ -6,6 +6,7 @@ import { getCartTitanBossState } from "./CartRoguePhase83Boss2";
 import {
   getCartRaidHazardState,
   queueCartRaidHazard,
+  type CartRaidHazardPublicState,
   type CartRaidHazardSpec,
 } from "./CartRoguePhase88RaidHazards";
 import {
@@ -26,6 +27,7 @@ interface PressureState {
   chainedHazardIds: Set<number>;
   quietSeconds: number;
   reengageSerial: number;
+  armed: boolean;
 }
 
 export interface CartRaidPressureChainPlacement {
@@ -60,6 +62,7 @@ function stateFor(session: Phase96Session): PressureState {
     chainedHazardIds: new Set(),
     quietSeconds: 0,
     reengageSerial: 0,
+    armed: false,
   };
   stateBySession.set(key, created);
   return created;
@@ -114,18 +117,22 @@ function deliberateEvasion(input: RallyInputState): boolean {
     || clamp(input.brake, 0, 1) >= CART_FORCED_DODGE_REACTION_BRAKE_THRESHOLD;
 }
 
-function queueReactionChain(session: CartArenaSession, input: RallyInputState, state: PressureState): boolean {
-  const raid = getCartRaidHazardState(session);
-  if (raid.activeCount > 2) return false;
-  const forced = raid.hazards.find((hazard) =>
+function normalForcedHazard(hazards: readonly CartRaidHazardPublicState[]): CartRaidHazardPublicState | undefined {
+  return hazards.find((hazard) =>
     hazard.source === "FIELD"
     && hazard.phase === "LOCKED"
     && hazard.secondsToFire > 0
     && hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX)
-    && !hazard.label.startsWith(CART_RAID_PRESSURE_CHAIN_LABEL)
-    && !state.chainedHazardIds.has(hazard.id),
+    && !hazard.label.startsWith(CART_RAID_PRESSURE_CHAIN_LABEL),
   );
-  if (!forced || !deliberateEvasion(input)) return false;
+}
+
+function queueReactionChain(session: CartArenaSession, input: RallyInputState, state: PressureState): boolean {
+  const raid = getCartRaidHazardState(session);
+  const forced = normalForcedHazard(raid.hazards);
+  if (forced) state.armed = true;
+  if (raid.activeCount > 2) return false;
+  if (!forced || state.chainedHazardIds.has(forced.id) || !deliberateEvasion(input)) return false;
 
   const rawSteer = clamp(input.strafe ?? input.steer, -1, 1);
   const placement = cartRaidPressureChainPlacement(
@@ -186,7 +193,9 @@ function updateQuietPressure(session: CartArenaSession, state: PressureState, de
   const titan = getCartTitanBossState(session);
   const escape = getCartEscapeRhythmState(session);
   const raid = getCartRaidHazardState(session);
-  if (titan.bossActive || escape.openingGraceSeconds > 0) {
+  // Phase89 owns the opening attack. Phase96 only compresses dead air after the
+  // ordinary director has produced a real forced intercept at least once.
+  if (!state.armed || titan.bossActive || escape.openingGraceSeconds > 0) {
     state.quietSeconds = 0;
     return;
   }
@@ -218,6 +227,8 @@ export function installCartRoguePhase96RaidPressure3(): void {
     const escape = getCartEscapeRhythmState(session);
     const titan = getCartTitanBossState(session);
 
+    const raid = getCartRaidHazardState(session);
+    if (normalForcedHazard(raid.hazards)) state.armed = true;
     if (!titan.bossActive && escape.openingGraceSeconds <= 0) {
       queueReactionChain(session, input, state);
     }
