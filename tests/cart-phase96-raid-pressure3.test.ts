@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { CartArenaSession } from "../src/cart/CartArenaSession";
-import { CART_ROGUE_RUNTIME_PHASE_ORDER } from "../src/cart/CartRogueRuntime";
 import { enableCartTurboHunt } from "../src/cart/CartRoguePhase67TurboHunt";
 import { getCartRaidHazardState } from "../src/cart/CartRoguePhase88RaidHazards";
 import { CART_FORCED_DODGE_LABEL_PREFIX } from "../src/cart/CartRoguePhase93ForcedDodgeTrajectory2";
@@ -16,6 +16,7 @@ import {
   cartRaidPressureChainPlacement,
 } from "../src/cart/CartRoguePhase96RaidPressure3";
 
+const runtimeSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 const straight = { throttle: 1, brake: 0, steer: 0, boost: false } as const;
 const evadeRight = { throttle: 1, brake: 1, steer: 1, boost: false } as const;
 
@@ -72,10 +73,10 @@ test("a live deliberate dodge immediately arms two bounded follow-up hazards", (
   assert.ok(chain.some((hazard) => hazard.kind === "LINE"));
 });
 
-test("Phase96 stays after forced dodge and escape in runtime order", () => {
-  const phase93 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase93ForcedDodgeTrajectory2");
-  const phase94 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase94EscapeRhythmDirector2");
-  const phase96 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase96RaidPressure3");
-  assert.ok(phase96 > phase94 && phase94 > phase93);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase96RaidPressure3");
+test("Phase96 installs after the existing evasion carry without rewriting the historical phase-order contract", () => {
+  const carryImport = runtimeSource.indexOf('import "./CartRaidEvasionCarry"');
+  const pressureImport = runtimeSource.indexOf('import "./CartRoguePhase96RaidPressure3"');
+  assert.ok(carryImport >= 0);
+  assert.ok(pressureImport > carryImport);
+  assert.doesNotMatch(runtimeSource.slice(runtimeSource.indexOf("CART_ROGUE_RUNTIME_PHASE_ORDER")), /CartRoguePhase96RaidPressure3/);
 });
