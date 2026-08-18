@@ -85,14 +85,14 @@ try {
       const text = document.body.innerText || '';
       if (!canvas) return { ready: false, text: text.slice(0, 800) };
       const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-      const aoeLine = text.split(/\n+/).map((line) => line.trim()).find((line) => /^AOE (TRACKING|LOCKED|FIRING|IMPACT)/.test(line)) || null;
-      const redWarning = aoeLine !== null;
+      const lines = text.split(String.fromCharCode(10)).map((line) => line.trim());
+      const aoeLine = lines.find((line) => line.startsWith('AOE TRACKING') || line.startsWith('AOE LOCKED') || line.startsWith('AOE FIRING') || line.startsWith('AOE IMPACT')) || null;
       return {
         ready: Boolean(gl) && !gl.isContextLost() && text.includes('TURBO HUNT'),
         webgl: Boolean(gl),
         contextLost: gl ? gl.isContextLost() : null,
         aoeLine,
-        redWarning,
+        redWarning: aoeLine !== null,
         hasTurboHunt: text.includes('TURBO HUNT'),
         hasGas: text.includes('GAS'),
         hasTurbo: text.includes('TURBO'),
