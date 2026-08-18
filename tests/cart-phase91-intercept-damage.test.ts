@@ -107,9 +107,13 @@ test("damage feedback reuses existing camera flash and spark systems and adds a 
   assert.match(hudCss, /damageBurstKick/);
 });
 
-test("damage feedback is the final gameplay wrapper after Titan Raid 4.0", () => {
+test("damage feedback remains before forced dodge and escape gameplay wrappers", () => {
   const phase90 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase90TitanRaidBoss4");
   const phase91 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase91DamageFeedback2");
+  const phase93 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase93ForcedDodgeTrajectory2");
+  const phase94 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase94EscapeRhythmDirector2");
   assert.ok(phase91 > phase90);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase91DamageFeedback2");
+  assert.ok(phase93 > phase91);
+  assert.ok(phase94 > phase93);
+  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase94EscapeRhythmDirector2");
 });
