@@ -26,7 +26,6 @@ interface CounterreadState {
 interface PendingCounterread {
   reaction: CartRaidPressureReaction;
   ageSeconds: number;
-  sampled: boolean;
   sampleWaitSeconds: number;
 }
 
@@ -139,8 +138,6 @@ function sideFromSteer(rawSteer: number, fallback: -1 | 1): -1 | 1 {
  * the follow-up telegraph.
  */
 export function cartRaidAdaptiveCounterread(sample: CartRaidCounterreadSample): CartRaidCounterreadPlacement {
-  const afx = Math.sin(sample.anchorHeading);
-  const afz = Math.cos(sample.anchorHeading);
   const arx = Math.cos(sample.anchorHeading);
   const arz = -Math.sin(sample.anchorHeading);
   const dx = sample.x - sample.anchorX;
@@ -184,9 +181,10 @@ export function cartRaidAdaptiveCounterread(sample: CartRaidCounterreadSample): 
   );
 
   if (mode === "BRAKE") {
+    const brakeLead = clamp(currentSpeed * 0.34 + 3.5, 4.8, 8.2);
     const point = clampField(
-      sample.x + fx * clamp(currentSpeed * 0.34 + 3.5, 4.8, 8.2) + rx * observedSide * 1.8,
-      sample.z + fz * clamp(currentSpeed * 0.34 + 3.5, 4.8, 8.2) + rz * observedSide * 1.8,
+      sample.x + fx * brakeLead + rx * observedSide * 1.8,
+      sample.z + fz * brakeLead + rz * observedSide * 1.8,
     );
     return {
       mode,
@@ -303,7 +301,6 @@ function observeNewReaction(session: CartArenaSession, state: CounterreadState):
   state.pending = {
     reaction,
     ageSeconds: 0,
-    sampled: false,
     sampleWaitSeconds: 0,
   };
   return true;
@@ -328,7 +325,6 @@ function updateCounterread(
 
   pending.ageSeconds += delta;
   if (pending.ageSeconds < CART_RAID_COUNTERREAD_SAMPLE_SECONDS) return;
-  pending.sampled = true;
   pending.sampleWaitSeconds += delta;
 
   const raid = getCartRaidHazardState(session);
