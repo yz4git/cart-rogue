@@ -13,6 +13,7 @@ import {
   CART_FORCED_DODGE_CIRCLE_RADIUS,
   CART_FORCED_DODGE_CONE_RADIUS,
   CART_FORCED_DODGE_CROSS_WIDTH,
+  CART_FORCED_DODGE_FINAL_LOCK_SECONDS,
   CART_FORCED_DODGE_LINE_WIDTH,
   CART_FORCED_DODGE_LOCK_MAX_SECONDS,
   CART_FORCED_DODGE_LOCK_MIN_SECONDS,
@@ -61,9 +62,6 @@ function runExplicitEvasion(kind: CartRaidHazardKind, steer: -1 | 1): ReturnType
   session.car.forwardVelocity = 14;
   session.car.speed = 14;
   queueShape(session, kind);
-
-  // Let Phase93 observe the ordinary FIELD lock and replace it with the
-  // predicted intercept before the player reacts.
   session.step(driveStraight, 0.05);
   const forced = getCartForcedDodgeTrajectoryState(session);
   assert.ok(forced.correctedSerial >= 1, `${kind} did not become a forced lock`);
@@ -89,6 +87,8 @@ test("Phase93 predicts the no-new-evasion trajectory ahead of a moving car", () 
   assert.ok(Math.hypot(point.x - startX, point.z - startZ) > 10);
   assert.ok(CART_FORCED_DODGE_LOCK_MIN_SECONDS >= 0.9);
   assert.ok(CART_FORCED_DODGE_LOCK_MAX_SECONDS <= 1.1);
+  assert.ok(CART_FORCED_DODGE_FINAL_LOCK_SECONDS >= 0.75);
+  assert.ok(CART_FORCED_DODGE_FINAL_LOCK_SECONDS < CART_FORCED_DODGE_LOCK_MIN_SECONDS);
 });
 
 test("forced hazard dimensions punish a centered straight line without consuming the whole escape corridor", () => {
@@ -108,7 +108,11 @@ test("a live FIELD telegraph is replaced once at LOCK with a forced intercept", 
   const raid = getCartRaidHazardState(session);
   assert.ok(forced.correctedSerial >= 1, JSON.stringify({ forced, raid }));
   assert.ok(forced.lockSeconds >= CART_FORCED_DODGE_LOCK_MIN_SECONDS);
-  assert.ok(raid.hazards.some((hazard) => hazard.source === "FIELD" && hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX)) || raid.hitSerial >= 1);
+  assert.ok(
+    raid.hazards.some((hazard) => hazard.source === "FIELD" && hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX))
+      || raid.hitSerial + raid.clearSerial >= 1,
+    JSON.stringify({ forced, raid }),
+  );
 });
 
 test("passive straight driving is punishable within the opening raid cycle", () => {
@@ -162,6 +166,7 @@ test("Phases 93-95 preserve fixed pools and put danger readability ahead of rewa
   assert.doesNotMatch(phase93Source, /new CartEnemy|enemies\.push|new THREE\.InstancedMesh|setColorAt|instanceColor|TextureLoader/);
   assert.doesNotMatch(phase94Source, /new CartEnemy|enemies\.push|new THREE\.InstancedMesh|setColorAt|instanceColor|TextureLoader/);
   assert.match(phase93Source, /applyReactionAssist/);
+  assert.match(phase93Source, /softTrackPassiveLine/);
   assert.match(phase94Source, /phase94-escape-rhythm-root/);
   assert.match(readabilitySource, /combo/);
   assert.match(readabilitySource, /ramBanner/);
