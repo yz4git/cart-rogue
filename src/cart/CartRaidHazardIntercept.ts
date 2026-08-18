@@ -1,7 +1,7 @@
 import type { RallyCar } from "../rally/RallyCar";
 
 export const CART_RAID_INTERCEPT_MIN_LEAD = 10;
-export const CART_RAID_INTERCEPT_MAX_LEAD = 25;
+export const CART_RAID_INTERCEPT_MAX_LEAD = 32;
 export const CART_RAID_INTERCEPT_SPEED_SCALE = 0.96;
 export const CART_RAID_INTERCEPT_BASE_EXTRA = 3.8;
 export const CART_RAID_INTERCEPT_DONUT_EXTRA = 9.5;
