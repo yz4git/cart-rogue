@@ -1,0 +1,55 @@
+.escapeBadge {
+  position: fixed;
+  top: max(56px, calc(env(safe-area-inset-top) + 48px));
+  left: 50%;
+  z-index: 92;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(68vw, 420px);
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 244, 211, .9);
+  border-left-width: 5px;
+  border-radius: 7px;
+  background: linear-gradient(90deg, rgba(128, 0, 20, .96), rgba(255, 28, 48, .92), rgba(119, 25, 0, .94));
+  box-shadow: 0 0 15px rgba(255, 20, 42, .46), inset 0 1px 0 rgba(255,255,255,.22);
+  color: white;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: .08em;
+  text-shadow: 0 1px 2px rgba(40,0,0,.92);
+}
+
+.escapeBadge strong {
+  flex: 0 0 auto;
+  color: #ffe451;
+  font-size: 10px;
+  letter-spacing: .12em;
+}
+
+.escapeBadge span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.escapeBadge small {
+  flex: 0 0 auto;
+  font-size: 8px;
+  color: #fff6d8;
+}
+
+@media (max-height: 430px) {
+  .escapeBadge {
+    top: max(50px, calc(env(safe-area-inset-top) + 43px));
+    max-width: 58vw;
+    padding: 3px 8px;
+    font-size: 8px;
+  }
+  .escapeBadge strong { font-size: 9px; }
+  .escapeBadge small { font-size: 7px; }
+}

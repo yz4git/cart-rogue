@@ -14,6 +14,7 @@ on:
       - "scripts/capture-webgl-audit.mjs"
       - "scripts/capture-raid-hazard-audit.mjs"
       - "scripts/capture-raid-damage-audit.mjs"
+      - "scripts/capture-dodge-escape-playtest.mjs"
       - "scripts/capture-iphone-landscape-layout.mjs"
       - "tests/**"
       - "package.json"
@@ -95,6 +96,19 @@ jobs:
             node scripts/capture-raid-damage-audit.mjs
           test -s artifacts/webgl-audit/cart-rogue-raid-damage.png
           test -s artifacts/webgl-audit/raid-damage-state.json
+      - name: Run forced dodge and escape playtest
+        run: |
+          DRIVER="$(command -v chromedriver || true)"
+          if [ -z "$DRIVER" ] && [ -n "${CHROMEWEBDRIVER:-}" ] && [ -x "$CHROMEWEBDRIVER/chromedriver" ]; then
+            DRIVER="$CHROMEWEBDRIVER/chromedriver"
+          fi
+          WEBDRIVER_BIN="$DRIVER" \
+            AUDIT_URL="http://127.0.0.1:3000/" \
+            DODGE_ESCAPE_SCREENSHOT_OUTPUT="artifacts/webgl-audit/cart-rogue-dodge-escape-playtest.png" \
+            DODGE_ESCAPE_STATE_OUTPUT="artifacts/webgl-audit/dodge-escape-playtest.json" \
+            node scripts/capture-dodge-escape-playtest.mjs
+          test -s artifacts/webgl-audit/cart-rogue-dodge-escape-playtest.png
+          test -s artifacts/webgl-audit/dodge-escape-playtest.json
       - name: Verify iPhone landscape UI fit
         run: |
           DRIVER="$(command -v chromedriver || true)"

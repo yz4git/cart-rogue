@@ -106,7 +106,7 @@ test("Phase88 uses a fixed four-slot pool and refuses an unbounded fifth telegra
   assert.equal(getCartRaidHazardState(session).activeCount, 0);
 });
 
-test("a tracking hazard locks before firing and applies a recoverable hit", () => {
+test("a tracking hazard locks, receives the Phase93 reaction window, then applies a recoverable hit", () => {
   const session = new CartArenaSession();
   enableCartTurboHunt(session);
   const gasBefore = session.gas;
@@ -120,9 +120,11 @@ test("a tracking hazard locks before firing and applies a recoverable hit", () =
   for (let index = 0; index < 14; index += 1) session.step(idleInput, 0.05);
   let state = getCartRaidHazardState(session);
   assert.equal(state.primaryPhase, "LOCKED");
-  assert.ok(state.primarySeconds > 0 && state.primarySeconds <= 0.55);
-  for (let index = 0; index < 11; index += 1) session.step(idleInput, 0.05);
-  state = getCartRaidHazardState(session);
+  assert.ok(state.primarySeconds > 0.5 && state.primarySeconds <= 1.05);
+  for (let index = 0; index < 24 && state.hitSerial === 0; index += 1) {
+    session.step(idleInput, 0.05);
+    state = getCartRaidHazardState(session);
+  }
   assert.equal(state.hitSerial, 1);
   assert.ok(session.gas < gasBefore);
   assert.ok(session.gas >= 0);
@@ -131,8 +133,11 @@ test("a tracking hazard locks before firing and applies a recoverable hit", () =
 test("leaving a locked AOE in the final window awards raid Perfect Dodge", () => {
   const session = new CartArenaSession();
   enableCartTurboHunt(session);
+  // TITAN source intentionally isolates the Phase88 Perfect Dodge contract from
+  // Phase93, which only re-locks FIELD telegraphs onto the predicted trajectory.
   queueCartRaidHazard(session, {
     kind: "CIRCLE",
+    source: "TITAN",
     label: "PERFECT TEST",
     radius: 7,
     telegraphSeconds: 1.2,
@@ -202,19 +207,23 @@ test("raid visuals use warning colors and no unsafe ground/color pipeline", () =
   assert.doesNotMatch(phase90Source, /enemies\.push|new CartEnemy|instanceColor|setColorAt|TextureLoader/);
 });
 
-test("runtime and design keep raid hazards before damage feedback and preserve Phase80 safety contract", () => {
+test("runtime and design keep raid hazards before later dodge/escape wrappers and preserve Phase80 safety contract", () => {
   const phase80 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase80EnvironmentRichness");
   const phase87 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase87ThreatPressure2");
   const phase88 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase88RaidHazards");
   const phase89 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase89HazardCombatDirector");
   const phase90 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase90TitanRaidBoss4");
   const phase91 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase91DamageFeedback2");
+  const phase93 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase93ForcedDodgeTrajectory2");
+  const phase94 = CART_ROGUE_RUNTIME_PHASE_ORDER.indexOf("CartRoguePhase94EscapeRhythmDirector2");
   assert.ok(phase87 > phase80);
   assert.ok(phase88 > phase87);
   assert.ok(phase89 > phase88);
   assert.ok(phase90 > phase89);
   assert.ok(phase91 > phase90);
-  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase91DamageFeedback2");
+  assert.ok(phase93 > phase91);
+  assert.ok(phase94 > phase93);
+  assert.equal(CART_ROGUE_RUNTIME_PHASE_ORDER.at(-1), "CartRoguePhase94EscapeRhythmDirector2");
   assert.match(design, /dedicated visual layer above the ground/);
   assert.match(design, /Fixed pool of at most four simultaneous hazard slots/);
   assert.match(design, /COUNTER windows cancel Titan hazards/);
