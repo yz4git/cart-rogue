@@ -108,12 +108,12 @@ interface Phase88Demo {
 
 interface HazardMeshSet {
   root: THREE.Group;
-  line: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
-  circle: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
-  crossA: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
-  crossB: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
-  cone: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
-  donut: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+  line: THREE.Mesh;
+  circle: THREE.Mesh;
+  crossA: THREE.Mesh;
+  crossB: THREE.Mesh;
+  cone: THREE.Mesh;
+  donut: THREE.Mesh;
 }
 
 interface HazardVisualState {
@@ -135,6 +135,8 @@ export const CART_RAID_HAZARD_LAYER_Y = 0.052;
 export const CART_RAID_HAZARD_MIN_LOCK_SECONDS = 0.45;
 export const CART_RAID_HAZARD_PERFECT_ESCAPE_WINDOW = 0.28;
 export const CART_RAID_HAZARD_FIRE_FLASH_SECONDS = 0.24;
+export const CART_RAID_HAZARD_DONUT_INNER_RATIO = 0.36;
+export const CART_RAID_HAZARD_CONE_ANGLE = Math.PI * 0.5;
 
 const DEFAULT_TELEGRAPH_SECONDS = 1.35;
 
@@ -151,33 +153,11 @@ function normalizeAngle(value: number): number {
 
 function emptySlot(index: number): HazardSlot {
   return {
-    id: -(index + 1),
-    active: false,
-    kind: "CIRCLE",
-    source: "FIELD",
-    label: "RAID HAZARD",
-    phase: "LOCKED",
-    x: 0,
-    z: 0,
-    heading: 0,
-    width: 7,
-    length: 28,
-    radius: 10,
-    innerRadius: 5,
-    outerRadius: 15,
-    coneAngle: Math.PI * 0.42,
-    secondsToFire: 0,
-    telegraphSeconds: DEFAULT_TELEGRAPH_SECONDS,
-    locked: true,
-    delaySeconds: 0,
-    followCarSeconds: 0,
-    followForward: 0,
-    followRight: 0,
-    followHeading: false,
-    headingOffset: 0,
-    insideWhileLocked: false,
-    lastInsideAge: Number.POSITIVE_INFINITY,
-    fireFlashSeconds: 0,
+    id: -(index + 1), active: false, kind: "CIRCLE", source: "FIELD", label: "RAID HAZARD", phase: "LOCKED",
+    x: 0, z: 0, heading: 0, width: 7, length: 28, radius: 10, innerRadius: 5.4, outerRadius: 15,
+    coneAngle: CART_RAID_HAZARD_CONE_ANGLE, secondsToFire: 0, telegraphSeconds: DEFAULT_TELEGRAPH_SECONDS, locked: true,
+    delaySeconds: 0, followCarSeconds: 0, followForward: 0, followRight: 0, followHeading: false, headingOffset: 0,
+    insideWhileLocked: false, lastInsideAge: Number.POSITIVE_INFINITY, fireFlashSeconds: 0,
   };
 }
 
@@ -201,32 +181,20 @@ function stateFor(session: CartArenaSession | Phase88Session): InternalRaidState
 
 function publicSlot(slot: HazardSlot): CartRaidHazardPublicState {
   return {
-    id: slot.id,
-    active: slot.active,
-    kind: slot.kind,
-    source: slot.source,
-    label: slot.label,
-    phase: slot.phase,
-    x: slot.x,
-    z: slot.z,
-    heading: slot.heading,
-    width: slot.width,
-    length: slot.length,
-    radius: slot.radius,
-    innerRadius: slot.innerRadius,
-    outerRadius: slot.outerRadius,
-    coneAngle: slot.coneAngle,
-    secondsToFire: slot.secondsToFire,
-    telegraphSeconds: slot.telegraphSeconds,
-    locked: slot.locked,
+    id: slot.id, active: slot.active, kind: slot.kind, source: slot.source, label: slot.label, phase: slot.phase,
+    x: slot.x, z: slot.z, heading: slot.heading, width: slot.width, length: slot.length, radius: slot.radius,
+    innerRadius: slot.innerRadius, outerRadius: slot.outerRadius, coneAngle: slot.coneAngle,
+    secondsToFire: slot.secondsToFire, telegraphSeconds: slot.telegraphSeconds, locked: slot.locked,
   };
 }
 
 function snapshotOf(state: InternalRaidState): CartRaidHazardSnapshot {
   const hazards = state.slots.filter((slot) => slot.active).map(publicSlot);
-  const primary = hazards
-    .filter((hazard) => hazard.phase !== "DELAY")
-    .sort((a, b) => a.secondsToFire - b.secondsToFire)[0] ?? null;
+  let primary: CartRaidHazardPublicState | null = null;
+  for (const hazard of hazards) {
+    if (hazard.phase === "DELAY") continue;
+    if (!primary || hazard.secondsToFire < primary.secondsToFire) primary = hazard;
+  }
   return {
     activeCount: hazards.length,
     imminentCount: hazards.filter((hazard) => hazard.phase !== "DELAY" && hazard.secondsToFire <= 0.55).length,
@@ -271,8 +239,7 @@ export function cartPointInRaidHazard(
   if (hazard.kind === "DONUT") return distance >= hazard.innerRadius && distance <= hazard.outerRadius;
   if (hazard.kind === "CONE") {
     if (distance > hazard.radius) return false;
-    const angle = Math.atan2(dx, dz);
-    return Math.abs(normalizeAngle(angle - hazard.heading)) <= hazard.coneAngle * 0.5;
+    return Math.abs(normalizeAngle(Math.atan2(dx, dz) - hazard.heading)) <= hazard.coneAngle * 0.5;
   }
   const forward = dx * Math.sin(hazard.heading) + dz * Math.cos(hazard.heading);
   const right = dx * Math.cos(hazard.heading) - dz * Math.sin(hazard.heading);
@@ -285,9 +252,9 @@ export function cartRaidHazardArea(hazard: Pick<CartRaidHazardSpec, "kind" | "wi
   const width = Math.max(0.1, hazard.width ?? 7);
   const length = Math.max(0.1, hazard.length ?? 28);
   const radius = Math.max(0.1, hazard.radius ?? 10);
-  const inner = Math.max(0, hazard.innerRadius ?? 5);
+  const inner = Math.max(0, hazard.innerRadius ?? 5.4);
   const outer = Math.max(inner + 0.1, hazard.outerRadius ?? 15);
-  const coneAngle = clamp(hazard.coneAngle ?? Math.PI * 0.42, 0.1, Math.PI * 1.9);
+  const coneAngle = clamp(hazard.coneAngle ?? CART_RAID_HAZARD_CONE_ANGLE, 0.1, Math.PI * 1.9);
   if (hazard.kind === "CIRCLE") return Math.PI * radius * radius;
   if (hazard.kind === "DONUT") return Math.PI * (outer * outer - inner * inner);
   if (hazard.kind === "CONE") return 0.5 * coneAngle * radius * radius;
@@ -312,24 +279,21 @@ export function queueCartRaidHazard(session: CartArenaSession, spec: CartRaidHaz
   if (!slot) return null;
   const telegraphSeconds = clamp(spec.telegraphSeconds ?? DEFAULT_TELEGRAPH_SECONDS, 0.75, 2.6);
   const followSeconds = clamp(spec.followCarSeconds ?? 0, 0, Math.max(0, telegraphSeconds - CART_RAID_HAZARD_MIN_LOCK_SECONDS));
-  const heading = spec.heading ?? session.car.heading;
-  const x = spec.x ?? session.car.position.x;
-  const z = spec.z ?? session.car.position.z;
   slot.id = state.nextId++;
   slot.active = true;
   slot.kind = spec.kind;
   slot.source = spec.source ?? "FIELD";
   slot.label = spec.label ?? `${spec.kind} STRIKE`;
   slot.phase = (spec.delaySeconds ?? 0) > 0 ? "DELAY" : followSeconds > 0 ? "TRACKING" : "LOCKED";
-  slot.x = x;
-  slot.z = z;
-  slot.heading = heading;
+  slot.x = spec.x ?? session.car.position.x;
+  slot.z = spec.z ?? session.car.position.z;
+  slot.heading = spec.heading ?? session.car.heading;
   slot.width = Math.max(1, spec.width ?? 7);
   slot.length = Math.max(4, spec.length ?? 28);
   slot.radius = Math.max(2, spec.radius ?? 10);
-  slot.innerRadius = Math.max(1, spec.innerRadius ?? 5);
-  slot.outerRadius = Math.max(slot.innerRadius + 1, spec.outerRadius ?? 15);
-  slot.coneAngle = clamp(spec.coneAngle ?? Math.PI * 0.42, 0.25, Math.PI * 1.5);
+  slot.outerRadius = Math.max(3, spec.outerRadius ?? 15);
+  slot.innerRadius = spec.kind === "DONUT" ? slot.outerRadius * CART_RAID_HAZARD_DONUT_INNER_RATIO : Math.max(1, spec.innerRadius ?? 5.4);
+  slot.coneAngle = spec.kind === "CONE" ? CART_RAID_HAZARD_CONE_ANGLE : clamp(spec.coneAngle ?? CART_RAID_HAZARD_CONE_ANGLE, 0.25, Math.PI * 1.5);
   slot.secondsToFire = telegraphSeconds;
   slot.telegraphSeconds = telegraphSeconds;
   slot.locked = followSeconds <= 0;
@@ -393,10 +357,7 @@ function rewardResult(session: Phase88Session, state: InternalRaidState, slot: H
 
 function fireHazard(session: Phase88Session, state: InternalRaidState, slot: HazardSlot): void {
   const inside = cartPointInRaidHazard(slot, session.car.position.x, session.car.position.z);
-  const perfect = !inside
-    && slot.insideWhileLocked
-    && Number.isFinite(slot.lastInsideAge)
-    && slot.lastInsideAge <= CART_RAID_HAZARD_PERFECT_ESCAPE_WINDOW;
+  const perfect = !inside && slot.insideWhileLocked && Number.isFinite(slot.lastInsideAge) && slot.lastInsideAge <= CART_RAID_HAZARD_PERFECT_ESCAPE_WINDOW;
   rewardResult(session, state, slot, inside ? "HIT" : perfect ? "PERFECT" : "CLEAR");
   slot.phase = "FIRED";
   slot.locked = true;
@@ -417,18 +378,17 @@ function updateSlot(session: Phase88Session, state: InternalRaidState, slot: Haz
     if (slot.delaySeconds > 0) return;
     slot.phase = slot.followCarSeconds > 0 ? "TRACKING" : "LOCKED";
     slot.locked = slot.followCarSeconds <= 0;
-    if (slot.followCarSeconds > 0) followCar(session, slot);
   }
 
   slot.secondsToFire = Math.max(0, slot.secondsToFire - delta);
   if (slot.followCarSeconds > 0) {
     followCar(session, slot);
     slot.followCarSeconds = Math.max(0, slot.followCarSeconds - delta);
-    slot.phase = slot.followCarSeconds > 0 ? "TRACKING" : "LOCKED";
     slot.locked = slot.followCarSeconds <= 0;
+    slot.phase = slot.locked ? "LOCKED" : "TRACKING";
   } else {
-    slot.phase = "LOCKED";
     slot.locked = true;
+    slot.phase = "LOCKED";
   }
 
   if (slot.locked && slot.secondsToFire > 0) {
@@ -444,37 +404,29 @@ function updateSlot(session: Phase88Session, state: InternalRaidState, slot: Haz
 }
 
 function hazardMaterial(color: number, opacity: number): THREE.MeshBasicMaterial {
-  return new THREE.MeshBasicMaterial({
-    color,
-    transparent: true,
-    opacity,
-    depthWrite: false,
-    depthTest: true,
-    side: THREE.DoubleSide,
-    toneMapped: false,
-  });
+  return new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, depthTest: true, side: THREE.DoubleSide, toneMapped: false });
 }
 
-function groundPlane(): THREE.PlaneGeometry {
+function planeGeometry(): THREE.PlaneGeometry {
   const geometry = new THREE.PlaneGeometry(1, 1);
   geometry.rotateX(-Math.PI / 2);
   return geometry;
 }
 
-function groundCircle(): THREE.CircleGeometry {
+function circleGeometry(): THREE.CircleGeometry {
   const geometry = new THREE.CircleGeometry(1, 48);
   geometry.rotateX(-Math.PI / 2);
   return geometry;
 }
 
-function groundCone(): THREE.CircleGeometry {
-  const geometry = new THREE.CircleGeometry(1, 48, -Math.PI * 0.5, Math.PI * 1.5);
+function coneGeometry(): THREE.CircleGeometry {
+  const geometry = new THREE.CircleGeometry(1, 48, -Math.PI / 4, CART_RAID_HAZARD_CONE_ANGLE);
   geometry.rotateX(-Math.PI / 2);
   return geometry;
 }
 
-function groundDonut(): THREE.RingGeometry {
-  const geometry = new THREE.RingGeometry(0.5, 1, 56);
+function donutGeometry(): THREE.RingGeometry {
+  const geometry = new THREE.RingGeometry(CART_RAID_HAZARD_DONUT_INNER_RATIO, 1, 56);
   geometry.rotateX(-Math.PI / 2);
   return geometry;
 }
@@ -482,17 +434,17 @@ function groundDonut(): THREE.RingGeometry {
 function meshSet(material: THREE.MeshBasicMaterial, index: number): HazardMeshSet {
   const root = new THREE.Group();
   root.name = `phase88-raid-hazard-slot-${index}`;
-  const line = new THREE.Mesh(groundPlane(), material);
+  const line = new THREE.Mesh(planeGeometry(), material);
+  const circle = new THREE.Mesh(circleGeometry(), material);
+  const crossA = new THREE.Mesh(planeGeometry(), material);
+  const crossB = new THREE.Mesh(planeGeometry(), material);
+  const cone = new THREE.Mesh(coneGeometry(), material);
+  const donut = new THREE.Mesh(donutGeometry(), material);
   line.name = `phase88-hazard-line-${index}`;
-  const circle = new THREE.Mesh(groundCircle(), material);
   circle.name = `phase88-hazard-circle-${index}`;
-  const crossA = new THREE.Mesh(groundPlane(), material);
   crossA.name = `phase88-hazard-cross-a-${index}`;
-  const crossB = new THREE.Mesh(groundPlane(), material);
   crossB.name = `phase88-hazard-cross-b-${index}`;
-  const cone = new THREE.Mesh(groundCone(), material);
   cone.name = `phase88-hazard-cone-${index}`;
-  const donut = new THREE.Mesh(groundDonut(), material);
   donut.name = `phase88-hazard-donut-${index}`;
   for (const mesh of [line, circle, crossA, crossB, cone, donut]) {
     mesh.position.y = CART_RAID_HAZARD_LAYER_Y;
@@ -507,11 +459,11 @@ function buildHazardVisuals(demo: Phase88Demo): HazardVisualState {
   const root = new THREE.Group();
   root.name = "phase88-raid-hazard-root";
   const warningMaterial = hazardMaterial(0xff1238, 0.38);
-  const lockedMaterial = hazardMaterial(0xff2416, 0.52);
-  const imminentMaterial = hazardMaterial(0xffb000, 0.68);
-  const fireMaterial = hazardMaterial(0xffffff, 0.84);
+  const lockedMaterial = hazardMaterial(0xff2416, 0.54);
+  const imminentMaterial = hazardMaterial(0xffb000, 0.7);
+  const fireMaterial = hazardMaterial(0xffffff, 0.88);
   const slots = Array.from({ length: CART_RAID_HAZARD_MAX_ACTIVE }, (_, index) => meshSet(warningMaterial, index));
-  slots.forEach((slot) => root.add(slot.root));
+  for (const slot of slots) root.add(slot.root);
   demo.scene.add(root);
   const visual = { root, slots, warningMaterial, lockedMaterial, imminentMaterial, fireMaterial };
   visualByDemo.set(demo as unknown as object, visual);
@@ -527,7 +479,7 @@ function hideMeshes(set: HazardMeshSet): void {
   set.donut.visible = false;
 }
 
-function applyMaterial(set: HazardMeshSet, material: THREE.MeshBasicMaterial): void {
+function assignMaterial(set: HazardMeshSet, material: THREE.MeshBasicMaterial): void {
   set.line.material = material;
   set.circle.material = material;
   set.crossA.material = material;
@@ -536,87 +488,64 @@ function applyMaterial(set: HazardMeshSet, material: THREE.MeshBasicMaterial): v
   set.donut.material = material;
 }
 
-function updateMeshSet(set: HazardMeshSet, hazard: CartRaidHazardPublicState, visual: HazardVisualState, time: number): void {
+function updateMeshSet(set: HazardMeshSet, slot: HazardSlot, visual: HazardVisualState, now: number): void {
   hideMeshes(set);
-  set.root.visible = hazard.phase !== "DELAY";
+  set.root.visible = slot.active && slot.phase !== "DELAY";
   if (!set.root.visible) return;
-  const material = hazard.phase === "FIRED"
-    ? visual.fireMaterial
-    : hazard.secondsToFire <= 0.35
-      ? visual.imminentMaterial
-      : hazard.phase === "LOCKED"
-        ? visual.lockedMaterial
-        : visual.warningMaterial;
-  applyMaterial(set, material);
-  const pulse = hazard.phase === "LOCKED" ? 1 + Math.sin(time * 0.018) * 0.035 : 1;
+  const material = slot.phase === "FIRED" ? visual.fireMaterial : slot.secondsToFire <= 0.35 ? visual.imminentMaterial : slot.phase === "LOCKED" ? visual.lockedMaterial : visual.warningMaterial;
+  assignMaterial(set, material);
+  const pulse = slot.phase === "LOCKED" ? 1 + Math.sin(now * 0.018) * 0.035 : 1;
 
-  if (hazard.kind === "LINE") {
+  if (slot.kind === "LINE") {
     set.line.visible = true;
-    set.line.position.set(hazard.x, CART_RAID_HAZARD_LAYER_Y, hazard.z);
-    set.line.rotation.y = hazard.heading;
-    set.line.scale.set(hazard.width * pulse, 1, hazard.length * pulse);
-  } else if (hazard.kind === "CIRCLE") {
+    set.line.position.set(slot.x, CART_RAID_HAZARD_LAYER_Y, slot.z);
+    set.line.rotation.y = slot.heading;
+    set.line.scale.set(slot.width * pulse, 1, slot.length * pulse);
+  } else if (slot.kind === "CIRCLE") {
     set.circle.visible = true;
-    set.circle.position.set(hazard.x, CART_RAID_HAZARD_LAYER_Y, hazard.z);
-    set.circle.scale.set(hazard.radius * pulse, 1, hazard.radius * pulse);
-  } else if (hazard.kind === "CROSS") {
+    set.circle.position.set(slot.x, CART_RAID_HAZARD_LAYER_Y, slot.z);
+    set.circle.scale.set(slot.radius * pulse, 1, slot.radius * pulse);
+  } else if (slot.kind === "CROSS") {
     set.crossA.visible = true;
     set.crossB.visible = true;
-    set.crossA.position.set(hazard.x, CART_RAID_HAZARD_LAYER_Y, hazard.z);
+    set.crossA.position.set(slot.x, CART_RAID_HAZARD_LAYER_Y, slot.z);
     set.crossB.position.copy(set.crossA.position);
-    set.crossA.rotation.y = hazard.heading;
-    set.crossB.rotation.y = hazard.heading + Math.PI / 2;
-    set.crossA.scale.set(hazard.width * pulse, 1, hazard.length * pulse);
+    set.crossA.rotation.y = slot.heading;
+    set.crossB.rotation.y = slot.heading + Math.PI / 2;
+    set.crossA.scale.set(slot.width * pulse, 1, slot.length * pulse);
     set.crossB.scale.copy(set.crossA.scale);
-  } else if (hazard.kind === "CONE") {
+  } else if (slot.kind === "CONE") {
     set.cone.visible = true;
-    set.cone.position.set(hazard.x, CART_RAID_HAZARD_LAYER_Y, hazard.z);
-    set.cone.rotation.y = hazard.heading - Math.PI / 2;
-    set.cone.scale.set(hazard.radius * pulse, 1, hazard.radius * pulse);
-    const baseArc = Math.PI * 1.5;
-    set.cone.scale.x *= clamp(hazard.coneAngle / baseArc, 0.22, 1);
+    set.cone.position.set(slot.x, CART_RAID_HAZARD_LAYER_Y, slot.z);
+    set.cone.rotation.y = slot.heading;
+    set.cone.scale.set(slot.radius * pulse, 1, slot.radius * pulse);
   } else {
     set.donut.visible = true;
-    set.donut.position.set(hazard.x, CART_RAID_HAZARD_LAYER_Y, hazard.z);
-    const ratio = clamp(hazard.innerRadius / Math.max(0.1, hazard.outerRadius), 0.08, 0.9);
-    set.donut.geometry.dispose();
-    const geometry = new THREE.RingGeometry(ratio, 1, 56);
-    geometry.rotateX(-Math.PI / 2);
-    set.donut.geometry = geometry;
-    set.donut.scale.set(hazard.outerRadius * pulse, 1, hazard.outerRadius * pulse);
+    set.donut.position.set(slot.x, CART_RAID_HAZARD_LAYER_Y, slot.z);
+    set.donut.scale.set(slot.outerRadius * pulse, 1, slot.outerRadius * pulse);
   }
 }
 
 function updateHazardVisuals(demo: Phase88Demo): void {
   const visual = visualByDemo.get(demo as unknown as object) ?? buildHazardVisuals(demo);
-  const snapshot = getCartRaidHazardState(demo.session);
+  const state = stateFor(demo.session);
   visual.root.visible = isCartTurboHuntEnabled(demo.session);
   if (!visual.root.visible) return;
-  for (let index = 0; index < visual.slots.length; index += 1) {
-    const hazard = snapshot.hazards[index];
-    const set = visual.slots[index];
-    if (!hazard) {
-      set.root.visible = false;
-      hideMeshes(set);
-      continue;
-    }
-    updateMeshSet(set, hazard, visual, typeof performance !== "undefined" ? performance.now() : Date.now());
-  }
+  const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+  for (let index = 0; index < visual.slots.length; index += 1) updateMeshSet(visual.slots[index], state.slots[index], visual, now);
+  const snapshot = snapshotOf(state);
   visual.root.userData.cartRaidHazardActiveCount = snapshot.activeCount;
   visual.root.userData.cartRaidHazardImminentCount = snapshot.imminentCount;
   visual.root.userData.cartRaidHazardPrimary = snapshot.primaryKind;
   visual.root.userData.cartRaidHazardHitSerial = snapshot.hitSerial;
   visual.root.userData.cartRaidHazardPerfectSerial = snapshot.perfectDodgeSerial;
+  visual.root.userData.cartRaidHazardLayerY = CART_RAID_HAZARD_LAYER_Y;
 }
 
 export function installCartRoguePhase88RaidHazards(): void {
   const sessionPrototype = CartArenaSession.prototype as unknown as Phase88Session;
   const previousStep = sessionPrototype.step;
-  sessionPrototype.step = function phase88RaidHazardStep(
-    this: Phase88Session,
-    input: RallyInputState,
-    fixedDelta = 1 / 60,
-  ): void {
+  sessionPrototype.step = function phase88RaidHazardStep(this: Phase88Session, input: RallyInputState, fixedDelta = 1 / 60): void {
     previousStep.call(this, input, fixedDelta);
     const session = this as unknown as CartArenaSession;
     if (!isCartTurboHuntEnabled(session)) return;
