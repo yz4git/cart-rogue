@@ -2,7 +2,7 @@ import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
 import type { CartEnemyState } from "./CartCombat";
 import { isCartTurboHuntEnabled } from "./CartRoguePhase67TurboHunt";
-import { getCartTitanBossState, type CartTitanBossStage } from "./CartRoguePhase83Boss2";
+import { getCartTitanBossState, type CartTitanStage } from "./CartRoguePhase83Boss2";
 import { getCartTitanPredatorState } from "./CartRoguePhase86BossPredator";
 import {
   cancelCartRaidHazards,
@@ -19,7 +19,7 @@ export interface CartTitanRaidBossSnapshot {
   patternLabel: string;
   cooldownSeconds: number;
   titanHazards: number;
-  stage: CartTitanBossStage;
+  stage: CartTitanStage;
 }
 
 interface InternalRaidBossState extends CartTitanRaidBossSnapshot {
@@ -114,13 +114,13 @@ function setReward(session: Phase90Session, text: string, seconds = 1.8): void {
   session.rewardTimer = Math.max(session.rewardTimer, seconds);
 }
 
-function intervalFor(stage: CartTitanBossStage): number {
+function intervalFor(stage: CartTitanStage): number {
   if (stage === "FURY") return CART_TITAN_RAID_FURY_INTERVAL;
   if (stage === "BREAKOUT") return CART_TITAN_RAID_BREAKOUT_INTERVAL;
   return CART_TITAN_RAID_ARMORED_INTERVAL;
 }
 
-export function cartTitanRaidPatternFor(stage: CartTitanBossStage, serial: number): CartTitanRaidPattern {
+export function cartTitanRaidPatternFor(stage: CartTitanStage, serial: number): CartTitanRaidPattern {
   const index = Math.abs(Math.floor(serial));
   if (stage === "FURY") {
     const fury: readonly CartTitanRaidPattern[] = ["HUNTING_BLAST", "FURY_RAID", "DONUT_CRUSH"];
