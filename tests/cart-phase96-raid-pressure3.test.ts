@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import "../src/cart/CartRogueRuntime";
 import { CartArenaSession } from "../src/cart/CartArenaSession";
 import { enableCartTurboHunt } from "../src/cart/CartRoguePhase67TurboHunt";
 import { getCartRaidHazardState } from "../src/cart/CartRoguePhase88RaidHazards";
@@ -27,6 +28,7 @@ test("Raid Pressure 3.0 turns one dodge into a fast cutback sequence", () => {
   assert.ok(CART_RAID_PRESSURE_SWEEP_DELAY - CART_RAID_PRESSURE_CUTBACK_DELAY <= 0.55);
   assert.ok(CART_RAID_PRESSURE_SWEEP_DELAY + CART_RAID_PRESSURE_SWEEP_TELEGRAPH <= 1.65);
   assert.ok(CART_RAID_PRESSURE_QUIET_LIMIT <= 1.1);
+  assert.equal(CART_RAID_PRESSURE_CHAIN_LABEL.startsWith(CART_FORCED_DODGE_LABEL_PREFIX), false);
 });
 
 test("chain placement attacks the side of the first dodge then crosses back over the future line", () => {
@@ -55,8 +57,7 @@ test("a live deliberate dodge immediately arms two bounded follow-up hazards", (
     if (raid.hazards.some((hazard) =>
       hazard.source === "FIELD"
       && hazard.phase === "LOCKED"
-      && hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX)
-      && !hazard.label.startsWith(CART_RAID_PRESSURE_CHAIN_LABEL),
+      && hazard.label.startsWith(CART_FORCED_DODGE_LABEL_PREFIX),
     )) {
       forcedFound = true;
       break;
