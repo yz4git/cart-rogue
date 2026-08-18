@@ -105,8 +105,9 @@ async function runScenario(sessionId, mode, seconds) {
   let direction = 1;
   let lastReactionAt = 0;
 
-  // Both scenarios continuously accelerate. The only difference is whether
-  // the reactive run changes line/brakes after a visible AOE LOCK.
+  // Both scenarios continuously accelerate. The reactive run deliberately
+  // changes line AND briefly brakes at each AOE LOCK; the passive run does
+  // neither. This models the clear driving decision the game is supposed to teach.
   await key(sessionId, "ArrowUp", true);
   try {
     while (Date.now() - started < seconds * 1000) {
@@ -125,15 +126,13 @@ async function runScenario(sessionId, mode, seconds) {
         direction *= -1;
         steering = direction;
         await key(sessionId, direction < 0 ? "ArrowLeft" : "ArrowRight", true);
-        steerReleaseAt = now + 920;
+        await key(sessionId, "ArrowDown", true);
+        braking = true;
+        steerReleaseAt = now + 980;
+        brakeReleaseAt = now + 390;
         metrics.steerActions += 1;
+        metrics.brakeActions += 1;
         lastReactionAt = now;
-        if (metrics.steerActions % 2 === 0) {
-          await key(sessionId, "ArrowDown", true);
-          braking = true;
-          brakeReleaseAt = now + 240;
-          metrics.brakeActions += 1;
-        }
       }
       if (steering !== 0 && now >= steerReleaseAt) {
         await key(sessionId, steering < 0 ? "ArrowLeft" : "ArrowRight", false);
@@ -243,7 +242,7 @@ try {
   await fresh();
   const passive = await runScenario(sessionId, "passive-straight", 21);
   await fresh();
-  const reactive = await runScenario(sessionId, "reactive", 21);
+  const reactive = await runScenario(sessionId, "reactive-steer-brake", 21);
 
   // Headless SwiftShader can advance gameplay fixed steps much slower than wall
   // clock time. Unit regression fixes ESCAPE at 6.2 game seconds; this separate
@@ -259,8 +258,8 @@ try {
     escapeObservation,
     acceptance: {
       passiveWasPunished: passive.hits >= 1,
-      reactiveUsedEvasion: reactive.steerActions >= 2,
-      reactiveNoWorseThanPassive: reactive.hits <= passive.hits,
+      reactiveUsedEvasion: reactive.steerActions >= 2 && reactive.brakeActions >= 2,
+      reactiveImprovedOverPassive: reactive.hits < passive.hits,
       escapeRendered: escapeObservation.observed,
     },
     finalTextSample: finalState.textSample,
