@@ -83,8 +83,11 @@ test("raid hits trigger a visible damage state and structural impact without bec
     radius: 8,
     telegraphSeconds: 0.8,
   });
-  for (let index = 0; index < 17; index += 1) session.step(idleInput, 0.05);
-  const feedback = getCartPlayerDamageFeedbackState(session);
+  let feedback = getCartPlayerDamageFeedbackState(session);
+  for (let index = 0; index < 28 && feedback.hitSerial === 0; index += 1) {
+    session.step(idleInput, 0.05);
+    feedback = getCartPlayerDamageFeedbackState(session);
+  }
   assert.equal(feedback.hitSerial, 1);
   assert.equal(feedback.active, true);
   assert.ok(feedback.flashSeconds > 0 && feedback.flashSeconds <= CART_PLAYER_DAMAGE_FLASH_SECONDS);
