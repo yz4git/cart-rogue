@@ -16,6 +16,7 @@ import {
   CART_ENCOUNTER_OPENING_SECONDS,
   cartEncounterBeatDuration,
   cartEncounterBeatPolicy,
+  cartEncounterProtectsActiveDodge,
   cartEncounterTimedNextBeat,
   getCartEncounterDirectorState,
 } from "../src/cart/CartRoguePhase106EncounterDirector2";
@@ -58,6 +59,20 @@ test("a live fixed-step run reaches the first DODGE beat instead of stalling in 
   assert.equal(sawPressure, true);
   assert.equal(sawDodge, true, `expected DODGE within 9 fixed seconds, got ${final.beat} with ${final.secondsRemaining.toFixed(3)}s remaining`);
   assert.ok(final.transitionCount >= 2);
+});
+
+test("an active DODGE raid cannot be stolen by field-clear, chase, or beat-expiry transitions", () => {
+  assert.equal(cartEncounterProtectsActiveDodge("DODGE", 1), true);
+  assert.equal(cartEncounterProtectsActiveDodge("DODGE", 2), true);
+  assert.equal(cartEncounterProtectsActiveDodge("DODGE", 1, true, false), false);
+  assert.equal(cartEncounterProtectsActiveDodge("DODGE", 1, false, true), false);
+  assert.equal(cartEncounterProtectsActiveDodge("DODGE", 0), false);
+  assert.equal(cartEncounterProtectsActiveDodge("PRESSURE", 1), false);
+  assert.match(source, /const dodgeChallengeActive = cartEncounterProtectsActiveDodge/);
+  assert.match(source, /!dodgeChallengeActive && \(pursuitWon \|\| eventCleared\)/);
+  assert.match(source, /!dodgeChallengeActive && \(escape\.active \|\| pursuit\.active\)/);
+  assert.match(source, /!dodgeChallengeActive && state\.secondsRemaining <= 0/);
+  assert.match(source, /"DODGE CHALLENGE RESOLVING"/);
 });
 
 test("counter and recovery are real safety windows rather than UI-only labels", () => {
@@ -161,9 +176,9 @@ test("low GAS can request mercy but cannot pin the run in permanent recovery", (
 
 test("live encounter signals can preempt the timed rhythm after scheduling permits them", () => {
   assert.match(source, /boss\.bossActive/);
-  assert.match(source, /hitNow \|\| pursuitLost/);
-  assert.match(source, /perfectNow \|\| pursuitWon \|\| eventCleared/);
-  assert.match(source, /escape\.active \|\| pursuit\.active/);
+  assert.match(source, /hitNow \|\| \(!dodgeChallengeActive && pursuitLost\)/);
+  assert.match(source, /perfectNow \|\| \(!dodgeChallengeActive && \(pursuitWon \|\| eventCleared\)\)/);
+  assert.match(source, /!dodgeChallengeActive && \(escape\.active \|\| pursuit\.active\)/);
   assert.match(source, /"PLAYER HIT"/);
   assert.match(source, /"PERFECT DODGE"/);
   assert.match(source, /"FIELD EVENT CLEAR"/);
