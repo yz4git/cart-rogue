@@ -82,6 +82,7 @@ import "./CartRaidEvasionCarry";
 import "./CartRoguePhase96RaidPressure3";
 import "./CartRoguePhase97AdaptiveCounterread";
 import "./CartRoguePhase98HardMode";
+import "./CartRoguePhase99ResourceReadability";
 import "./CartGameplayAuditRuntime";
 import "./CartRenderAuditRuntime";
 
