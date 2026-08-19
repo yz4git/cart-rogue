@@ -6,10 +6,22 @@ import {
   type CartHardModeSnapshot,
   type CartRunDifficulty,
 } from "../src/cart/CartRunDifficulty";
+import {
+  CART_ROGUE_CAMERA_DISTANCE_MAX,
+  CART_ROGUE_CAMERA_DISTANCE_MIN,
+  CART_ROGUE_CAMERA_DISTANCE_STEP,
+  DEFAULT_CART_ROGUE_CONFIG,
+  loadCartRogueConfig,
+  saveCartRogueConfig,
+} from "../src/cart/CartRogueConfig";
+import { loadRallySettings, saveRallySettings } from "../src/rally/RallySettings";
 import styles from "./CartGameMenu.module.css";
+import configStyles from "./CartGameMenuConfig.module.css";
 
 const MENU_PAUSE_EVENT = "cart-rogue-menu-pause";
 const MENU_RESUME_EVENT = "cart-rogue-menu-resume";
+
+type PausePage = "menu" | "config";
 
 interface CartGameMenuProps {
   started: boolean;
@@ -24,33 +36,73 @@ function hasBlockingGameOverlay(): boolean {
 
 export default function CartGameMenu({ started, onStart, onReturnTitle }: CartGameMenuProps) {
   const [paused, setPaused] = useState(false);
+  const [pausePage, setPausePage] = useState<PausePage>("menu");
   const [difficulty, setDifficulty] = useState<CartRunDifficulty>("normal");
   const [hardSnapshot, setHardSnapshot] = useState<CartHardModeSnapshot | null>(null);
+  const [cameraDistance, setCameraDistance] = useState(DEFAULT_CART_ROGUE_CONFIG.cameraDistance);
+  const [vibrationEnabled, setVibrationEnabled] = useState(true);
   const gameOver = Boolean(hardSnapshot?.gameOver);
 
   const pauseGame = useCallback(() => {
     if (!started || paused || gameOver || hasBlockingGameOverlay()) return;
     window.dispatchEvent(new Event(MENU_PAUSE_EVENT));
+    setPausePage("menu");
     setPaused(true);
   }, [gameOver, paused, started]);
 
   const resumeGame = useCallback(() => {
     if (!started || !paused || gameOver) return;
     window.dispatchEvent(new Event(MENU_RESUME_EVENT));
+    setPausePage("menu");
     setPaused(false);
   }, [gameOver, paused, started]);
 
   const startGame = (nextDifficulty = difficulty) => {
     setPaused(false);
+    setPausePage("menu");
     setHardSnapshot(null);
     onStart(nextDifficulty);
   };
 
   const returnTitle = () => {
     setPaused(false);
+    setPausePage("menu");
     setHardSnapshot(null);
     onReturnTitle();
   };
+
+  const openConfig = () => {
+    const config = loadCartRogueConfig();
+    const rallySettings = loadRallySettings();
+    setCameraDistance(config.cameraDistance);
+    setVibrationEnabled(rallySettings.vibrationEnabled);
+    setPausePage("config");
+  };
+
+  const updateCameraDistance = (value: number) => {
+    const next = saveCartRogueConfig({ cameraDistance: value });
+    setCameraDistance(next.cameraDistance);
+  };
+
+  const toggleVibration = () => {
+    const nextEnabled = !vibrationEnabled;
+    const current = loadRallySettings();
+    setVibrationEnabled(nextEnabled);
+    saveRallySettings({ ...current, vibrationEnabled: nextEnabled });
+  };
+
+  const resetConfig = () => {
+    const next = saveCartRogueConfig(DEFAULT_CART_ROGUE_CONFIG);
+    const current = loadRallySettings();
+    setCameraDistance(next.cameraDistance);
+    setVibrationEnabled(true);
+    saveRallySettings({ ...current, vibrationEnabled: true });
+  };
+
+  useEffect(() => {
+    setCameraDistance(loadCartRogueConfig().cameraDistance);
+    setVibrationEnabled(loadRallySettings().vibrationEnabled);
+  }, []);
 
   useEffect(() => {
     const onHardSnapshot = (event: Event) => {
@@ -77,18 +129,20 @@ export default function CartGameMenu({ started, onStart, onReturnTitle }: CartGa
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || gameOver) return;
       event.preventDefault();
-      if (paused) resumeGame();
-      else pauseGame();
+      if (!paused) pauseGame();
+      else if (pausePage === "config") setPausePage("menu");
+      else resumeGame();
     };
     window.addEventListener("keydown", onKeyDown, { passive: false });
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [gameOver, pauseGame, paused, resumeGame, started]);
+  }, [gameOver, pauseGame, pausePage, paused, resumeGame, started]);
 
   useEffect(() => {
     if (!started) return undefined;
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible" || gameOver || hasBlockingGameOverlay()) return;
       window.dispatchEvent(new Event(MENU_PAUSE_EVENT));
+      setPausePage("menu");
       setPaused(true);
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
@@ -172,17 +226,71 @@ export default function CartGameMenu({ started, onStart, onReturnTitle }: CartGa
           <i /><i />
         </button>
       )}
-      {paused && (
+      {paused && pausePage === "menu" && (
         <div className={styles.pauseOverlay} role="dialog" aria-modal="true" aria-label="Game paused">
           <div className={styles.pausePanel}>
             <div className={styles.pauseEyebrow}>RUN SUSPENDED</div>
             <h2>PAUSED</h2>
             <p>Steering, brake and Turbo input are released while paused.</p>
-            <button className={styles.resumeButton} onClick={resumeGame}>
-              <strong>RESUME</strong>
-              <small>BACK TO THE HUNT</small>
-            </button>
+            <div className={configStyles.menuActions}>
+              <button className={styles.resumeButton} onClick={resumeGame}>
+                <strong>RESUME</strong>
+                <small>BACK TO THE HUNT</small>
+              </button>
+              <button className={configStyles.secondaryButton} onClick={openConfig}>
+                <strong>CONFIG</strong>
+                <small>CAMERA / VIBRATION</small>
+              </button>
+              <button className={configStyles.dangerButton} onClick={returnTitle}>
+                <strong>BACK TO TITLE</strong>
+                <small>END CURRENT RUN</small>
+              </button>
+            </div>
             <div className={styles.pauseHint}>ESC · PAUSE / RESUME</div>
+          </div>
+        </div>
+      )}
+      {paused && pausePage === "config" && (
+        <div className={styles.pauseOverlay} role="dialog" aria-modal="true" aria-label="Configuration">
+          <div className={`${styles.pausePanel} ${configStyles.configPanel}`}>
+            <div className={styles.pauseEyebrow}>RUN CONFIGURATION</div>
+            <h2>CONFIG</h2>
+            <p className={configStyles.configIntro}>Changes apply immediately and are saved on this device.</p>
+            <div className={configStyles.configRows}>
+              <div className={configStyles.configRow}>
+                <label className={configStyles.configLabel} htmlFor="cart-camera-distance">
+                  <span>CAMERA DISTANCE</span>
+                  <span className={configStyles.configValue}>{Math.round(cameraDistance * 100)}%</span>
+                </label>
+                <input
+                  id="cart-camera-distance"
+                  className={configStyles.range}
+                  type="range"
+                  min={CART_ROGUE_CAMERA_DISTANCE_MIN}
+                  max={CART_ROGUE_CAMERA_DISTANCE_MAX}
+                  step={CART_ROGUE_CAMERA_DISTANCE_STEP}
+                  value={cameraDistance}
+                  onChange={(event) => updateCameraDistance(Number(event.currentTarget.value))}
+                  aria-label="Camera distance"
+                />
+                <div className={configStyles.rangeScale}><span>CURRENT</span><span>FAR +60%</span></div>
+              </div>
+              <div className={`${configStyles.configRow} ${configStyles.toggleRow}`}>
+                <div className={configStyles.configLabel}><span>VIBRATION</span></div>
+                <button
+                  className={`${configStyles.toggleButton} ${vibrationEnabled ? configStyles.toggleOn : ""}`}
+                  onClick={toggleVibration}
+                  aria-pressed={vibrationEnabled}
+                >
+                  {vibrationEnabled ? "ON" : "OFF"}
+                </button>
+              </div>
+            </div>
+            <div className={configStyles.configFooter}>
+              <button className={configStyles.resetButton} onClick={resetConfig}>RESET</button>
+              <button className={configStyles.backButton} onClick={() => setPausePage("menu")}>BACK</button>
+            </div>
+            <div className={styles.pauseHint}>ESC · BACK</div>
           </div>
         </div>
       )}
