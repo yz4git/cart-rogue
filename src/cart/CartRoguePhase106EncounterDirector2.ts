@@ -192,6 +192,7 @@ function applySchedulingGate(session: Phase106Session, state: EncounterDirectorS
   setCartEncounterDirectorGatePolicy(session as unknown as CartArenaSession, {
     allowThreatPressure: state.beat === "PRESSURE",
     allowFieldRaid: state.beat === "DODGE",
+    commitCap: state.commitCap,
   });
 }
 
