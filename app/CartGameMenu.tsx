@@ -100,11 +100,6 @@ export default function CartGameMenu({ started, onStart, onReturnTitle }: CartGa
   };
 
   useEffect(() => {
-    setCameraDistance(loadCartRogueConfig().cameraDistance);
-    setVibrationEnabled(loadRallySettings().vibrationEnabled);
-  }, []);
-
-  useEffect(() => {
     const onHardSnapshot = (event: Event) => {
       const detail = (event as CustomEvent<CartHardModeSnapshot>).detail;
       if (detail) setHardSnapshot(detail);
