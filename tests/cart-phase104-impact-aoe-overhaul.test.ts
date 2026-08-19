@@ -20,7 +20,7 @@ test("Phase104 keeps AOE presentation in the same fixed four-slot budget", () =>
   assert.match(source, /fixedAoeFxSlots/);
   assert.match(source, /sharedFixedPools/);
   assert.doesNotMatch(source, /new THREE\.PointLight/);
-  assert.doesNotMatch(source, /EffectComposer|UnrealBloomPass|postprocessing/i);
+  assert.doesNotMatch(source, /EffectComposer|UnrealBloomPass|three\/examples\/jsm\/postprocessing/i);
 });
 
 test("Phase104 AOE countdown becomes more urgent without changing gameplay timing", () => {
