@@ -1,4 +1,4 @@
-import { CartArenaSession } from "./CartArenaSession";
+import type { CartArenaSession } from "./CartArenaSession";
 
 export interface CartEncounterDirectorGatePolicy {
   allowThreatPressure: boolean;
