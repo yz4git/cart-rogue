@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
+  CART_HARD_OPENING_GRACE_SECONDS,
+  CART_HARD_PRESSURE_INTERVAL_SECONDS,
+  CART_HARD_PRESSURE_MAX_EXISTING,
+} from "../src/cart/CartRoguePhase98HardMode";
+import {
   CART_PHASE105_HARD_DECISION_SECONDS,
   CART_PHASE105_HARD_MAX_SPEED,
   CART_PHASE105_LOW_GAS_THRESHOLD,
@@ -69,6 +74,14 @@ test("Phase105 replaces permanent speed pressure with bounded tactical bursts", 
   assert.match(source, /enemy\.moveSpeed = desiredSpeed/);
   assert.match(source, /intentScale = 0\.74/);
   assert.doesNotMatch(source, /new THREE\./);
+});
+
+test("Hard trades some RAID density for smarter ordinary enemy pressure", () => {
+  assert.equal(CART_HARD_OPENING_GRACE_SECONDS, 2.6);
+  assert.equal(CART_HARD_PRESSURE_INTERVAL_SECONDS, 2.8);
+  assert.equal(CART_HARD_PRESSURE_MAX_EXISTING, 1);
+  assert.ok(CART_PHASE105_HARD_DECISION_SECONDS < CART_PHASE105_NORMAL_DECISION_SECONDS);
+  assert.ok(CART_PHASE105_HARD_MAX_SPEED > CART_PHASE105_NORMAL_MAX_SPEED);
 });
 
 test("Phase105 preserves the fixed Turbo Hunt enemy pool and does not add spawn capacity", () => {
