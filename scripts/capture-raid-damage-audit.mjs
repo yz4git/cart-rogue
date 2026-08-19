@@ -82,6 +82,30 @@ try {
     method: "POST",
     body: JSON.stringify({ url: auditUrl }),
   });
+  await execute(sessionId, `
+    window.__cartPhase106DamageBeats = [];
+    window.__cartPhase106DamageLatest = null;
+    window.__cartPhase106DamageSawAoe = false;
+    window.addEventListener('cart-encounter-director2-snapshot', (event) => {
+      const detail = event && event.detail ? event.detail : null;
+      if (!detail) return;
+      window.__cartPhase106DamageLatest = {
+        beat: detail.beat,
+        beatSerial: detail.beatSerial,
+        reason: detail.reason,
+        secondsRemaining: detail.secondsRemaining,
+        fieldHazardsAllowed: detail.fieldHazardsAllowed,
+        raidActiveCount: detail.raidActiveCount,
+        transitionCount: detail.transitionCount,
+      };
+      const beats = window.__cartPhase106DamageBeats;
+      const last = beats.length > 0 ? beats[beats.length - 1] : null;
+      if (!last || last.beatSerial !== detail.beatSerial || last.beat !== detail.beat || last.reason !== detail.reason) {
+        beats.push({ ...window.__cartPhase106DamageLatest });
+        if (beats.length > 48) beats.shift();
+      }
+    });
+  `);
 
   let ready = null;
   for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -104,8 +128,8 @@ try {
 
   // Hold a straight accelerating line and never steer or brake. Phase106 now
   // schedules the first FIELD RAID only after its OPENING + PRESSURE beats.
-  // SwiftShader can advance deterministic game time far slower than wall time,
-  // so this acceptance window is deliberately gameplay-rhythm aware.
+  // Once the DODGE challenge actually begins, it must resolve to HIT/PERFECT
+  // rather than being cancelled by an unrelated event clear or beat expiry.
   await execute(sessionId, `
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', code: 'ArrowUp', bubbles: true, cancelable: true }));
     return true;
@@ -122,14 +146,18 @@ try {
       const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
       const directHit = Boolean(overlay) && text.includes('DIRECT HIT') && text.includes('GAS -8%') && text.includes('SPEED -42%');
       const aoeWarning = text.includes('AOE TRACKING') || text.includes('AOE LOCKED') || text.includes('AOE FIRING');
+      if (aoeWarning) window.__cartPhase106DamageSawAoe = true;
       return {
         ready: Boolean(gl) && !gl.isContextLost(),
         directHit,
         aoeWarning,
+        sawAoeWarning: Boolean(window.__cartPhase106DamageSawAoe),
         escapeActive: Boolean(escape),
         overlayVisible: Boolean(overlay),
         hasGasLoss: text.includes('GAS -8%'),
         hasSpeedLoss: text.includes('SPEED -42%'),
+        encounterBeats: window.__cartPhase106DamageBeats || [],
+        encounterLatest: window.__cartPhase106DamageLatest || null,
         textSample: text.split('\\n').filter(Boolean).slice(0, 30),
         width: canvas.width,
         height: canvas.height,
@@ -146,7 +174,7 @@ try {
     return true;
   `);
 
-  if (!state?.ready || !state?.directHit || !state?.overlayVisible) {
+  if (!state?.ready || !state?.directHit || !state?.overlayVisible || !state?.sawAoeWarning) {
     throw new Error(`Straight-line raid hit did not produce visible damage feedback: ${JSON.stringify(state)}`);
   }
 
