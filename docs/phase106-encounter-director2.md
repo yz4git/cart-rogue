@@ -8,11 +8,11 @@ Phase105 made individual enemies smarter. Phase106 owns the higher-level questio
 
 ## Beat model
 
-The first implementation uses seven deterministic beats:
+Phase106 uses seven deterministic beats:
 
 1. `OPENING` — readable first seconds; no FIELD RAID and no immediate charge spam.
-2. `PRESSURE` — normal hunting pressure and role-based Phase105 intelligence.
-3. `DODGE` — the highest non-boss danger beat; FIELD RAID is allowed.
+2. `PRESSURE` — enemy-wave pressure and role-based Phase105 intelligence; new FIELD RAID is gated off.
+3. `DODGE` — movement/evasion test; new FIELD RAID is allowed while new Threat Pressure waves are gated off.
 4. `COUNTER` — guaranteed attack opportunity after a clean defensive result or encounter clear.
 5. `CHASE` — Pursuit/Escape owns attention; FIELD RAID is suppressed so two movement tests do not stack.
 6. `RECOVERY` — short mercy window after a hit/failure or periodically at very low GAS/LIFE.
@@ -31,6 +31,17 @@ Live gameplay can preempt that timeline:
 - Titan release -> `RECOVERY`
 - low GAS/LIFE -> bounded `RECOVERY` with an 8s lockout so mercy cannot become permanent immunity
 
+## Authoritative scheduling gates
+
+`CartEncounterDirectorGate` keeps the old systems compatible when Phase106 is absent: its default policy is permissive. When Phase106 is installed, it publishes the current beat policy before the historical wrapper chain runs.
+
+- Phase87 Threat Pressure may start a new pressure wave only while the current beat is `PRESSURE`.
+- Phase89 Hazard Combat Director may start a new FIELD RAID only while the current beat is `DODGE`.
+- Existing Pursuit/Escape systems remain event-driven. When either becomes active, Phase106 preempts into `CHASE` and removes FIELD RAID overlap rather than delaying the event itself.
+- Active legacy attacks are allowed to resolve where safe; `OPENING`, `COUNTER`, `CHASE`, `RECOVERY`, and `BOSS` still cancel FIELD RAID and suppress fresh normal-enemy charge.
+
+This makes the Director authoritative at **start time**, not only a cleanup layer after overlapping attacks have already appeared.
+
 ## Difficulty contract
 
 Normal keeps longer counter/recovery windows and a lower intended commit cap.
@@ -42,13 +53,19 @@ Hard keeps smarter Phase105 reads and higher pressure intensity, but still recei
 - enemy pool remains fixed at 19 Turbo Hunt slots
 - RAID pool remains fixed at four slots
 - no new Three.js meshes, shaders, post-processing, particles, or render-loop allocations
-- state is stored per session in a `WeakMap`
+- state and scheduling policy are stored per session in `WeakMap`s
 - Phase106 is imported after Phase105 in `CartGameMenuRuntime` and does not rewrite the historical `CART_ROGUE_RUNTIME_PHASE_ORDER`
 
-## First implementation slice
+## Implemented acceptance contract
 
-The initial Phase106 runtime already enforces the most important fairness rule: `OPENING`, `COUNTER`, `CHASE`, and `RECOVERY` suppress FIELD RAID overlap, while safe beats cancel active normal-enemy charge and impose a minimum charge cooldown. It also publishes a lightweight snapshot event for later HUD/debug/telemetry use.
+- readable `OPENING -> PRESSURE -> DODGE -> COUNTER` baseline rhythm
+- actual safe windows, not HUD-only labels
+- event-driven `CHASE`, `RECOVERY`, and `BOSS` preemption
+- low-GAS mercy cannot create permanent immunity
+- Threat Pressure and FIELD RAID begin on separate beats
+- historical Phase87/89 unit behavior remains available when Phase106 is not installed
+- no additional spawn or render capacity
 
-## Next slice
+## Follow-up tuning after playtest
 
-After this core is stable in CI/WebGL audit, wire explicit start gates into Threat Pressure, Hazard Combat Director and Escape Rhythm so their internal clocks request permission from Phase106 before beginning a new encounter beat. This will make the Director authoritative at scheduling time rather than correcting overlap after it is created.
+Use gameplay telemetry and WebGL playtests to tune beat durations, Hard intensity, and how often Field Events/Pursuit preempt the baseline rhythm. Do not remove the counter/recovery guarantees merely to increase difficulty.
