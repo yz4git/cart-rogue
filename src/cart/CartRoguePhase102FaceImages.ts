@@ -2,9 +2,14 @@ import {
   registerCartCutinImagePortrait,
   type CartFaceEditorExpressionId,
 } from "./CartRoguePhase102AnimeCutin";
-import driver0 from "./data/portraits/driver-0";
-import driver1 from "./data/portraits/driver-1";
-import driver2 from "./data/portraits/driver-2";
+import driver00 from "./data/portraits-small/driver-00";
+import driver01 from "./data/portraits-small/driver-01";
+import driver02 from "./data/portraits-small/driver-02";
+import driver03 from "./data/portraits-small/driver-03";
+import driver04 from "./data/portraits-small/driver-04";
+import driver05 from "./data/portraits-small/driver-05";
+import driver06 from "./data/portraits-small/driver-06";
+import driver07 from "./data/portraits-small/driver-07";
 import operator0 from "./data/portraits/operator-0";
 import operator1 from "./data/portraits/operator-1";
 import operator2 from "./data/portraits/operator-2";
@@ -20,7 +25,7 @@ const EXPRESSIONS: readonly CartFaceEditorExpressionId[] = [
   "blink",
 ] as const;
 
-export const CART_DRIVER_PORTRAIT_BASE64 = `${driver0}${driver1}${driver2}`;
+export const CART_DRIVER_PORTRAIT_BASE64 = `${driver00}${driver01}${driver02}${driver03}${driver04}${driver05}${driver06}${driver07}`;
 export const CART_OPERATOR_PORTRAIT_BASE64 = `${operator0}${operator1}${operator2}`;
 
 export const CART_PHASE102_FACE_IMAGE_META = {
