@@ -1,6 +1,7 @@
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
 import type { CartEnemyArchetype, CartEnemyState } from "./CartCombat";
+import { cartEncounterCommitCap } from "./CartEncounterDirectorGate";
 import { getCartRunDifficulty, type CartRunDifficulty } from "./CartRunDifficulty";
 import { isCartTurboHuntEnabled } from "./CartRoguePhase67TurboHunt";
 import { getCartThreatPressureState } from "./CartRoguePhase87ThreatPressure2";
@@ -264,6 +265,10 @@ function makeDecision(session: Phase105Session, state: IntelligenceState, diffic
     session.gas,
     state.raidActiveCount,
     aliveEnemyCount,
+  );
+  state.commitBudget = cartEncounterCommitCap(
+    session as unknown as CartArenaSession,
+    state.commitBudget,
   );
 
   for (const enemy of session.enemies) {
