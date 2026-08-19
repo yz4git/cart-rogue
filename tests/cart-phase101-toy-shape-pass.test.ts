@@ -30,6 +30,14 @@ test("toy industrial landmarks are static, bounded and share three instanced dra
   assert.doesNotMatch(phase101Source, /setColorAt|instanceColor/);
 });
 
+test("landmarks follow the giant Turbo Hunt field and stay outside its playable edge", () => {
+  assert.match(phase101Source, /CART_TURBO_HUNT_FIELD/);
+  assert.match(phase101Source, /CART_TURBO_HUNT_FIELD\.centerX/);
+  assert.match(phase101Source, /CART_TURBO_HUNT_FIELD\.halfWidth \+ 11/);
+  assert.match(phase101Source, /CART_TURBO_HUNT_FIELD\.centerZ \+ zOffsets\[index\]/);
+  assert.match(phase101Source, /turbo-hunt-field-exterior-relative/);
+});
+
 test("Phase101 is build-time presentation only and does not add per-frame shape work", () => {
   assert.match(phase101Source, /shared-geometry-fixed-entity-shells-static-landmarks/);
   assert.doesNotMatch(phase101Source, /updateVisuals|animate\(|requestAnimationFrame|session\.step|session\.advance/);
