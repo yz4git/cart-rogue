@@ -51,6 +51,8 @@ jobs:
         run: npm run test:shape
       - name: Anime cut-in regression
         run: npm run test:cutin
+      - name: Impact and AOE visual regression
+        run: npm run test:fx
       - name: iPhone landscape UI regression
         run: node --import tsx --test tests/cart-iphone-landscape-ui.test.ts
       - name: Test
