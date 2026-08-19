@@ -1,0 +1,73 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+import {
+  CART_ENCOUNTER_LOW_GAS_MERCY_LOCKOUT_SECONDS,
+  CART_ENCOUNTER_LOW_GAS_THRESHOLD,
+  CART_ENCOUNTER_OPENING_SECONDS,
+  cartEncounterBeatDuration,
+  cartEncounterBeatPolicy,
+  cartEncounterTimedNextBeat,
+} from "../src/cart/CartRoguePhase106EncounterDirector2";
+
+const source = readFileSync(new URL("../src/cart/CartRoguePhase106EncounterDirector2.ts", import.meta.url), "utf8");
+const runtimeSource = readFileSync(new URL("../src/cart/CartGameMenuRuntime.ts", import.meta.url), "utf8");
+
+test("Phase106 defines a readable pressure-dodge-counter rhythm", () => {
+  assert.equal(cartEncounterTimedNextBeat("OPENING"), "PRESSURE");
+  assert.equal(cartEncounterTimedNextBeat("PRESSURE"), "DODGE");
+  assert.equal(cartEncounterTimedNextBeat("DODGE"), "COUNTER");
+  assert.equal(cartEncounterTimedNextBeat("COUNTER"), "PRESSURE");
+  assert.equal(cartEncounterTimedNextBeat("CHASE"), "COUNTER");
+  assert.equal(cartEncounterTimedNextBeat("RECOVERY"), "PRESSURE");
+  assert.equal(CART_ENCOUNTER_OPENING_SECONDS, 3);
+});
+
+test("counter and recovery are real safety windows rather than UI-only labels", () => {
+  const normalCounter = cartEncounterBeatPolicy("COUNTER", "normal");
+  const hardCounter = cartEncounterBeatPolicy("COUNTER", "hard");
+  const recovery = cartEncounterBeatPolicy("RECOVERY", "normal");
+  assert.equal(normalCounter.allowFieldHazards, false);
+  assert.equal(recovery.allowFieldHazards, false);
+  assert.equal(normalCounter.commitCap, 1);
+  assert.equal(recovery.commitCap, 1);
+  assert.ok(normalCounter.attackCooldownFloor > hardCounter.attackCooldownFloor);
+  assert.ok(recovery.attackCooldownFloor >= 1);
+  assert.match(source, /cancelCartRaidHazards\(session as unknown as CartArenaSession, "FIELD"\)/);
+  assert.match(source, /enemy\.chargeTime = 0/);
+  assert.match(source, /enemy\.chargeCooldown = Math\.max/);
+});
+
+test("Hard raises thinking pressure but keeps shorter nonzero counter and recovery windows", () => {
+  assert.ok(cartEncounterBeatDuration("PRESSURE", "hard") < cartEncounterBeatDuration("PRESSURE", "normal"));
+  assert.ok(cartEncounterBeatDuration("COUNTER", "hard") > 1.5);
+  assert.ok(cartEncounterBeatDuration("RECOVERY", "hard") > 1.7);
+  assert.ok(cartEncounterBeatPolicy("DODGE", "hard").intensity > cartEncounterBeatPolicy("DODGE", "normal").intensity);
+  assert.ok(cartEncounterBeatPolicy("PRESSURE", "hard").commitCap > cartEncounterBeatPolicy("PRESSURE", "normal").commitCap);
+});
+
+test("low GAS can request mercy but cannot pin the run in permanent recovery", () => {
+  assert.equal(CART_ENCOUNTER_LOW_GAS_THRESHOLD, 0.24);
+  assert.ok(CART_ENCOUNTER_LOW_GAS_MERCY_LOCKOUT_SECONDS >= 8);
+  assert.match(source, /state\.lowGasMercyLockout <= 0/);
+  assert.match(source, /state\.lowGasMercyLockout = CART_ENCOUNTER_LOW_GAS_MERCY_LOCKOUT_SECONDS/);
+});
+
+test("live encounter signals can preempt the timed rhythm", () => {
+  assert.match(source, /boss\.bossActive/);
+  assert.match(source, /hitNow \|\| pursuitLost/);
+  assert.match(source, /perfectNow \|\| pursuitWon \|\| eventCleared/);
+  assert.match(source, /escape\.active \|\| pursuit\.active/);
+  assert.match(source, /"PLAYER HIT"/);
+  assert.match(source, /"PERFECT DODGE"/);
+  assert.match(source, /"FIELD EVENT CLEAR"/);
+});
+
+test("Phase106 stays outside the historical phase chain and wraps after Phase105", () => {
+  const phase105 = runtimeSource.indexOf('import "./CartRoguePhase105EnemyIntelligenceBalance"');
+  const phase106 = runtimeSource.indexOf('import "./CartRoguePhase106EncounterDirector2"');
+  assert.ok(phase105 >= 0);
+  assert.ok(phase106 > phase105);
+  assert.doesNotMatch(source, /new THREE\.|WebGLRenderer|ShaderMaterial|EffectComposer/);
+  assert.match(source, /WeakMap<object, EncounterDirectorState>/);
+});
