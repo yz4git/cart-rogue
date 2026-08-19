@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { CartArenaSession } from "../src/cart/CartArenaSession";
 import {
+  cartEncounterAllowsChaseStart,
   getCartEncounterDirectorGatePolicy,
   setCartEncounterDirectorGatePolicy,
 } from "../src/cart/CartEncounterDirectorGate";
@@ -17,8 +18,10 @@ import {
 
 const source = readFileSync(new URL("../src/cart/CartRoguePhase106EncounterDirector2.ts", import.meta.url), "utf8");
 const gateSource = readFileSync(new URL("../src/cart/CartEncounterDirectorGate.ts", import.meta.url), "utf8");
+const pursuitSource = readFileSync(new URL("../src/cart/CartRoguePhase85PursuitEvents.ts", import.meta.url), "utf8");
 const pressureSource = readFileSync(new URL("../src/cart/CartRoguePhase87ThreatPressure2.ts", import.meta.url), "utf8");
 const raidSource = readFileSync(new URL("../src/cart/CartRoguePhase89HazardCombatDirector.ts", import.meta.url), "utf8");
+const escapeSource = readFileSync(new URL("../src/cart/CartRoguePhase94EscapeRhythmDirector2.ts", import.meta.url), "utf8");
 const runtimeSource = readFileSync(new URL("../src/cart/CartGameMenuRuntime.ts", import.meta.url), "utf8");
 
 test("Phase106 defines a readable pressure-dodge-counter rhythm", () => {
@@ -55,18 +58,47 @@ test("PRESSURE owns enemy waves while DODGE owns new FIELD RAID scheduling", () 
   assert.match(raidSource, /cartEncounterAllowsFieldRaid\(session\)/);
 });
 
+test("first cycle reaches DODGE before Pursuit or Escape may start", () => {
+  const session = new CartArenaSession();
+  assert.equal(cartEncounterAllowsChaseStart(session), true);
+
+  setCartEncounterDirectorGatePolicy(session, {
+    allowThreatPressure: true,
+    allowFieldRaid: false,
+  });
+  assert.equal(cartEncounterAllowsChaseStart(session), false);
+
+  setCartEncounterDirectorGatePolicy(session, {
+    allowThreatPressure: false,
+    allowFieldRaid: true,
+  });
+  assert.equal(cartEncounterAllowsChaseStart(session), false);
+
+  setCartEncounterDirectorGatePolicy(session, {
+    allowThreatPressure: true,
+    allowFieldRaid: false,
+  });
+  assert.equal(cartEncounterAllowsChaseStart(session), true);
+  assert.match(pursuitSource, /cartEncounterAllowsChaseStart\(session\)/);
+  assert.match(escapeSource, /cartEncounterAllowsChaseStart\(session\)/);
+  assert.match(gateSource, /dodgeSeenBySession/);
+});
+
 test("director gate defaults preserve historical standalone phase behavior", () => {
   const session = new CartArenaSession();
   assert.deepEqual(getCartEncounterDirectorGatePolicy(session), {
     allowThreatPressure: true,
     allowFieldRaid: true,
+    allowChaseStart: true,
   });
   setCartEncounterDirectorGatePolicy(session, {
     allowThreatPressure: false,
     allowFieldRaid: true,
+    allowChaseStart: false,
   });
   assert.equal(getCartEncounterDirectorGatePolicy(session).allowThreatPressure, false);
   assert.equal(getCartEncounterDirectorGatePolicy(session).allowFieldRaid, true);
+  assert.equal(getCartEncounterDirectorGatePolicy(session).allowChaseStart, false);
   assert.match(gateSource, /DEFAULT_POLICY/);
   assert.match(gateSource, /WeakMap<object, CartEncounterDirectorGatePolicy>/);
 });
@@ -86,7 +118,7 @@ test("low GAS can request mercy but cannot pin the run in permanent recovery", (
   assert.match(source, /state\.lowGasMercyLockout = CART_ENCOUNTER_LOW_GAS_MERCY_LOCKOUT_SECONDS/);
 });
 
-test("live encounter signals can preempt the timed rhythm", () => {
+test("live encounter signals can preempt the timed rhythm after scheduling permits them", () => {
   assert.match(source, /boss\.bossActive/);
   assert.match(source, /hitNow \|\| pursuitLost/);
   assert.match(source, /perfectNow \|\| pursuitWon \|\| eventCleared/);
