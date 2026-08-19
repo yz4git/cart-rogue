@@ -102,17 +102,17 @@ try {
   }
   if (!ready?.ready) throw new Error(`Raid damage audit runtime did not become ready: ${JSON.stringify(ready)}`);
 
-  // Hold a straight accelerating line and never steer or brake. Phase94 may
-  // intentionally clear FIELD AOE during its 1.6s escape-introduction grace,
-  // so this presentation audit spans that opening and waits for the next
-  // natural forced-intercept hit instead of assuming the first telegraph fires.
+  // Hold a straight accelerating line and never steer or brake. Phase106 now
+  // schedules the first FIELD RAID only after its OPENING + PRESSURE beats.
+  // SwiftShader can advance deterministic game time far slower than wall time,
+  // so this acceptance window is deliberately gameplay-rhythm aware.
   await execute(sessionId, `
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', code: 'ArrowUp', bubbles: true, cancelable: true }));
     return true;
   `);
 
   let state = null;
-  for (let attempt = 0; attempt < 2600; attempt += 1) {
+  for (let attempt = 0; attempt < 3600; attempt += 1) {
     state = await execute(sessionId, `
       const canvas = document.querySelector('canvas.cart-rogue-canvas');
       const text = document.body.innerText || '';
