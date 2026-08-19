@@ -3,12 +3,14 @@ import type { CartArenaSession } from "./CartArenaSession";
 export interface CartEncounterDirectorGatePolicy {
   allowThreatPressure: boolean;
   allowFieldRaid: boolean;
+  allowChaseStart: boolean;
 }
 
 const policyBySession = new WeakMap<object, CartEncounterDirectorGatePolicy>();
 const DEFAULT_POLICY: CartEncounterDirectorGatePolicy = {
   allowThreatPressure: true,
   allowFieldRaid: true,
+  allowChaseStart: true,
 };
 
 export function setCartEncounterDirectorGatePolicy(
@@ -30,4 +32,8 @@ export function cartEncounterAllowsThreatPressure(session: CartArenaSession): bo
 
 export function cartEncounterAllowsFieldRaid(session: CartArenaSession): boolean {
   return getCartEncounterDirectorGatePolicy(session).allowFieldRaid;
+}
+
+export function cartEncounterAllowsChaseStart(session: CartArenaSession): boolean {
+  return getCartEncounterDirectorGatePolicy(session).allowChaseStart;
 }
