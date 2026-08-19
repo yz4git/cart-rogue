@@ -159,6 +159,7 @@ export function getCartHardModeState(session: CartArenaSession): CartHardModeSna
 }
 
 export function getLatestCartHardModeState(): CartHardModeSnapshot | null {
+  if (getCartRunDifficulty() !== "hard" || latestSnapshot?.gameOver) return null;
   return latestSnapshot ? { ...latestSnapshot } : null;
 }
 
