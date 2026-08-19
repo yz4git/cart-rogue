@@ -12,9 +12,18 @@ import {
   registerCartCutinFaceEditorBundle,
   type CartFaceEditorCharacterBundle,
 } from "../src/cart/CartRoguePhase102AnimeCutin";
+import {
+  CART_CUTIN_OPERATOR_MIX_SHARE,
+  CART_CUTIN_SPEAKER_CYCLES,
+  cartCutinSpeakerVariant,
+  resetCartCutinSpeakerMix,
+  rotateCartCutinSpeaker,
+} from "../src/cart/CartRoguePhase102OperatorMix";
 
 const phase102Source = readFileSync(new URL("../src/cart/CartRoguePhase102AnimeCutin.ts", import.meta.url), "utf8");
+const operatorMixSource = readFileSync(new URL("../src/cart/CartRoguePhase102OperatorMix.ts", import.meta.url), "utf8");
 const runtimeSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
+const gameplayAuditRuntimeSource = readFileSync(new URL("../src/cart/CartGameplayAuditRuntime.ts", import.meta.url), "utf8");
 
 function minimalFaceEditorBundle(): CartFaceEditorCharacterBundle {
   return {
@@ -72,6 +81,29 @@ test("same event respects cooldown and pending queue stays bounded", () => {
   assert.equal(enqueueCartCutin(state, CART_CUTIN_EVENTS.run_start, 230), "dropped");
 });
 
+test("operator-heavy speaker mix rotates through player moments without randomness", () => {
+  resetCartCutinSpeakerMix();
+  assert.ok(CART_CUTIN_OPERATOR_MIX_SHARE > 0.7);
+  assert.equal(CART_CUTIN_SPEAKER_CYCLES.perfect_dodge.length, 3);
+  assert.equal(CART_CUTIN_SPEAKER_CYCLES.perfect_dodge.filter((variant) => variant.characterId === "operator").length, 2);
+  assert.equal(CART_CUTIN_SPEAKER_CYCLES.turbo_start.filter((variant) => variant.characterId === "operator").length, 3);
+  assert.equal(CART_CUTIN_SPEAKER_CYCLES.low_life.filter((variant) => variant.characterId === "operator").length, 2);
+
+  assert.equal(cartCutinSpeakerVariant("perfect_dodge").characterId, "operator");
+  assert.equal(rotateCartCutinSpeaker("perfect_dodge").characterId, "driver");
+  assert.equal(rotateCartCutinSpeaker("perfect_dodge").characterId, "operator");
+  assert.equal(rotateCartCutinSpeaker("perfect_dodge").characterId, "operator");
+
+  resetCartCutinSpeakerMix();
+  assert.equal(CART_CUTIN_EVENTS.run_start.characterId, "operator");
+  assert.equal(CART_CUTIN_EVENTS.low_life.characterId, "operator");
+  assert.equal(CART_CUTIN_EVENTS.perfect_dodge.characterId, "operator");
+  assert.equal(CART_CUTIN_EVENTS.turbo_start.characterId, "operator");
+  assert.equal(CART_CUTIN_EVENTS.recovery.characterId, "operator");
+  assert.doesNotMatch(operatorMixSource, /Math\.random/);
+  assert.match(gameplayAuditRuntimeSource, /CartRoguePhase102OperatorMix/);
+});
+
 test("Phase102 wires gameplay moments without pausing or adding a render-loop workload", () => {
   assert.equal(CART_ANIME_CUTIN_SYSTEM, "anime-cutin-face-editor-compatible-v1");
   assert.match(phase102Source, /huntBossSpawned/);
@@ -81,6 +113,7 @@ test("Phase102 wires gameplay moments without pausing or adding a render-loop wo
   assert.match(phase102Source, /snapshot\.gas <= 0\.34/);
   assert.match(phase102Source, /snapshot\.gas <= 0\.3/);
   assert.doesNotMatch(phase102Source, /\.pause\(|session\.step\(|requestAnimationFrame|THREE\./);
+  assert.doesNotMatch(operatorMixSource, /requestAnimationFrame|THREE\./);
 });
 
 test("iPhone landscape cut-in is safe-area aware and does not own touch input", () => {
