@@ -53,6 +53,8 @@ jobs:
         run: npm run test:cutin
       - name: Impact and AOE visual regression
         run: npm run test:fx
+      - name: Enemy intelligence and balance regression
+        run: npm run test:ai
       - name: iPhone landscape UI regression
         run: node --import tsx --test tests/cart-iphone-landscape-ui.test.ts
       - name: Test
