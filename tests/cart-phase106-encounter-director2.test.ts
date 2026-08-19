@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { CartArenaSession } from "../src/cart/CartArenaSession";
+import {
+  getCartEncounterDirectorGatePolicy,
+  setCartEncounterDirectorGatePolicy,
+} from "../src/cart/CartEncounterDirectorGate";
 import {
   CART_ENCOUNTER_LOW_GAS_MERCY_LOCKOUT_SECONDS,
   CART_ENCOUNTER_LOW_GAS_THRESHOLD,
@@ -11,6 +16,9 @@ import {
 } from "../src/cart/CartRoguePhase106EncounterDirector2";
 
 const source = readFileSync(new URL("../src/cart/CartRoguePhase106EncounterDirector2.ts", import.meta.url), "utf8");
+const gateSource = readFileSync(new URL("../src/cart/CartEncounterDirectorGate.ts", import.meta.url), "utf8");
+const pressureSource = readFileSync(new URL("../src/cart/CartRoguePhase87ThreatPressure2.ts", import.meta.url), "utf8");
+const raidSource = readFileSync(new URL("../src/cart/CartRoguePhase89HazardCombatDirector.ts", import.meta.url), "utf8");
 const runtimeSource = readFileSync(new URL("../src/cart/CartGameMenuRuntime.ts", import.meta.url), "utf8");
 
 test("Phase106 defines a readable pressure-dodge-counter rhythm", () => {
@@ -36,6 +44,31 @@ test("counter and recovery are real safety windows rather than UI-only labels", 
   assert.match(source, /cancelCartRaidHazards\(session as unknown as CartArenaSession, "FIELD"\)/);
   assert.match(source, /enemy\.chargeTime = 0/);
   assert.match(source, /enemy\.chargeCooldown = Math\.max/);
+});
+
+test("PRESSURE owns enemy waves while DODGE owns new FIELD RAID scheduling", () => {
+  assert.equal(cartEncounterBeatPolicy("PRESSURE", "normal").allowFieldHazards, false);
+  assert.equal(cartEncounterBeatPolicy("DODGE", "normal").allowFieldHazards, true);
+  assert.match(source, /allowThreatPressure: state\.beat === "PRESSURE"/);
+  assert.match(source, /allowFieldRaid: state\.beat === "DODGE"/);
+  assert.match(pressureSource, /cartEncounterAllowsThreatPressure\(session\)/);
+  assert.match(raidSource, /cartEncounterAllowsFieldRaid\(session\)/);
+});
+
+test("director gate defaults preserve historical standalone phase behavior", () => {
+  const session = new CartArenaSession();
+  assert.deepEqual(getCartEncounterDirectorGatePolicy(session), {
+    allowThreatPressure: true,
+    allowFieldRaid: true,
+  });
+  setCartEncounterDirectorGatePolicy(session, {
+    allowThreatPressure: false,
+    allowFieldRaid: true,
+  });
+  assert.equal(getCartEncounterDirectorGatePolicy(session).allowThreatPressure, false);
+  assert.equal(getCartEncounterDirectorGatePolicy(session).allowFieldRaid, true);
+  assert.match(gateSource, /DEFAULT_POLICY/);
+  assert.match(gateSource, /WeakMap<object, CartEncounterDirectorGatePolicy>/);
 });
 
 test("Hard raises thinking pressure but keeps shorter nonzero counter and recovery windows", () => {
