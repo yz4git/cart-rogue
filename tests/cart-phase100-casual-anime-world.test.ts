@@ -23,12 +23,12 @@ function saturation(hex: number): number {
   return hsl.s;
 }
 
-test("Phase100 remaps the legacy diorama palette into a brighter casual anime palette", () => {
+test("Phase100 remaps the legacy diorama palette into a stronger casual anime palette", () => {
   assert.equal(cartCasualAnimeColor(0x42bdb7), CART_CASUAL_ANIME_PLAYER);
   assert.equal(cartCasualAnimeColor(0x73e0d5), CART_CASUAL_ANIME_PLAYER_ACCENT);
   assert.equal(cartCasualAnimeColor(0xe0d95d), CART_CASUAL_ANIME_ENEMY);
   assert.equal(cartCasualAnimeColor(0x34313a), CART_CASUAL_ANIME_BOSS);
-  assert.equal(cartCasualAnimeColor(0xf1cd94), 0xf6b85e);
+  assert.equal(cartCasualAnimeColor(0xf1cd94), 0xf3ad4d);
 });
 
 test("core palette roles remain visually separated and saturated", () => {
@@ -46,10 +46,12 @@ test("core palette roles remain visually separated and saturated", () => {
   assert.notEqual(CART_CASUAL_ANIME_SKY, CART_CASUAL_ANIME_FOG);
 });
 
-test("Phase100 uses a lightweight material and lighting pass instead of AAA post processing", () => {
+test("Phase100 uses a lightweight material and one-time vertex-color pass instead of AAA post processing", () => {
   assert.match(phase100Source, /flatShading = true/);
   assert.match(phase100Source, /roughness = Math\.max/);
   assert.match(phase100Source, /metalness = Math\.min/);
+  assert.match(phase100Source, /styleVertexColors/);
+  assert.match(phase100Source, /one-time-at-build/);
   assert.match(phase100Source, /HemisphereLight/);
   assert.match(phase100Source, /DirectionalLight/);
   assert.match(phase100Source, /reuse-existing-geometry-and-pools/);
