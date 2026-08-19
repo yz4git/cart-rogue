@@ -79,20 +79,23 @@ try {
   await request(`/session/${sessionId}/url`, { method: "POST", body: JSON.stringify({ url: auditUrl }) });
   await execute(sessionId, `
     window.__cartPhase106AuditBeats = [];
+    window.__cartPhase106AuditLatest = null;
     window.addEventListener('cart-encounter-director2-snapshot', (event) => {
       const detail = event && event.detail ? event.detail : null;
       if (!detail) return;
+      window.__cartPhase106AuditLatest = {
+        beat: detail.beat,
+        beatSerial: detail.beatSerial,
+        reason: detail.reason,
+        secondsRemaining: detail.secondsRemaining,
+        fieldHazardsAllowed: detail.fieldHazardsAllowed,
+        raidActiveCount: detail.raidActiveCount,
+        transitionCount: detail.transitionCount,
+      };
       const beats = window.__cartPhase106AuditBeats;
       const last = beats.length > 0 ? beats[beats.length - 1] : null;
       if (!last || last.beatSerial !== detail.beatSerial || last.beat !== detail.beat) {
-        beats.push({
-          beat: detail.beat,
-          beatSerial: detail.beatSerial,
-          reason: detail.reason,
-          secondsRemaining: detail.secondsRemaining,
-          fieldHazardsAllowed: detail.fieldHazardsAllowed,
-          raidActiveCount: detail.raidActiveCount,
-        });
+        beats.push({ ...window.__cartPhase106AuditLatest });
         if (beats.length > 32) beats.shift();
       }
     });
@@ -103,7 +106,7 @@ try {
     state = await execute(sessionId, `
       const canvas = document.querySelector('canvas.cart-rogue-canvas');
       const text = document.body.innerText || '';
-      if (!canvas) return { ready: false, text: text.slice(0, 800), encounterBeats: window.__cartPhase106AuditBeats || [] };
+      if (!canvas) return { ready: false, text: text.slice(0, 800), encounterBeats: window.__cartPhase106AuditBeats || [], encounterLatest: window.__cartPhase106AuditLatest || null };
       const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
       const lines = text.split(String.fromCharCode(10)).map((line) => line.trim());
       const aoeLine = lines.find((line) => line.startsWith('AOE TRACKING') || line.startsWith('AOE LOCKED') || line.startsWith('AOE FIRING') || line.startsWith('AOE IMPACT')) || null;
@@ -121,6 +124,7 @@ try {
         clientWidth: canvas.clientWidth,
         clientHeight: canvas.clientHeight,
         encounterBeats: window.__cartPhase106AuditBeats || [],
+        encounterLatest: window.__cartPhase106AuditLatest || null,
       };
     `);
     if (state?.ready && state?.redWarning) break;
