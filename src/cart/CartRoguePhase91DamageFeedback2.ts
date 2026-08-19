@@ -64,10 +64,14 @@ export function cartRaidGasLifeDamagePercent(difficulty: CartRunDifficulty): num
     : CART_PLAYER_DAMAGE_GAS_LOSS_PERCENT;
 }
 
+export function cartGasLifeAfterDamage(gas: number, lossPercent: number): number {
+  return Math.max(0, clamp(gas, 0, 1) - Math.max(0, lossPercent) / 100);
+}
+
 function applyGasLifeDamage(session: Phase91Session, lossPercent: number): number {
   const gasSession = session as unknown as GasLifeSession;
   const before = clamp(gasSession.gas, 0, 1);
-  gasSession.gas = Math.max(0, before - Math.max(0, lossPercent) / 100);
+  gasSession.gas = cartGasLifeAfterDamage(before, lossPercent);
   return before - gasSession.gas;
 }
 
