@@ -15,7 +15,7 @@ type SpeakerVariant = Pick<
  * Presentation-only speaker rotation.
  * High-frequency moments deliberately lean toward OPERATOR while still
  * returning to DRIVER often enough that the player character keeps a voice.
- * Cycles are deterministic so audits and replays never depend on Math.random().
+ * Cycles are deterministic so audits and replays stay stable.
  */
 export const CART_CUTIN_SPEAKER_CYCLES: Record<CartCutinEventId, readonly SpeakerVariant[]> = {
   run_start: [
