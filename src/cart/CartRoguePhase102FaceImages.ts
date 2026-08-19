@@ -10,9 +10,16 @@ import driver04 from "./data/portraits-small/driver-04";
 import driver05 from "./data/portraits-small/driver-05";
 import driver06 from "./data/portraits-small/driver-06";
 import driver07 from "./data/portraits-small/driver-07";
-import operator0 from "./data/portraits/operator-0";
-import operator1 from "./data/portraits/operator-1";
-import operator2 from "./data/portraits/operator-2";
+import operator00 from "./data/portraits-small/operator-00";
+import operator01 from "./data/portraits-small/operator-01";
+import operator02 from "./data/portraits-small/operator-02";
+import operator03 from "./data/portraits-small/operator-03";
+import operator04 from "./data/portraits-small/operator-04";
+import operator05 from "./data/portraits-small/operator-05";
+import operator06 from "./data/portraits-small/operator-06";
+import operator07 from "./data/portraits-small/operator-07";
+import operator08 from "./data/portraits-small/operator-08";
+import operator09 from "./data/portraits-small/operator-09";
 
 const EXPRESSIONS: readonly CartFaceEditorExpressionId[] = [
   "neutral",
@@ -26,7 +33,7 @@ const EXPRESSIONS: readonly CartFaceEditorExpressionId[] = [
 ] as const;
 
 export const CART_DRIVER_PORTRAIT_BASE64 = `${driver00}${driver01}${driver02}${driver03}${driver04}${driver05}${driver06}${driver07}`;
-export const CART_OPERATOR_PORTRAIT_BASE64 = `${operator0}${operator1}${operator2}`;
+export const CART_OPERATOR_PORTRAIT_BASE64 = `${operator00}${operator01}${operator02}${operator03}${operator04}${operator05}${operator06}${operator07}${operator08}${operator09}`;
 
 export const CART_PHASE102_FACE_IMAGE_META = {
   driver: {
