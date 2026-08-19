@@ -65,7 +65,7 @@ test("Phase105 specializes roles instead of giving every enemy the same pursuit"
 test("Phase105 replaces permanent speed pressure with bounded tactical bursts", () => {
   assert.equal(CART_PHASE105_NORMAL_MAX_SPEED, 6.75);
   assert.equal(CART_PHASE105_HARD_MAX_SPEED, 7.15);
-  assert.match(source, /pressure\.active && brain\.intent === "INTERCEPT"/);
+  assert.match(source, /pressureActive && brain\.intent === "INTERCEPT"/);
   assert.match(source, /enemy\.moveSpeed = desiredSpeed/);
   assert.match(source, /intentScale = 0\.74/);
   assert.doesNotMatch(source, /new THREE\./);
