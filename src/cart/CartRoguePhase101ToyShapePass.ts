@@ -8,6 +8,7 @@ import {
   CART_CASUAL_ANIME_THEME,
 } from "./CartRoguePhase100CasualAnimeWorld";
 import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
+import { CART_TURBO_HUNT_FIELD } from "./CartTurboHuntTrack";
 
 interface Phase101Demo {
   scene: THREE.Scene;
@@ -285,13 +286,17 @@ function buildToyWorldLandmarks(demo: Phase101Demo): void {
   towerCaps.castShadow = true;
   landmarkRings.castShadow = false;
 
-  const zPositions = [44, 126, 206, 286, 366, 446] as const;
+  // Phase67 moves Turbo Hunt to a 184×184 field centered far from the legacy
+  // route map. Keep these visual-only landmarks just outside its playable edge,
+  // so they frame the arena without creating ghost collision expectations.
+  const zOffsets = [-70, -42, -14, 14, 42, 70] as const;
   const dummy = new THREE.Object3D();
   for (let index = 0; index < CART_TOY_WORLD_LANDMARK_COUNT; index += 1) {
     const side = index % 2 === 0 ? -1 : 1;
     const height = 7.2 + (index % 3) * 1.35;
-    const x = side * (39 + (index % 2) * 3.5);
-    const z = zPositions[index];
+    const x = CART_TURBO_HUNT_FIELD.centerX
+      + side * (CART_TURBO_HUNT_FIELD.halfWidth + 11 + (index % 3) * 3.5);
+    const z = CART_TURBO_HUNT_FIELD.centerZ + zOffsets[index];
 
     dummy.position.set(x, height * 0.5, z);
     dummy.rotation.set(0, index * 0.27, 0);
@@ -323,6 +328,7 @@ function buildToyWorldLandmarks(demo: Phase101Demo): void {
   demo.scene.userData.cartShapePass = CART_TOY_SHAPE_PASS;
   demo.scene.userData.shapeDirection = "chunky-rounded-toy-mecha-and-industrial-props";
   demo.scene.userData.shapePerformanceIntent = "shared-geometry-fixed-entity-shells-static-landmarks";
+  demo.scene.userData.landmarkPlacement = "turbo-hunt-field-exterior-relative";
 }
 
 export function installCartRoguePhase101ToyShapePass(): void {
