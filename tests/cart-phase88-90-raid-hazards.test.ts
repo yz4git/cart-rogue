@@ -133,8 +133,6 @@ test("a tracking hazard locks, receives the Phase93 reaction window, then applie
 test("leaving a locked AOE in the final window awards raid Perfect Dodge", () => {
   const session = new CartArenaSession();
   enableCartTurboHunt(session);
-  // TITAN source intentionally isolates the Phase88 Perfect Dodge contract from
-  // Phase93, which only re-locks FIELD telegraphs onto the predicted trajectory.
   queueCartRaidHazard(session, {
     kind: "CIRCLE",
     source: "TITAN",
@@ -180,14 +178,22 @@ test("Titan Raid 4.0 rotates readable patterns and FURY is materially faster", (
 test("live FURY cancels all Titan raid hazards when Predator hands out the counter window", () => {
   const session = new CartArenaSession();
   enableCartTurboHunt(session);
-  for (let index = 0; index < 3040; index += 1) session.step(idleInput, 0.05);
+  const isolatedTitanRaidGasLife = session as unknown as { gas: number };
+  for (let index = 0; index < 3040; index += 1) {
+    // This regression owns Titan raid cancellation/counter timing, not
+    // survival. Keep GAS life replenished as if recovery cells were collected.
+    isolatedTitanRaidGasLife.gas = 1;
+    session.step(idleInput, 0.05);
+  }
   const boss = session.enemies.find((enemy) => enemy.kind === "boss");
   if (!boss) throw new Error("boss missing");
   boss.hp = 250;
+  isolatedTitanRaidGasLife.gas = 1;
   session.step(idleInput, 1 / 60);
   assert.equal(getCartTitanRaidBossState(session).stage, "FURY");
 
   for (let index = 0; index < 250 && getCartTitanPredatorState(session).mode !== "COUNTER"; index += 1) {
+    isolatedTitanRaidGasLife.gas = 1;
     session.step(idleInput, 0.05);
   }
   assert.equal(getCartTitanPredatorState(session).mode, "COUNTER");
