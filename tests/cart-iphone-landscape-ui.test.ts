@@ -6,6 +6,8 @@ const layout = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8
 const viewportSync = readFileSync(new URL("../app/CartViewportSync.tsx", import.meta.url), "utf8");
 const mobileFix = readFileSync(new URL("../app/cart-rogue-mobile-fix.css", import.meta.url), "utf8");
 const legacyGameCss = readFileSync(new URL("../app/CartRogueGame.module.css", import.meta.url), "utf8");
+const gameMenu = readFileSync(new URL("../app/CartGameMenu.tsx", import.meta.url), "utf8");
+const menuConfigCss = readFileSync(new URL("../app/CartGameMenuConfig.module.css", import.meta.url), "utf8");
 
 test("iPhone landscape shell follows the measured visual viewport without the iOS fixed-bottom path", () => {
   assert.match(layout, /import "\.\/cart-rogue-mobile-fix\.css"/);
@@ -42,4 +44,25 @@ test("mobile fix keeps the WebGL canvas bounded by the repaired stage", () => {
   assert.match(mobileFix, /canvas\.cart-rogue-canvas/);
   assert.match(mobileFix, /max-height:\s*100%\s*!important/);
   assert.doesNotMatch(mobileFix, /min-height:\s*100vh/);
+});
+
+test("pause screen exposes config and title return while config remains compact and touch friendly", () => {
+  assert.match(gameMenu, />CONFIG</);
+  assert.match(gameMenu, />BACK TO TITLE</);
+  assert.match(gameMenu, /type="range"/);
+  assert.match(gameMenu, /CAMERA DISTANCE/);
+  assert.match(gameMenu, /VIBRATION/);
+  assert.match(gameMenu, /FAR \+60%/);
+  assert.match(menuConfigCss, /safe-area-inset-left/);
+  assert.match(menuConfigCss, /touch-action:manipulation/);
+  assert.match(menuConfigCss, /@media\(max-height:460px\)/);
+});
+
+test("anime cut-ins use a slightly smaller presentation footprint on iPhone landscape", () => {
+  assert.match(menuConfigCss, /#cart-anime-cutin-v1/);
+  assert.match(menuConfigCss, /width:min\(39vw,390px\)!important/);
+  assert.match(menuConfigCss, /height:clamp\(98px,36vh,142px\)!important/);
+  assert.match(menuConfigCss, /orientation:landscape/);
+  assert.match(menuConfigCss, /max-height:500px/);
+  assert.match(menuConfigCss, /width:min\(37vw,360px\)!important/);
 });
