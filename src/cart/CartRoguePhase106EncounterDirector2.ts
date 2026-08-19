@@ -117,6 +117,15 @@ export function cartEncounterTimedNextBeat(beat: CartEncounterBeat): CartEncount
   return "BOSS";
 }
 
+export function cartEncounterProtectsActiveDodge(
+  beat: CartEncounterBeat,
+  raidActiveCount: number,
+  hitNow = false,
+  perfectNow = false,
+): boolean {
+  return beat === "DODGE" && raidActiveCount > 0 && !hitNow && !perfectNow;
+}
+
 function snapshotOf(state: EncounterDirectorState): CartEncounterDirectorSnapshot {
   return {
     beat: state.beat,
@@ -237,6 +246,12 @@ function updateEncounter(
   const pursuitWon = pursuit.successSerial > state.lastPursuitSuccessSerial;
   const pursuitLost = pursuit.failureSerial > state.lastPursuitFailureSerial;
   const eventCleared = event.rewardSerial > state.lastEventRewardSerial;
+  const dodgeChallengeActive = cartEncounterProtectsActiveDodge(
+    state.beat,
+    raid.activeCount,
+    hitNow,
+    perfectNow,
+  );
 
   state.lastRaidHitSerial = raid.hitSerial;
   state.lastPerfectDodgeSerial = raid.perfectDodgeSerial;
@@ -248,7 +263,7 @@ function updateEncounter(
     beginBeat(state, "BOSS", difficulty, "TITAN ACTIVE");
   } else if (state.beat === "BOSS") {
     beginBeat(state, "RECOVERY", difficulty, "TITAN PHASE RELEASE");
-  } else if (hitNow || pursuitLost) {
+  } else if (hitNow || (!dodgeChallengeActive && pursuitLost)) {
     beginBeat(state, "RECOVERY", difficulty, hitNow ? "PLAYER HIT" : "PURSUIT FAILED");
   } else if (
     session.gas <= CART_ENCOUNTER_LOW_GAS_THRESHOLD
@@ -257,20 +272,22 @@ function updateEncounter(
   ) {
     state.lowGasMercyLockout = CART_ENCOUNTER_LOW_GAS_MERCY_LOCKOUT_SECONDS;
     beginBeat(state, "RECOVERY", difficulty, "LOW GAS MERCY");
-  } else if (perfectNow || pursuitWon || eventCleared) {
+  } else if (perfectNow || (!dodgeChallengeActive && (pursuitWon || eventCleared))) {
     beginBeat(
       state,
       "COUNTER",
       difficulty,
       perfectNow ? "PERFECT DODGE" : pursuitWon ? "PURSUIT CLEAR" : "FIELD EVENT CLEAR",
     );
-  } else if (escape.active || pursuit.active) {
+  } else if (!dodgeChallengeActive && (escape.active || pursuit.active)) {
     if (state.beat !== "RECOVERY") beginBeat(state, "CHASE", difficulty, escape.active ? "ESCAPE ACTIVE" : "PURSUIT ACTIVE");
-  } else if (state.beat === "CHASE") {
+  } else if (!dodgeChallengeActive && state.beat === "CHASE") {
     beginBeat(state, "COUNTER", difficulty, "CHASE RELEASE");
-  } else if (state.secondsRemaining <= 0) {
+  } else if (!dodgeChallengeActive && state.secondsRemaining <= 0) {
     const next = cartEncounterTimedNextBeat(state.beat);
     beginBeat(state, next, difficulty, `RHYTHM ${state.beat} -> ${next}`);
+  } else if (dodgeChallengeActive && state.secondsRemaining <= 0) {
+    state.reason = "DODGE CHALLENGE RESOLVING";
   } else if (state.beat === "PRESSURE" && pressure.active) {
     state.intensity = Math.max(state.intensity, difficulty === "hard" ? 0.86 : 0.76);
   }
