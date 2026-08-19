@@ -4,6 +4,7 @@ export interface CartEncounterDirectorGatePolicy {
   allowThreatPressure: boolean;
   allowFieldRaid: boolean;
   allowChaseStart?: boolean;
+  commitCap?: number;
 }
 
 const policyBySession = new WeakMap<object, CartEncounterDirectorGatePolicy>();
@@ -43,4 +44,11 @@ export function cartEncounterAllowsChaseStart(session: CartArenaSession): boolea
   if (!policy) return true;
   if (policy.allowChaseStart !== undefined) return policy.allowChaseStart;
   return dodgeSeenBySession.has(key) && policy.allowThreatPressure;
+}
+
+export function cartEncounterCommitCap(session: CartArenaSession, fallback: number): number {
+  const policy = policyBySession.get(session as unknown as object);
+  const cap = policy?.commitCap;
+  if (!Number.isFinite(cap)) return Math.max(0, Math.floor(fallback));
+  return Math.max(0, Math.min(Math.floor(fallback), Math.floor(cap as number)));
 }
