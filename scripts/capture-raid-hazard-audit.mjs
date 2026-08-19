@@ -102,7 +102,11 @@ try {
   `);
 
   let state = null;
-  for (let attempt = 0; attempt < 240; attempt += 1) {
+  // SwiftShader can advance the deterministic fixed-step simulation much more
+  // slowly than wall-clock time. Phase106 intentionally schedules the first
+  // FIELD RAID after OPENING + PRESSURE, so wait for the gameplay beat rather
+  // than preserving the pre-Phase106 ~30s wall-clock assumption.
+  for (let attempt = 0; attempt < 960; attempt += 1) {
     state = await execute(sessionId, `
       const canvas = document.querySelector('canvas.cart-rogue-canvas');
       const text = document.body.innerText || '';
