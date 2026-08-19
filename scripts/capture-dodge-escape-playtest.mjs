@@ -55,13 +55,14 @@ async function key(sessionId, keyName, down) {
 
 async function sample(sessionId) {
   return execute(sessionId, `
-    const text = document.body.innerText || '';
+    const body = document.body;
+    const text = body ? (body.innerText || '') : '';
     const canvas = document.querySelector('canvas.cart-rogue-canvas');
     const escape = document.querySelector('[aria-label="Escape rhythm status"]');
     const damage = document.querySelector('[aria-label="Damage taken"]');
     const gas = text.match(/GAS\\s+(\\d+)%/);
     return {
-      ready: Boolean(canvas) && text.includes('TURBO HUNT'),
+      ready: Boolean(body) && Boolean(canvas) && text.includes('TURBO HUNT'),
       hazard: /AOE (TRACKING|LOCKED|FIRING|IMPACT)/.test(text),
       locked: text.includes('AOE LOCKED') && text.includes('LOCKED INTERCEPT'),
       firing: text.includes('AOE FIRING'),
