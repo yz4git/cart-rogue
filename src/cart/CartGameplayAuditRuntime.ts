@@ -1,4 +1,5 @@
 import "./CartRoguePhase102FaceImages";
+import "./CartRoguePhase102OperatorMix";
 import type { CartArenaSession } from "./CartArenaSession";
 import { CartGameplayAuditRecorder } from "./CartGameplayAudit";
 import type { CartRenderDiagnostics } from "./CartRenderDiagnostics";
