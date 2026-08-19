@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import "../src/cart/CartGameMenuRuntime";
 import { CartArenaSession } from "../src/cart/CartArenaSession";
 import {
   cartEncounterAllowsChaseStart,
   getCartEncounterDirectorGatePolicy,
   setCartEncounterDirectorGatePolicy,
 } from "../src/cart/CartEncounterDirectorGate";
+import { enableCartTurboHunt } from "../src/cart/CartRoguePhase67TurboHunt";
 import {
   CART_ENCOUNTER_LOW_GAS_MERCY_LOCKOUT_SECONDS,
   CART_ENCOUNTER_LOW_GAS_THRESHOLD,
@@ -14,6 +16,7 @@ import {
   cartEncounterBeatDuration,
   cartEncounterBeatPolicy,
   cartEncounterTimedNextBeat,
+  getCartEncounterDirectorState,
 } from "../src/cart/CartRoguePhase106EncounterDirector2";
 
 const source = readFileSync(new URL("../src/cart/CartRoguePhase106EncounterDirector2.ts", import.meta.url), "utf8");
@@ -23,6 +26,7 @@ const pressureSource = readFileSync(new URL("../src/cart/CartRoguePhase87ThreatP
 const raidSource = readFileSync(new URL("../src/cart/CartRoguePhase89HazardCombatDirector.ts", import.meta.url), "utf8");
 const escapeSource = readFileSync(new URL("../src/cart/CartRoguePhase94EscapeRhythmDirector2.ts", import.meta.url), "utf8");
 const runtimeSource = readFileSync(new URL("../src/cart/CartGameMenuRuntime.ts", import.meta.url), "utf8");
+const idle = { throttle: 0, brake: 0, steer: 0, boost: false } as const;
 
 test("Phase106 defines a readable pressure-dodge-counter rhythm", () => {
   assert.equal(cartEncounterTimedNextBeat("OPENING"), "PRESSURE");
@@ -32,6 +36,26 @@ test("Phase106 defines a readable pressure-dodge-counter rhythm", () => {
   assert.equal(cartEncounterTimedNextBeat("CHASE"), "COUNTER");
   assert.equal(cartEncounterTimedNextBeat("RECOVERY"), "PRESSURE");
   assert.equal(CART_ENCOUNTER_OPENING_SECONDS, 3);
+});
+
+test("a live fixed-step run reaches the first DODGE beat instead of stalling in PRESSURE", () => {
+  const session = new CartArenaSession();
+  enableCartTurboHunt(session);
+  let sawPressure = false;
+  let sawDodge = false;
+  for (let frame = 0; frame < 60 * 9; frame += 1) {
+    session.step(idle, 1 / 60);
+    const encounter = getCartEncounterDirectorState(session);
+    if (encounter.beat === "PRESSURE") sawPressure = true;
+    if (encounter.beat === "DODGE") {
+      sawDodge = true;
+      break;
+    }
+  }
+  const final = getCartEncounterDirectorState(session);
+  assert.equal(sawPressure, true);
+  assert.equal(sawDodge, true, `expected DODGE within 9 fixed seconds, got ${final.beat} with ${final.secondsRemaining.toFixed(3)}s remaining`);
+  assert.ok(final.transitionCount >= 2);
 });
 
 test("counter and recovery are real safety windows rather than UI-only labels", () => {
