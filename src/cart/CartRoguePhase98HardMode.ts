@@ -69,6 +69,17 @@ export function cartHardIntegrityAfterHits(currentIntegrity: number, newHits: nu
   return Math.max(0, Math.min(CART_HARD_MAX_INTEGRITY, currentIntegrity) - Math.max(0, Math.floor(newHits)));
 }
 
+export function cartHardDefeatReason(
+  integrity: number,
+  gas: number,
+  runComplete: boolean,
+): CartHardGameOverReason {
+  if (runComplete) return null;
+  if (integrity <= 0) return "HULL";
+  if (gas <= 0.0001) return "GAS";
+  return null;
+}
+
 export function cartHardPressurePattern(serial: number): CartHardPressurePattern {
   const index = Math.abs(Math.floor(serial)) % 4;
   if (index === 0) {
@@ -229,20 +240,19 @@ function installHardMode(): void {
       state.perfectDodges += newPerfects;
     }
 
-    if (state.difficulty === "hard" && !run.runComplete) {
-      if (state.integrity <= 0) {
-        triggerGameOver(state, "HULL");
-        return;
-      }
-      if (run.gas <= 0.0001) {
-        triggerGameOver(state, "GAS");
+    if (state.difficulty === "hard") {
+      const defeatReason = cartHardDefeatReason(state.integrity, run.gas, run.runComplete);
+      if (defeatReason) {
+        triggerGameOver(state, defeatReason);
         return;
       }
 
-      state.pressureTimer -= delta;
-      if (state.pressureTimer <= 0) {
-        queueHardPressure(session, state);
-        state.pressureTimer += CART_HARD_PRESSURE_INTERVAL_SECONDS;
+      if (!run.runComplete) {
+        state.pressureTimer -= delta;
+        if (state.pressureTimer <= 0) {
+          queueHardPressure(session, state);
+          state.pressureTimer += CART_HARD_PRESSURE_INTERVAL_SECONDS;
+        }
       }
     }
 
