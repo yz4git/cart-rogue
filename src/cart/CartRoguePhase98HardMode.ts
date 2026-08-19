@@ -22,7 +22,7 @@ interface Phase98Session {
 }
 
 interface InternalHardState {
-  difficulty: CartRunDifficulty;
+  difficulty: "hard";
   integrity: number;
   maxIntegrity: number;
   gameOver: boolean;
@@ -48,6 +48,7 @@ export interface CartHardPressurePattern {
   outerRadius?: number;
 }
 
+const difficultyBySession = new WeakMap<object, CartRunDifficulty>();
 const stateBySession = new WeakMap<object, InternalHardState>();
 let latestSnapshot: CartHardModeSnapshot | null = null;
 
@@ -63,6 +64,29 @@ const MENU_PAUSE_EVENT = "cart-rogue-menu-pause";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function difficultyFor(session: CartArenaSession | Phase98Session): CartRunDifficulty {
+  const key = session as unknown as object;
+  const existing = difficultyBySession.get(key);
+  if (existing) return existing;
+  const difficulty = getCartRunDifficulty();
+  difficultyBySession.set(key, difficulty);
+  return difficulty;
+}
+
+function normalSnapshot(): CartHardModeSnapshot {
+  return {
+    difficulty: "normal",
+    hardMode: false,
+    integrity: CART_HARD_MAX_INTEGRITY,
+    maxIntegrity: CART_HARD_MAX_INTEGRITY,
+    gameOver: false,
+    gameOverReason: null,
+    raidHits: 0,
+    perfectDodges: 0,
+    pressureSerial: 0,
+  };
 }
 
 export function cartHardIntegrityAfterHits(currentIntegrity: number, newHits: number): number {
@@ -83,55 +107,24 @@ export function cartHardDefeatReason(
 export function cartHardPressurePattern(serial: number): CartHardPressurePattern {
   const index = Math.abs(Math.floor(serial)) % 4;
   if (index === 0) {
-    return {
-      kind: "LINE",
-      label: `${CART_HARD_PRESSURE_LABEL} · SPEAR`,
-      telegraphSeconds: CART_HARD_PRESSURE_TELEGRAPH_SECONDS,
-      followCarSeconds: CART_HARD_PRESSURE_FOLLOW_SECONDS,
-      followForward: 16,
-      width: 7.2,
-      length: 35,
-    };
+    return { kind: "LINE", label: `${CART_HARD_PRESSURE_LABEL} · SPEAR`, telegraphSeconds: CART_HARD_PRESSURE_TELEGRAPH_SECONDS, followCarSeconds: CART_HARD_PRESSURE_FOLLOW_SECONDS, followForward: 16, width: 7.2, length: 35 };
   }
   if (index === 1) {
-    return {
-      kind: "CIRCLE",
-      label: `${CART_HARD_PRESSURE_LABEL} · CRUSH`,
-      telegraphSeconds: CART_HARD_PRESSURE_TELEGRAPH_SECONDS,
-      followCarSeconds: CART_HARD_PRESSURE_FOLLOW_SECONDS,
-      followForward: 13,
-      radius: 9.5,
-    };
+    return { kind: "CIRCLE", label: `${CART_HARD_PRESSURE_LABEL} · CRUSH`, telegraphSeconds: CART_HARD_PRESSURE_TELEGRAPH_SECONDS, followCarSeconds: CART_HARD_PRESSURE_FOLLOW_SECONDS, followForward: 13, radius: 9.5 };
   }
   if (index === 2) {
-    return {
-      kind: "CROSS",
-      label: `${CART_HARD_PRESSURE_LABEL} · CROSSCUT`,
-      telegraphSeconds: CART_HARD_PRESSURE_TELEGRAPH_SECONDS,
-      followCarSeconds: CART_HARD_PRESSURE_FOLLOW_SECONDS,
-      followForward: 15,
-      width: 5.8,
-      length: 30,
-    };
+    return { kind: "CROSS", label: `${CART_HARD_PRESSURE_LABEL} · CROSSCUT`, telegraphSeconds: CART_HARD_PRESSURE_TELEGRAPH_SECONDS, followCarSeconds: CART_HARD_PRESSURE_FOLLOW_SECONDS, followForward: 15, width: 5.8, length: 30 };
   }
-  return {
-    kind: "DONUT",
-    label: `${CART_HARD_PRESSURE_LABEL} · RINGBREAK`,
-    telegraphSeconds: CART_HARD_PRESSURE_TELEGRAPH_SECONDS,
-    followCarSeconds: CART_HARD_PRESSURE_FOLLOW_SECONDS,
-    followForward: 11,
-    outerRadius: 14,
-  };
+  return { kind: "DONUT", label: `${CART_HARD_PRESSURE_LABEL} · RINGBREAK`, telegraphSeconds: CART_HARD_PRESSURE_TELEGRAPH_SECONDS, followCarSeconds: CART_HARD_PRESSURE_FOLLOW_SECONDS, followForward: 11, outerRadius: 14 };
 }
 
-function stateFor(session: CartArenaSession | Phase98Session): InternalHardState {
+function hardStateFor(session: CartArenaSession | Phase98Session): InternalHardState {
   const key = session as unknown as object;
   const existing = stateBySession.get(key);
   if (existing) return existing;
-  const difficulty = getCartRunDifficulty();
   const raid = getCartRaidHazardState(session as CartArenaSession);
   const created: InternalHardState = {
-    difficulty,
+    difficulty: "hard",
     integrity: CART_HARD_MAX_INTEGRITY,
     maxIntegrity: CART_HARD_MAX_INTEGRITY,
     gameOver: false,
@@ -149,17 +142,7 @@ function stateFor(session: CartArenaSession | Phase98Session): InternalHardState
 }
 
 function snapshotOf(state: InternalHardState): CartHardModeSnapshot {
-  return {
-    difficulty: state.difficulty,
-    hardMode: state.difficulty === "hard",
-    integrity: state.integrity,
-    maxIntegrity: state.maxIntegrity,
-    gameOver: state.gameOver,
-    gameOverReason: state.gameOverReason,
-    raidHits: state.raidHits,
-    perfectDodges: state.perfectDodges,
-    pressureSerial: state.pressureSerial,
-  };
+  return { ...state };
 }
 
 function broadcast(state: InternalHardState): void {
@@ -171,7 +154,8 @@ function broadcast(state: InternalHardState): void {
 }
 
 export function getCartHardModeState(session: CartArenaSession): CartHardModeSnapshot {
-  return snapshotOf(stateFor(session));
+  if (difficultyFor(session) !== "hard") return normalSnapshot();
+  return snapshotOf(hardStateFor(session));
 }
 
 export function getLatestCartHardModeState(): CartHardModeSnapshot | null {
@@ -203,8 +187,7 @@ function queueHardPressure(session: CartArenaSession, state: InternalHardState):
     radius: pattern.radius,
     outerRadius: pattern.outerRadius,
   };
-  const id = queueCartRaidHazard(session, spec);
-  if (id !== null) state.pressureSerial += 1;
+  if (queueCartRaidHazard(session, spec) !== null) state.pressureSerial += 1;
 }
 
 function installHardMode(): void {
@@ -215,13 +198,17 @@ function installHardMode(): void {
     input: RallyInputState,
     fixedDelta = 1 / 60,
   ): void {
-    const state = stateFor(this);
-    if (state.gameOver) return;
+    if (difficultyFor(this) !== "hard") {
+      previousStep.call(this, input, fixedDelta);
+      return;
+    }
 
+    const state = hardStateFor(this);
+    if (state.gameOver) return;
     previousStep.call(this, input, fixedDelta);
+
     const session = this as unknown as CartArenaSession;
     if (!isCartTurboHuntEnabled(session)) return;
-
     const delta = clamp(fixedDelta, 0, 0.05);
     const raid = getCartRaidHazardState(session);
     const run = this.snapshot();
@@ -230,9 +217,7 @@ function installHardMode(): void {
       const newHits = raid.hitSerial - state.seenHitSerial;
       state.seenHitSerial = raid.hitSerial;
       state.raidHits += newHits;
-      if (state.difficulty === "hard") {
-        state.integrity = cartHardIntegrityAfterHits(state.integrity, newHits);
-      }
+      state.integrity = cartHardIntegrityAfterHits(state.integrity, newHits);
     }
     if (raid.perfectDodgeSerial > state.seenPerfectSerial) {
       const newPerfects = raid.perfectDodgeSerial - state.seenPerfectSerial;
@@ -240,19 +225,17 @@ function installHardMode(): void {
       state.perfectDodges += newPerfects;
     }
 
-    if (state.difficulty === "hard") {
-      const defeatReason = cartHardDefeatReason(state.integrity, run.gas, run.runComplete);
-      if (defeatReason) {
-        triggerGameOver(state, defeatReason);
-        return;
-      }
+    const defeatReason = cartHardDefeatReason(state.integrity, run.gas, run.runComplete);
+    if (defeatReason) {
+      triggerGameOver(state, defeatReason);
+      return;
+    }
 
-      if (!run.runComplete) {
-        state.pressureTimer -= delta;
-        if (state.pressureTimer <= 0) {
-          queueHardPressure(session, state);
-          state.pressureTimer += CART_HARD_PRESSURE_INTERVAL_SECONDS;
-        }
+    if (!run.runComplete) {
+      state.pressureTimer -= delta;
+      if (state.pressureTimer <= 0) {
+        queueHardPressure(session, state);
+        state.pressureTimer += CART_HARD_PRESSURE_INTERVAL_SECONDS;
       }
     }
 
