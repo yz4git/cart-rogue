@@ -5,6 +5,7 @@ import "../src/cart/CartGameMenuRuntime";
 import { CartArenaSession } from "../src/cart/CartArenaSession";
 import {
   cartEncounterAllowsChaseStart,
+  cartEncounterCommitCap,
   getCartEncounterDirectorGatePolicy,
   setCartEncounterDirectorGatePolicy,
 } from "../src/cart/CartEncounterDirectorGate";
@@ -21,6 +22,7 @@ import {
 
 const source = readFileSync(new URL("../src/cart/CartRoguePhase106EncounterDirector2.ts", import.meta.url), "utf8");
 const gateSource = readFileSync(new URL("../src/cart/CartEncounterDirectorGate.ts", import.meta.url), "utf8");
+const phase105Source = readFileSync(new URL("../src/cart/CartRoguePhase105EnemyIntelligenceBalance.ts", import.meta.url), "utf8");
 const pursuitSource = readFileSync(new URL("../src/cart/CartRoguePhase85PursuitEvents.ts", import.meta.url), "utf8");
 const pressureSource = readFileSync(new URL("../src/cart/CartRoguePhase87ThreatPressure2.ts", import.meta.url), "utf8");
 const raidSource = readFileSync(new URL("../src/cart/CartRoguePhase89HazardCombatDirector.ts", import.meta.url), "utf8");
@@ -71,6 +73,21 @@ test("counter and recovery are real safety windows rather than UI-only labels", 
   assert.match(source, /cancelCartRaidHazards\(session as unknown as CartArenaSession, "FIELD"\)/);
   assert.match(source, /enemy\.chargeTime = 0/);
   assert.match(source, /enemy\.chargeCooldown = Math\.max/);
+});
+
+test("Phase106 commit caps feed the actual Phase105 tactical budget without changing legacy defaults", () => {
+  const session = new CartArenaSession();
+  assert.equal(cartEncounterCommitCap(session, 3), 3);
+  setCartEncounterDirectorGatePolicy(session, {
+    allowThreatPressure: false,
+    allowFieldRaid: false,
+    commitCap: 1,
+  });
+  assert.equal(cartEncounterCommitCap(session, 3), 1);
+  assert.equal(cartEncounterCommitCap(session, 2), 1);
+  assert.match(source, /commitCap: state\.commitCap/);
+  assert.match(phase105Source, /cartEncounterCommitCap/);
+  assert.match(phase105Source, /state\.commitBudget = cartEncounterCommitCap/);
 });
 
 test("PRESSURE owns enemy waves while DODGE owns new FIELD RAID scheduling", () => {
