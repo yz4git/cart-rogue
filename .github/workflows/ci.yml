@@ -41,6 +41,8 @@ jobs:
         run: npm run test:raid
       - name: Forced dodge and escape regression
         run: npm run test:escape
+      - name: Hard Mode regression
+        run: npm run test:hard
       - name: iPhone landscape UI regression
         run: node --import tsx --test tests/cart-iphone-landscape-ui.test.ts
       - name: Test

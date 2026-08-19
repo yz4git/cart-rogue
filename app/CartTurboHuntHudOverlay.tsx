@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  CART_HARD_MODE_SNAPSHOT_EVENT,
+  type CartHardModeSnapshot,
+} from "../src/cart/CartRunDifficulty";
+import {
   CART_TURBO_HUNT_SNAPSHOT_EVENT,
   getLatestCartTurboHuntSnapshot,
   type CartTurboHuntSnapshot,
@@ -16,6 +20,7 @@ import {
   getLatestCartPlayerDamageFeedbackState,
   type CartPlayerDamageFeedbackSnapshot,
 } from "../src/cart/CartRoguePhase91DamageFeedback2";
+import { getLatestCartHardModeState } from "../src/cart/CartRoguePhase98HardMode";
 import legacyStyles from "./CartRogueGame.module.css";
 import routeStyles from "./CartRunRouteMap.module.css";
 import styles from "./CartTurboHuntHudOverlay.module.css";
@@ -87,6 +92,7 @@ export default function CartTurboHuntHudOverlay() {
   const [predator, setPredator] = useState<PredatorHudSnapshot | null>(null);
   const [raidHazard, setRaidHazard] = useState<CartRaidHazardSnapshot | null>(() => getLatestCartRaidHazardState());
   const [damageFeedback, setDamageFeedback] = useState<CartPlayerDamageFeedbackSnapshot | null>(() => getLatestCartPlayerDamageFeedbackState());
+  const [hardMode, setHardMode] = useState<CartHardModeSnapshot | null>(() => getLatestCartHardModeState());
   const damageSerialRef = useRef(getLatestCartPlayerDamageFeedbackState()?.hitSerial ?? 0);
 
   useEffect(() => {
@@ -118,6 +124,10 @@ export default function CartTurboHuntHudOverlay() {
       const detail = (event as CustomEvent<CartRaidHazardSnapshot>).detail;
       if (detail) setRaidHazard(detail);
     };
+    const hardHandler = (event: Event) => {
+      const detail = (event as CustomEvent<CartHardModeSnapshot>).detail;
+      if (detail) setHardMode(detail);
+    };
     const damageHandler = (event: Event) => {
       const detail = (event as CustomEvent<CartPlayerDamageFeedbackSnapshot>).detail;
       if (!detail) return;
@@ -136,6 +146,7 @@ export default function CartTurboHuntHudOverlay() {
     window.addEventListener("cart-pursuit-event-snapshot", pursuitHandler);
     window.addEventListener("cart-titan-predator-snapshot", predatorHandler);
     window.addEventListener(CART_RAID_HAZARD_SNAPSHOT_EVENT, raidHandler);
+    window.addEventListener(CART_HARD_MODE_SNAPSHOT_EVENT, hardHandler);
     window.addEventListener(CART_PLAYER_DAMAGE_FEEDBACK_EVENT, damageHandler);
     return () => {
       window.removeEventListener(CART_TURBO_HUNT_SNAPSHOT_EVENT, huntHandler);
@@ -145,6 +156,7 @@ export default function CartTurboHuntHudOverlay() {
       window.removeEventListener("cart-pursuit-event-snapshot", pursuitHandler);
       window.removeEventListener("cart-titan-predator-snapshot", predatorHandler);
       window.removeEventListener(CART_RAID_HAZARD_SNAPSHOT_EVENT, raidHandler);
+      window.removeEventListener(CART_HARD_MODE_SNAPSHOT_EVENT, hardHandler);
       window.removeEventListener(CART_PLAYER_DAMAGE_FEEDBACK_EVENT, damageHandler);
     };
   }, []);
@@ -160,6 +172,7 @@ export default function CartTurboHuntHudOverlay() {
   const titanLabel = titan?.bossActive
     ? `TITAN ${titan.stage}${titan.armorSegments > 0 ? ` · ARMOR ${titan.armorSegments}` : titan.vulnerable ? " · CORE OPEN" : ""}`
     : snapshot.huntBossSpawned ? "TITAN ACTIVE" : phaseLabel;
+  const hardLabel = hardMode?.hardMode ? `HARD · HULL ${hardMode.integrity}/${hardMode.maxIntegrity} · ` : "";
 
   let dangerText: string | null = null;
   let dangerMode: "danger" | "counter" | "raid" | "hit" = "danger";
@@ -213,7 +226,7 @@ export default function CartTurboHuntHudOverlay() {
           <span className={styles.kicker}>CART ROGUE</span>
           <strong className={styles.title}>TURBO HUNT</strong>
           <span className={styles.region}>
-            {snapshot.huntRegion} · {phaseLabel}{overdrive > 0 ? ` · OVERDRIVE ${overdrive.toFixed(1)}s` : ""}
+            {hardLabel}{snapshot.huntRegion} · {phaseLabel}{overdrive > 0 ? ` · OVERDRIVE ${overdrive.toFixed(1)}s` : ""}
           </span>
         </div>
 
