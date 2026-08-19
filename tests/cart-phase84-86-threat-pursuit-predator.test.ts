@@ -94,16 +94,27 @@ test("Boss Predator constants keep the survive burst bounded and guarantee a cou
 test("live FURY enters Predator survive then hands control back through an overheat counter", () => {
   const session = new CartArenaSession();
   enableCartTurboHunt(session);
-  for (let index = 0; index < 3040; index += 1) session.step(idleInput, 0.05);
+  const isolatedPredatorGasLife = session as unknown as { gas: number };
+  for (let index = 0; index < 3040; index += 1) {
+    // This test owns Predator/FURY state timing. Keep GAS life replenished as
+    // if recovery cells were collected so a deliberately passive test driver
+    // does not trigger the real GAS=0 defeat before Predator can be inspected.
+    isolatedPredatorGasLife.gas = 1;
+    session.step(idleInput, 0.05);
+  }
   const hunt = getCartTurboHuntSnapshot(session);
   const boss = session.enemies.find((enemy) => enemy.kind === "boss");
   assert.equal(hunt?.huntBossSpawned, true);
   if (!boss) throw new Error("boss missing");
 
   boss.hp = 250;
+  isolatedPredatorGasLife.gas = 1;
   session.step(idleInput, 1 / 60);
   assert.equal(getCartTitanBossState(session).stage, "FURY");
-  for (let index = 0; index < 40; index += 1) session.step(idleInput, 0.05);
+  for (let index = 0; index < 40; index += 1) {
+    isolatedPredatorGasLife.gas = 1;
+    session.step(idleInput, 0.05);
+  }
   let predator = getCartTitanPredatorState(session);
   assert.equal(predator.mode, "SURVIVE");
   assert.equal(predator.active, true);
@@ -111,6 +122,7 @@ test("live FURY enters Predator survive then hands control back through an overh
   assert.ok((boss.chargeCooldown ?? 1) <= CART_TITAN_PREDATOR_CHARGE_COOLDOWN + 0.05);
 
   for (let index = 0; index < 170 && getCartTitanPredatorState(session).mode === "SURVIVE"; index += 1) {
+    isolatedPredatorGasLife.gas = 1;
     session.step(idleInput, 0.05);
   }
   predator = getCartTitanPredatorState(session);
