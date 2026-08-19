@@ -172,12 +172,14 @@ export default function CartTurboHuntHudOverlay() {
   const titanLabel = titan?.bossActive
     ? `TITAN ${titan.stage}${titan.armorSegments > 0 ? ` · ARMOR ${titan.armorSegments}` : titan.vulnerable ? " · CORE OPEN" : ""}`
     : snapshot.huntBossSpawned ? "TITAN ACTIVE" : phaseLabel;
-  const hardLabel = hardMode?.hardMode ? `HARD · HULL ${hardMode.integrity}/${hardMode.maxIntegrity} · ` : "";
+  const lifeLabel = hardMode
+    ? `${hardMode.hardMode ? "HARD · " : ""}LIFE/GAS ${hardMode.gasLifePercent}% · `
+    : "";
 
   let dangerText: string | null = null;
   let dangerMode: "danger" | "counter" | "raid" | "hit" = "danger";
   if (damageFeedback?.active && damageFeedback.flashSeconds > 0) {
-    dangerText = `DIRECT HIT · GAS -${damageFeedback.gasLossPercent}% · SPEED -${damageFeedback.speedLossPercent}%`;
+    dangerText = `DIRECT HIT · LIFE/GAS -${damageFeedback.gasLossPercent}% · SPEED -${damageFeedback.speedLossPercent}%`;
     dangerMode = "hit";
   } else if (predator?.active && predator.mode === "COUNTER") {
     dangerText = `COUNTER WINDOW · ${predator.counterSeconds.toFixed(1)}s · HIT THE CORE`;
@@ -217,7 +219,7 @@ export default function CartTurboHuntHudOverlay() {
           <div className={styles.damageBurst}>
             <strong>DIRECT HIT</strong>
             <span>{damageFeedback.label}</span>
-            <small>GAS -{damageFeedback.gasLossPercent}% · SPEED -{damageFeedback.speedLossPercent}%</small>
+            <small>LIFE/GAS -{damageFeedback.gasLossPercent}% · SPEED -{damageFeedback.speedLossPercent}%</small>
           </div>
         </div>
       )}
@@ -226,7 +228,7 @@ export default function CartTurboHuntHudOverlay() {
           <span className={styles.kicker}>CART ROGUE</span>
           <strong className={styles.title}>TURBO HUNT</strong>
           <span className={styles.region}>
-            {hardLabel}{snapshot.huntRegion} · {phaseLabel}{overdrive > 0 ? ` · OVERDRIVE ${overdrive.toFixed(1)}s` : ""}
+            {lifeLabel}{snapshot.huntRegion} · {phaseLabel}{overdrive > 0 ? ` · OVERDRIVE ${overdrive.toFixed(1)}s` : ""}
           </span>
         </div>
 
