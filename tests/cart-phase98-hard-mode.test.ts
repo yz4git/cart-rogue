@@ -13,32 +13,62 @@ import {
   CART_RAID_HAZARD_MIN_LOCK_SECONDS,
 } from "../src/cart/CartRoguePhase88RaidHazards";
 import {
-  CART_HARD_MAX_INTEGRITY,
+  CART_HARD_PLAYER_DAMAGE_GAS_LOSS_PERCENT,
+  CART_PLAYER_DAMAGE_GAS_LOSS_PERCENT,
+  cartGasLifeAfterDamage,
+  cartRaidGasLifeDamagePercent,
+} from "../src/cart/CartRoguePhase91DamageFeedback2";
+import {
   CART_HARD_OPENING_GRACE_SECONDS,
   CART_HARD_PRESSURE_FOLLOW_SECONDS,
   CART_HARD_PRESSURE_INTERVAL_SECONDS,
   CART_HARD_PRESSURE_MAX_EXISTING,
   CART_HARD_PRESSURE_TELEGRAPH_SECONDS,
-  cartHardDefeatReason,
-  cartHardIntegrityAfterHits,
+  cartGasLifeDefeatReason,
+  cartGasLifePercent,
   cartHardPressurePattern,
   getCartHardModeState,
 } from "../src/cart/CartRoguePhase98HardMode";
 
 const runtimeSource = readFileSync(new URL("../src/cart/CartRogueRuntime.ts", import.meta.url), "utf8");
 const menuSource = readFileSync(new URL("../app/CartGameMenu.tsx", import.meta.url), "utf8");
+const hudSource = readFileSync(new URL("../app/CartTurboHuntHudOverlay.tsx", import.meta.url), "utf8");
 const phaseSource = readFileSync(new URL("../src/cart/CartRoguePhase98HardMode.ts", import.meta.url), "utf8");
+const damageSource = readFileSync(new URL("../src/cart/CartRoguePhase91DamageFeedback2.ts", import.meta.url), "utf8");
+const arenaSource = readFileSync(new URL("../src/cart/CartArenaSession.ts", import.meta.url), "utf8");
 const idle = { throttle: 0, brake: 0, steer: 0, boost: false } as const;
 
-test("Hard Mode is a three-major-hit defeat instead of an enemy HP inflation switch", () => {
-  assert.equal(CART_HARD_MAX_INTEGRITY, 3);
-  assert.equal(cartHardIntegrityAfterHits(3, 1), 2);
-  assert.equal(cartHardIntegrityAfterHits(2, 1), 1);
-  assert.equal(cartHardIntegrityAfterHits(1, 1), 0);
-  assert.equal(cartHardDefeatReason(0, 0.8, false), "HULL");
-  assert.equal(cartHardDefeatReason(2, 0, false), "GAS");
-  assert.equal(cartHardDefeatReason(0, 0, true), null);
-  assert.doesNotMatch(phaseSource, /enemy\.hp\s*\*=|maxHp\s*\*=/);
+test("GAS is the single life resource in both NORMAL and HARD", () => {
+  assert.equal(CART_PLAYER_DAMAGE_GAS_LOSS_PERCENT, 8);
+  assert.equal(CART_HARD_PLAYER_DAMAGE_GAS_LOSS_PERCENT, 34);
+  assert.equal(cartRaidGasLifeDamagePercent("normal"), 8);
+  assert.equal(cartRaidGasLifeDamagePercent("hard"), 34);
+
+  let hardGas = 1;
+  hardGas = cartGasLifeAfterDamage(hardGas, cartRaidGasLifeDamagePercent("hard"));
+  assert.ok(Math.abs(hardGas - 0.66) < 1e-9);
+  hardGas = cartGasLifeAfterDamage(hardGas, cartRaidGasLifeDamagePercent("hard"));
+  assert.ok(Math.abs(hardGas - 0.32) < 1e-9);
+  hardGas = cartGasLifeAfterDamage(hardGas, cartRaidGasLifeDamagePercent("hard"));
+  assert.equal(hardGas, 0);
+
+  assert.equal(cartGasLifeDefeatReason(0, false), "GAS");
+  assert.equal(cartGasLifeDefeatReason(0.01, false), null);
+  assert.equal(cartGasLifeDefeatReason(0, true), null);
+  assert.equal(cartGasLifePercent(0.42), 42);
+
+  assert.doesNotMatch(phaseSource, /integrity|maxIntegrity|HULL|CART_HARD_MAX_INTEGRITY/);
+  assert.doesNotMatch(menuSource, /HULL/);
+  assert.doesNotMatch(hudSource, /HULL/);
+  assert.match(damageSource, /gasSession\.gas = cartGasLifeAfterDamage/);
+});
+
+test("GAS recovery remains the same system that now restores life", () => {
+  assert.match(arenaSource, /this\.gas = Math\.min\(1, this\.gas \+ 0\.12\)/);
+  assert.match(arenaSource, /GAS CELL · \+12%/);
+  assert.match(arenaSource, /const gasReward = contact\.kind === "boss"/);
+  assert.match(menuSource, /GAS = LIFE/);
+  assert.match(menuSource, /RECOVERY CELLS RESTORE GAS/);
 });
 
 test("Hard Mode pressure is aggressive but remains telegraphed and inside the fixed four-slot raid pool", () => {
@@ -61,7 +91,7 @@ test("Hard Mode pressure is aggressive but remains telegraphed and inside the fi
   }
 });
 
-test("difficulty is captured per run and NORMAL keeps the Hard defeat system inactive", () => {
+test("difficulty is captured per run while both modes share GAS life", () => {
   setCartRunDifficulty("hard");
   assert.equal(getCartRunDifficulty(), "hard");
   const hardSession = new CartArenaSession();
@@ -69,7 +99,7 @@ test("difficulty is captured per run and NORMAL keeps the Hard defeat system ina
   hardSession.step(idle, 0.05);
   const hard = getCartHardModeState(hardSession);
   assert.equal(hard.hardMode, true);
-  assert.equal(hard.integrity, 3);
+  assert.equal(hard.gasLifePercent, 100);
   assert.equal(hard.gameOver, false);
 
   setCartRunDifficulty("normal");
@@ -78,24 +108,30 @@ test("difficulty is captured per run and NORMAL keeps the Hard defeat system ina
   normalSession.step(idle, 0.05);
   const normal = getCartHardModeState(normalSession);
   assert.equal(normal.hardMode, false);
-  assert.equal(normal.integrity, 3);
+  assert.equal(normal.gasLifePercent, 100);
   assert.equal(normal.gameOver, false);
 });
 
-test("title offers NORMAL and HARD, warns about the failure rules, and supports Hard retry", () => {
+test("title and game over UI explain the unified GAS life rule", () => {
   assert.match(menuSource, />NORMAL</);
   assert.match(menuSource, />HARD</);
-  assert.match(menuSource, /3 MAJOR HITS OR ZERO GAS = GAME OVER/);
-  assert.match(menuSource, /START HARD RUN/);
+  assert.match(menuSource, /GAS = LIFE/);
+  assert.match(menuSource, /ZERO GAS = GAME OVER/);
+  assert.match(menuSource, /HARD RAID HITS DEAL HEAVY LIFE DAMAGE/);
+  assert.match(menuSource, /GAS EMPTY · LIFE LOST/);
   assert.match(menuSource, /RETRY HARD/);
+  assert.match(menuSource, /RETRY RUN/);
   assert.match(menuSource, /BACK TO TITLE/);
+  assert.match(hudSource, /LIFE\/GAS/);
 });
 
-test("Phase98 installs after adaptive counterread and before audit wrappers", () => {
+test("Phase98 installs after damage feedback and adaptive counterread and before audit wrappers", () => {
+  const damageImport = runtimeSource.indexOf('import "./CartRoguePhase91DamageFeedback2"');
   const counterreadImport = runtimeSource.indexOf('import "./CartRoguePhase97AdaptiveCounterread"');
   const hardImport = runtimeSource.indexOf('import "./CartRoguePhase98HardMode"');
   const gameplayAuditImport = runtimeSource.indexOf('import "./CartGameplayAuditRuntime"');
-  assert.ok(counterreadImport >= 0);
+  assert.ok(damageImport >= 0);
+  assert.ok(counterreadImport > damageImport);
   assert.ok(hardImport > counterreadImport);
   assert.ok(gameplayAuditImport > hardImport);
   const historicalOrder = runtimeSource.slice(runtimeSource.indexOf("CART_ROGUE_RUNTIME_PHASE_ORDER"));
