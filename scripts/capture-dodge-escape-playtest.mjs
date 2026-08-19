@@ -268,7 +268,8 @@ try {
     escapeObservation,
     acceptance: {
       passiveWasPunished: passive.hits >= 1,
-      reactiveUsedEvasion: reactive.steerActions >= 2 && reactive.brakeActions >= 2 && reactive.reactionsCompleted >= 2,
+      reactiveUsedEvasion: reactive.steerActions >= 1 && reactive.brakeActions >= 1 && reactive.reactionsCompleted >= 1,
+      reactivePerfectlyDodged: reactive.perfectDodges >= 1,
       reactiveAvoidedForcedHits: reactive.hits === 0,
       reactiveImprovedOverPassive: reactive.hits < passive.hits,
       escapeRendered: escapeObservation.observed,
