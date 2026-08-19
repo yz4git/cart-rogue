@@ -110,12 +110,40 @@ export class CartRogueCanvasPreview implements CartRogueDemoHandle {
       const p = worldToScreen(pickup.x, pickup.z);
       ctx.save();
       ctx.translate(p.x, p.y);
-      ctx.rotate(Math.PI / 4);
-      ctx.fillStyle = pickup.kind === "gas" ? "#79d99a" : "#61dbe8";
-      ctx.fillRect(-0.8 * scale, -0.8 * scale, 1.6 * scale, 1.6 * scale);
-      ctx.strokeStyle = "rgba(255,255,255,.82)";
-      ctx.lineWidth = Math.max(1, 0.18 * scale);
-      ctx.strokeRect(-1.05 * scale, -1.05 * scale, 2.1 * scale, 2.1 * scale);
+      if (pickup.kind === "gas") {
+        // Recovery: broad red rescue badge + unmistakable white medical plus.
+        // No rotation keeps the symbol readable while the car is moving fast.
+        ctx.fillStyle = "rgba(130,255,176,.28)";
+        ctx.beginPath();
+        ctx.arc(0, 0, 1.42 * scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#ff4f68";
+        ctx.fillRect(-1.12 * scale, -0.78 * scale, 2.24 * scale, 1.56 * scale);
+        ctx.strokeStyle = "rgba(255,255,255,.9)";
+        ctx.lineWidth = Math.max(1, 0.16 * scale);
+        ctx.strokeRect(-1.12 * scale, -0.78 * scale, 2.24 * scale, 1.56 * scale);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(-0.22 * scale, -0.62 * scale, 0.44 * scale, 1.24 * scale);
+        ctx.fillRect(-0.62 * scale, -0.22 * scale, 1.24 * scale, 0.44 * scale);
+      } else {
+        // Turbo: narrow cyan diamond with a white lightning bolt silhouette.
+        ctx.rotate(Math.PI / 4);
+        ctx.fillStyle = "rgba(66,199,255,.24)";
+        ctx.fillRect(-1.18 * scale, -1.18 * scale, 2.36 * scale, 2.36 * scale);
+        ctx.fillStyle = "#42c7ff";
+        ctx.fillRect(-0.82 * scale, -0.82 * scale, 1.64 * scale, 1.64 * scale);
+        ctx.rotate(-Math.PI / 4);
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.moveTo(-0.12 * scale, -0.92 * scale);
+        ctx.lineTo(0.42 * scale, -0.2 * scale);
+        ctx.lineTo(0.12 * scale, -0.2 * scale);
+        ctx.lineTo(0.36 * scale, 0.92 * scale);
+        ctx.lineTo(-0.46 * scale, 0.12 * scale);
+        ctx.lineTo(-0.12 * scale, 0.12 * scale);
+        ctx.closePath();
+        ctx.fill();
+      }
       ctx.restore();
     }
 
