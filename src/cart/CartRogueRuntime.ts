@@ -84,6 +84,7 @@ import "./CartRoguePhase97AdaptiveCounterread";
 import "./CartRoguePhase98HardMode";
 import "./CartRoguePhase99ResourceReadability";
 import "./CartRoguePhase100CasualAnimeWorld";
+import "./CartRoguePhase101ToyShapePass";
 import "./CartGameplayAuditRuntime";
 import "./CartRenderAuditRuntime";
 
