@@ -1,6 +1,7 @@
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
 import type { CartEnemyState } from "./CartCombat";
+import { setCartEncounterDirectorGatePolicy } from "./CartEncounterDirectorGate";
 import { getCartRunDifficulty, type CartRunDifficulty } from "./CartRunDifficulty";
 import { isCartTurboHuntEnabled } from "./CartRoguePhase67TurboHunt";
 import { getCartTurboHuntEventState } from "./CartRoguePhase81EventDirector2";
@@ -89,7 +90,7 @@ export function cartEncounterBeatPolicy(
     return { intensity: 0.32, commitCap: 1, allowFieldHazards: false, attackCooldownFloor: 0.62 };
   }
   if (beat === "PRESSURE") {
-    return { intensity: difficulty === "hard" ? 0.82 : 0.72, commitCap: difficulty === "hard" ? 3 : 2, allowFieldHazards: true, attackCooldownFloor: 0 };
+    return { intensity: difficulty === "hard" ? 0.82 : 0.72, commitCap: difficulty === "hard" ? 3 : 2, allowFieldHazards: false, attackCooldownFloor: 0 };
   }
   if (beat === "DODGE") {
     return { intensity: difficulty === "hard" ? 0.92 : 0.84, commitCap: difficulty === "hard" ? 2 : 1, allowFieldHazards: true, attackCooldownFloor: 0 };
@@ -187,6 +188,13 @@ function beginBeat(
   state.fieldHazardsAllowed = policy.allowFieldHazards;
 }
 
+function applySchedulingGate(session: Phase106Session, state: EncounterDirectorState): void {
+  setCartEncounterDirectorGatePolicy(session as unknown as CartArenaSession, {
+    allowThreatPressure: state.beat === "PRESSURE",
+    allowFieldRaid: state.beat === "DODGE",
+  });
+}
+
 function enforceSafeWindow(
   session: Phase106Session,
   state: EncounterDirectorState,
@@ -266,6 +274,7 @@ function updateEncounter(
     state.intensity = Math.max(state.intensity, difficulty === "hard" ? 0.86 : 0.76);
   }
 
+  applySchedulingGate(session, state);
   enforceSafeWindow(session, state, difficulty);
 }
 
@@ -300,7 +309,10 @@ function patchSession(): void {
     const difficulty = getCartRunDifficulty();
     const delta = clamp(fixedDelta, 0, 0.05);
 
-    if (isCartTurboHuntEnabled(typed)) enforceSafeWindow(this, state, difficulty);
+    if (isCartTurboHuntEnabled(typed)) {
+      applySchedulingGate(this, state);
+      enforceSafeWindow(this, state, difficulty);
+    }
     previousStep.call(this, input, fixedDelta);
     if (!isCartTurboHuntEnabled(typed)) return;
 
