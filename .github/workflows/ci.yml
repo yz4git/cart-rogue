@@ -43,6 +43,10 @@ jobs:
         run: npm run test:escape
       - name: Hard Mode regression
         run: npm run test:hard
+      - name: Resource readability regression
+        run: npm run test:resources
+      - name: Casual anime visual regression
+        run: npm run test:visual
       - name: iPhone landscape UI regression
         run: node --import tsx --test tests/cart-iphone-landscape-ui.test.ts
       - name: Test
