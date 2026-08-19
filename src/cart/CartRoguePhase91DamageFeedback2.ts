@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
+import { getCartRunDifficulty, type CartRunDifficulty } from "./CartRunDifficulty";
 import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
 import { isCartTurboHuntEnabled } from "./CartRoguePhase67TurboHunt";
 import { getCartRaidHazardState } from "./CartRoguePhase88RaidHazards";
@@ -16,6 +17,7 @@ export interface CartPlayerDamageFeedbackSnapshot {
 }
 
 interface InternalDamageState extends CartPlayerDamageFeedbackSnapshot {
+  difficulty: CartRunDifficulty;
   seenRaidHitSerial: number;
   broadcastClock: number;
 }
@@ -25,6 +27,10 @@ interface Phase91Session {
   rewardTimer: number;
   lastReward: string | null;
   step(input: RallyInputState, fixedDelta?: number): void;
+}
+
+interface GasLifeSession {
+  gas: number;
 }
 
 interface Phase91Demo {
@@ -45,10 +51,28 @@ export const CART_PLAYER_DAMAGE_FEEDBACK_EVENT = "cart-player-damage-feedback";
 export const CART_PLAYER_DAMAGE_FLASH_SECONDS = 0.62;
 export const CART_PLAYER_DAMAGE_SHAKE_SECONDS = 0.48;
 export const CART_PLAYER_DAMAGE_GAS_LOSS_PERCENT = 8;
+export const CART_HARD_PLAYER_DAMAGE_GAS_LOSS_PERCENT = 34;
 export const CART_PLAYER_DAMAGE_SPEED_LOSS_PERCENT = 42;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+export function cartRaidGasLifeDamagePercent(difficulty: CartRunDifficulty): number {
+  return difficulty === "hard"
+    ? CART_HARD_PLAYER_DAMAGE_GAS_LOSS_PERCENT
+    : CART_PLAYER_DAMAGE_GAS_LOSS_PERCENT;
+}
+
+export function cartGasLifeAfterDamage(gas: number, lossPercent: number): number {
+  return Math.max(0, clamp(gas, 0, 1) - Math.max(0, lossPercent) / 100);
+}
+
+function applyGasLifeDamage(session: Phase91Session, lossPercent: number): number {
+  const gasSession = session as unknown as GasLifeSession;
+  const before = clamp(gasSession.gas, 0, 1);
+  gasSession.gas = cartGasLifeAfterDamage(before, lossPercent);
+  return before - gasSession.gas;
 }
 
 function stateFor(session: CartArenaSession | Phase91Session): InternalDamageState {
@@ -56,14 +80,16 @@ function stateFor(session: CartArenaSession | Phase91Session): InternalDamageSta
   const existing = stateBySession.get(key);
   if (existing) return existing;
   const raid = getCartRaidHazardState(session as CartArenaSession);
+  const difficulty = getCartRunDifficulty();
   const created: InternalDamageState = {
     active: false,
     hitSerial: raid.hitSerial,
     flashSeconds: 0,
     shakeSeconds: 0,
     label: "RAID HIT",
-    gasLossPercent: CART_PLAYER_DAMAGE_GAS_LOSS_PERCENT,
+    gasLossPercent: cartRaidGasLifeDamagePercent(difficulty),
     speedLossPercent: CART_PLAYER_DAMAGE_SPEED_LOSS_PERCENT,
+    difficulty,
     seenRaidHitSerial: raid.hitSerial,
     broadcastClock: 0,
   };
@@ -105,10 +131,11 @@ function beginDamageFeedback(session: Phase91Session, state: InternalDamageState
   state.shakeSeconds = CART_PLAYER_DAMAGE_SHAKE_SECONDS;
   state.active = true;
   state.label = label || "RAID HIT";
+  applyGasLifeDamage(session, state.gasLossPercent);
   session.car.collisionImpact = Math.max(session.car.collisionImpact, 1.45);
   session.car.bodyDamage = Math.min(1, session.car.bodyDamage + 0.1);
   session.car.smokeLevel = Math.max(session.car.smokeLevel, 0.16);
-  session.lastReward = `DIRECT HIT · GAS -${CART_PLAYER_DAMAGE_GAS_LOSS_PERCENT}% · SPEED BREAK`;
+  session.lastReward = `DIRECT HIT · LIFE/GAS -${state.gasLossPercent}% · SPEED BREAK`;
   session.rewardTimer = Math.max(session.rewardTimer, 1.7);
   broadcast(state);
 }

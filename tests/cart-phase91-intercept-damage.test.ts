@@ -73,7 +73,7 @@ test("field and Titan tracking attacks both use predictive lead rather than tiny
   assert.doesNotMatch(phase89Source, /followForward:\s*7\b/);
 });
 
-test("raid hits trigger a visible damage state and structural impact without becoming instant death", () => {
+test("raid hits trigger a visible GAS-life damage state and structural impact without becoming instant death", () => {
   const session = new CartArenaSession();
   enableCartTurboHunt(session);
   const gasBefore = session.gas;
@@ -95,7 +95,7 @@ test("raid hits trigger a visible damage state and structural impact without bec
   assert.equal(feedback.speedLossPercent, CART_PLAYER_DAMAGE_SPEED_LOSS_PERCENT);
   assert.ok(session.gas < gasBefore && session.gas >= 0);
   assert.ok(session.car.bodyDamage >= 0.1 && session.car.bodyDamage < 1);
-  assert.match(session.lastReward ?? "", /DIRECT HIT · GAS -8% · SPEED BREAK/);
+  assert.match(session.lastReward ?? "", /DIRECT HIT · LIFE\/GAS -8% · SPEED BREAK/);
 });
 
 test("damage feedback reuses existing camera flash and spark systems and adds a strong HUD hit layer", () => {
@@ -105,6 +105,7 @@ test("damage feedback reuses existing camera flash and spark systems and adds a 
   assert.match(phase91Source, /0xff1238/);
   assert.doesNotMatch(phase91Source, /new THREE\.InstancedMesh|TextureLoader|setColorAt|instanceColor/);
   assert.match(hudSource, /DIRECT HIT/);
+  assert.match(hudSource, /LIFE\/GAS/);
   assert.match(hudSource, /damageOverlay/);
   assert.match(hudCss, /damageScreenFlash/);
   assert.match(hudCss, /damageBurstKick/);

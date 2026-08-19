@@ -26,7 +26,7 @@ export default function CartGameMenu({ started, onStart, onReturnTitle }: CartGa
   const [paused, setPaused] = useState(false);
   const [difficulty, setDifficulty] = useState<CartRunDifficulty>("normal");
   const [hardSnapshot, setHardSnapshot] = useState<CartHardModeSnapshot | null>(null);
-  const gameOver = Boolean(hardSnapshot?.hardMode && hardSnapshot.gameOver);
+  const gameOver = Boolean(hardSnapshot?.gameOver);
 
   const pauseGame = useCallback(() => {
     if (!started || paused || gameOver || hasBlockingGameOverlay()) return;
@@ -66,7 +66,7 @@ export default function CartGameMenu({ started, onStart, onReturnTitle }: CartGa
     const timer = window.setTimeout(() => {
       // CartRogueGame's keyboard sync calls all three control setters. The
       // harmless key-up makes both WebGL and Canvas fallback bind menu events
-      // before the player can hit PAUSE or HARD MODE can end the run.
+      // before the player can hit PAUSE or GAS life can end the run.
       window.dispatchEvent(new KeyboardEvent("keyup", { key: "CartMenuBind" }));
     }, 0);
     return () => window.clearTimeout(timer);
@@ -123,9 +123,9 @@ export default function CartGameMenu({ started, onStart, onReturnTitle }: CartGa
               <small>EXPERT RAID</small>
             </button>
           </div>
-          {hard && (
-            <div className={styles.hardWarning}>EXPERT ONLY · 3 MAJOR HITS OR ZERO GAS = GAME OVER · EXTRA RAID PRESSURE</div>
-          )}
+          <div className={styles.hardWarning}>
+            GAS = LIFE · RECOVERY CELLS RESTORE GAS · ZERO GAS = GAME OVER{hard ? " · HARD RAID HITS DEAL HEAVY LIFE DAMAGE" : ""}
+          </div>
           <button className={`${styles.startButton} ${hard ? styles.startButtonHard : ""}`} onClick={() => startGame()}>
             <strong>{hard ? "START HARD RUN" : "START RUN"}</strong>
             <small>{hard ? "SURVIVE THE RAID" : "TAP TO IGNITE"}</small>
@@ -142,19 +142,21 @@ export default function CartGameMenu({ started, onStart, onReturnTitle }: CartGa
   }
 
   if (gameOver && hardSnapshot) {
-    const reason = hardSnapshot.gameOverReason === "GAS" ? "OUT OF GAS" : "HULL DESTROYED";
+    const failedDifficulty = hardSnapshot.difficulty;
+    const hard = failedDifficulty === "hard";
     return (
       <div className={styles.gameOverOverlay} role="dialog" aria-modal="true" aria-label="Game over">
         <div className={styles.gameOverPanel}>
-          <div className={styles.gameOverEyebrow}>HARD MODE · RUN FAILED</div>
+          <div className={styles.gameOverEyebrow}>{hard ? "HARD MODE" : "TURBO HUNT"} · RUN FAILED</div>
           <h2>GAME OVER</h2>
-          <strong className={styles.gameOverReason}>{reason}</strong>
+          <strong className={styles.gameOverReason}>GAS EMPTY · LIFE LOST</strong>
           <div className={styles.gameOverStats}>
+            <span>GAS / LIFE {hardSnapshot.gasLifePercent}%</span>
             <span>RAID HITS {hardSnapshot.raidHits}</span>
             <span>PERFECT DODGES {hardSnapshot.perfectDodges}</span>
           </div>
-          <button className={styles.retryButton} onClick={() => startGame("hard")}>
-            <strong>RETRY HARD</strong>
+          <button className={styles.retryButton} onClick={() => startGame(failedDifficulty)}>
+            <strong>{hard ? "RETRY HARD" : "RETRY RUN"}</strong>
             <small>RUN IT BACK</small>
           </button>
           <button className={styles.titleButton} onClick={returnTitle}>BACK TO TITLE</button>

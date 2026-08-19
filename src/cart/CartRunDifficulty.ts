@@ -1,13 +1,13 @@
 export type CartRunDifficulty = "normal" | "hard";
-export type CartHardGameOverReason = "HULL" | "GAS" | null;
+export type CartRunGameOverReason = "GAS" | null;
+export type CartHardGameOverReason = CartRunGameOverReason;
 
 export interface CartHardModeSnapshot {
   difficulty: CartRunDifficulty;
   hardMode: boolean;
-  integrity: number;
-  maxIntegrity: number;
+  gasLifePercent: number;
   gameOver: boolean;
-  gameOverReason: CartHardGameOverReason;
+  gameOverReason: CartRunGameOverReason;
   raidHits: number;
   perfectDodges: number;
   pressureSerial: number;

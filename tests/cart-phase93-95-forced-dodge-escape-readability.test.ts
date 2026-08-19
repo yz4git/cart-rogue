@@ -77,9 +77,6 @@ function runExplicitEvasion(kind: CartRaidHazardKind, steer: -1 | 1): ReturnType
   for (let index = 0; index < 32; index += 1) {
     session.step(evasion, 0.05);
     raid = getCartRaidHazardState(session);
-    // Phase97 intentionally continues after this result. Stop at the first
-    // resolved hazard so this historical test still answers its original
-    // question: is the forced first beat itself fairly escapable?
     if (raid.hitSerial + raid.clearSerial > startingResults) break;
   }
   return raid;
@@ -131,9 +128,6 @@ test("same-frame early dodge input cannot drag the forced target toward the dodg
   session.car.forwardVelocity = 14;
   session.car.speed = 14;
   queueShape(session, "LINE");
-
-  // This mirrors the WebGL/UI race: the player sees ordinary LOCK and already
-  // has steer+brake held by the frame Phase93 replaces it with forced LOCK.
   session.step(evadeRight, 0.05);
   const forced = getCartForcedDodgeTrajectoryState(session);
   assert.ok(forced.correctedSerial >= 1, JSON.stringify(forced));
@@ -193,7 +187,13 @@ test("Phase94 returns after recovery without allocating new enemies", () => {
   const session = new CartArenaSession();
   enableCartTurboHunt(session);
   const enemyCount = session.enemies.length;
-  for (let index = 0; index < 610; index += 1) session.step(idleInput, 0.05);
+  const isolatedEscapeGasLife = session as unknown as { gas: number };
+  for (let index = 0; index < 610; index += 1) {
+    // This test owns escape cadence/pool reuse, not survival. Keep GAS life
+    // replenished so the passive driver cannot end the run before cycle two.
+    isolatedEscapeGasLife.gas = 1;
+    session.step(idleInput, 0.05);
+  }
   const escape = getCartEscapeRhythmState(session);
   assert.ok(escape.serial >= 2, JSON.stringify(escape));
   assert.equal(session.enemies.length, enemyCount);

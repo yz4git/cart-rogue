@@ -76,21 +76,31 @@ test("pressure cadence fills the long gaps around Pursuit events instead of leav
 test("Boss pressure is fast outside counter windows and Phase87 never destroys the overheat opening", () => {
   const session = new CartArenaSession();
   enableCartTurboHunt(session);
-  for (let index = 0; index < 3040; index += 1) session.step(idleInput, 0.05);
+  const isolatedPressureGasLife = session as unknown as { gas: number };
+  for (let index = 0; index < 3040; index += 1) {
+    // This regression owns boss-pressure/counter timing, not survival. Keep
+    // GAS life replenished as if recovery cells were collected so the passive
+    // test driver does not trigger the real GAS=0 defeat before inspection.
+    isolatedPressureGasLife.gas = 1;
+    session.step(idleInput, 0.05);
+  }
   assert.equal(getCartTurboHuntSnapshot(session)?.huntBossSpawned, true);
   const boss = session.enemies.find((enemy) => enemy.kind === "boss");
   if (!boss) throw new Error("boss missing");
 
   boss.hp = 250;
+  isolatedPressureGasLife.gas = 1;
   session.step(idleInput, 1 / 60);
   assert.equal(getCartTitanBossState(session).stage, "FURY");
   assert.ok(boss.moveSpeed >= CART_THREAT_PRESSURE_FURY_SPEED);
   assert.ok((boss.chargeCooldown ?? 99) <= CART_THREAT_PRESSURE_FURY_COOLDOWN + 0.05 || (boss.chargeTime ?? 0) > 0);
 
   for (let index = 0; index < 210 && getCartTitanPredatorState(session).mode !== "COUNTER"; index += 1) {
+    isolatedPressureGasLife.gas = 1;
     session.step(idleInput, 0.05);
   }
   assert.equal(getCartTitanPredatorState(session).mode, "COUNTER");
+  isolatedPressureGasLife.gas = 1;
   session.step(idleInput, 0.05);
   assert.ok(boss.moveSpeed <= 2.1);
   assert.ok((boss.chargeCooldown ?? 0) >= 3.6);
