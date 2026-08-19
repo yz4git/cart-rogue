@@ -47,6 +47,8 @@ jobs:
         run: npm run test:resources
       - name: Casual anime visual regression
         run: npm run test:visual
+      - name: Toy shape regression
+        run: npm run test:shape
       - name: iPhone landscape UI regression
         run: node --import tsx --test tests/cart-iphone-landscape-ui.test.ts
       - name: Test
