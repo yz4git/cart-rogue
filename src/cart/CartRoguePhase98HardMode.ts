@@ -142,7 +142,17 @@ function hardStateFor(session: CartArenaSession | Phase98Session): InternalHardS
 }
 
 function snapshotOf(state: InternalHardState): CartHardModeSnapshot {
-  return { ...state };
+  return {
+    difficulty: "hard",
+    hardMode: true,
+    integrity: state.integrity,
+    maxIntegrity: state.maxIntegrity,
+    gameOver: state.gameOver,
+    gameOverReason: state.gameOverReason,
+    raidHits: state.raidHits,
+    perfectDodges: state.perfectDodges,
+    pressureSerial: state.pressureSerial,
+  };
 }
 
 function broadcast(state: InternalHardState): void {
