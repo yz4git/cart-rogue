@@ -114,7 +114,14 @@ test("RAM TITAN Boss 2.0 has readable three-stage thresholds", () => {
 test("live hunt reaches Boss 2.0 fallback and transitions through BREAKOUT and FURY", () => {
   const session = new CartArenaSession();
   enableCartTurboHunt(session);
-  for (let index = 0; index < 3040; index += 1) session.step(idleInput, 0.05);
+  const isolatedBossGasLife = session as unknown as { gas: number };
+  for (let index = 0; index < 3040; index += 1) {
+    // This regression owns boss fallback timing, not survival. Keep the unified
+    // GAS life topped up as if recovery cells were collected so raid damage
+    // cannot terminate the deliberately passive 152-second simulation.
+    isolatedBossGasLife.gas = 1;
+    session.step(idleInput, 0.05);
+  }
   const hunt = getCartTurboHuntSnapshot(session);
   const boss = session.enemies.find((enemy) => enemy.kind === "boss");
   assert.equal(hunt?.huntBossSpawned, true);
@@ -125,12 +132,14 @@ test("live hunt reaches Boss 2.0 fallback and transitions through BREAKOUT and F
 
   if (!boss) throw new Error("boss missing");
   boss.hp = 500;
+  isolatedBossGasLife.gas = 1;
   session.step(idleInput, 1 / 60);
   let titan = getCartTitanBossState(session);
   assert.equal(titan.stage, "BREAKOUT");
   assert.ok(titan.armorSegments >= 2);
 
   boss.hp = 250;
+  isolatedBossGasLife.gas = 1;
   session.step(idleInput, 1 / 60);
   titan = getCartTitanBossState(session);
   assert.equal(titan.stage, "FURY");
@@ -139,6 +148,7 @@ test("live hunt reaches Boss 2.0 fallback and transitions through BREAKOUT and F
 
   boss.hp = 0;
   boss.alive = false;
+  isolatedBossGasLife.gas = 1;
   session.step(idleInput, 1 / 60);
   assert.equal(getCartTitanBossState(session).stage, "DOWN");
 });
