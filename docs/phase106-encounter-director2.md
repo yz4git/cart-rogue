@@ -22,7 +22,7 @@ Timed baseline rhythm:
 
 `OPENING -> PRESSURE -> DODGE -> COUNTER -> PRESSURE ...`
 
-Live gameplay can preempt that timeline:
+Live gameplay can preempt that timeline after the opening teaching cycle:
 
 - RAID hit / Pursuit failure -> `RECOVERY`
 - Perfect Dodge / Pursuit clear / Field Event clear -> `COUNTER`
@@ -33,11 +33,13 @@ Live gameplay can preempt that timeline:
 
 ## Authoritative scheduling gates
 
-`CartEncounterDirectorGate` keeps the old systems compatible when Phase106 is absent: its default policy is permissive. When Phase106 is installed, it publishes the current beat policy before the historical wrapper chain runs.
+`CartEncounterDirectorGate` keeps old systems compatible when Phase106 is absent: its default policy is permissive. When Phase106 is installed, it publishes the current beat policy before the historical wrapper chain runs.
 
 - Phase87 Threat Pressure may start a new pressure wave only while the current beat is `PRESSURE`.
 - Phase89 Hazard Combat Director may start a new FIELD RAID only while the current beat is `DODGE`.
-- Existing Pursuit/Escape systems remain event-driven. When either becomes active, Phase106 preempts into `CHASE` and removes FIELD RAID overlap rather than delaying the event itself.
+- Phase85 Pursuit and Phase94 Escape may not start until Phase106 has reached its first `DODGE`; after that, new chase events are admitted from a later `PRESSURE` beat.
+- This guarantees that a new run teaches one complete `OPENING -> PRESSURE -> DODGE -> COUNTER` cycle before chase events are allowed to interrupt the baseline rhythm.
+- Once Pursuit/Escape is active, Phase106 preempts into `CHASE` and removes FIELD RAID overlap.
 - Active legacy attacks are allowed to resolve where safe; `OPENING`, `COUNTER`, `CHASE`, `RECOVERY`, and `BOSS` still cancel FIELD RAID and suppress fresh normal-enemy charge.
 
 This makes the Director authoritative at **start time**, not only a cleanup layer after overlapping attacks have already appeared.
@@ -53,19 +55,20 @@ Hard keeps smarter Phase105 reads and higher pressure intensity, but still recei
 - enemy pool remains fixed at 19 Turbo Hunt slots
 - RAID pool remains fixed at four slots
 - no new Three.js meshes, shaders, post-processing, particles, or render-loop allocations
-- state and scheduling policy are stored per session in `WeakMap`s
+- state and scheduling policy are stored per session in `WeakMap`/`WeakSet` state
 - Phase106 is imported after Phase105 in `CartGameMenuRuntime` and does not rewrite the historical `CART_ROGUE_RUNTIME_PHASE_ORDER`
 
 ## Implemented acceptance contract
 
 - readable `OPENING -> PRESSURE -> DODGE -> COUNTER` baseline rhythm
+- first full baseline cycle is protected from new Pursuit/Escape starts
 - actual safe windows, not HUD-only labels
-- event-driven `CHASE`, `RECOVERY`, and `BOSS` preemption
+- gated `CHASE`, event-driven `RECOVERY`, and `BOSS` preemption
 - low-GAS mercy cannot create permanent immunity
 - Threat Pressure and FIELD RAID begin on separate beats
-- historical Phase87/89 unit behavior remains available when Phase106 is not installed
+- historical Phase85/87/89/94 behavior remains available when Phase106 is not installed
 - no additional spawn or render capacity
 
 ## Follow-up tuning after playtest
 
-Use gameplay telemetry and WebGL playtests to tune beat durations, Hard intensity, and how often Field Events/Pursuit preempt the baseline rhythm. Do not remove the counter/recovery guarantees merely to increase difficulty.
+Use gameplay telemetry and WebGL playtests to tune beat durations, Hard intensity, and how often Field Events/Pursuit preempt later baseline cycles. Do not remove the counter/recovery guarantees merely to increase difficulty.
