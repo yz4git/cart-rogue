@@ -51,11 +51,11 @@ const difficultyBySession = new WeakMap<object, CartRunDifficulty>();
 const stateBySession = new WeakMap<object, InternalRunState>();
 let latestSnapshot: CartHardModeSnapshot | null = null;
 
-export const CART_HARD_OPENING_GRACE_SECONDS = 2.4;
-export const CART_HARD_PRESSURE_INTERVAL_SECONDS = 2.65;
+export const CART_HARD_OPENING_GRACE_SECONDS = 2.6;
+export const CART_HARD_PRESSURE_INTERVAL_SECONDS = 2.8;
 export const CART_HARD_PRESSURE_TELEGRAPH_SECONDS = 0.95;
 export const CART_HARD_PRESSURE_FOLLOW_SECONDS = 0.28;
-export const CART_HARD_PRESSURE_MAX_EXISTING = 2;
+export const CART_HARD_PRESSURE_MAX_EXISTING = 1;
 export const CART_HARD_PRESSURE_LABEL = "HARD RAID";
 
 const MENU_PAUSE_EVENT = "cart-rogue-menu-pause";
