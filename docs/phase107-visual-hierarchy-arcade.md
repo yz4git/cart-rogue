@@ -28,3 +28,14 @@ Phase107 is a presentation-only pass over the Phase106 Turbo Hunt loop. It does 
 3. current objective / counter opportunity
 4. GAS and TURBO
 5. secondary stats and decorative information
+
+## Implemented presentation layers
+
+- compact top HUD and bottom GAS/TURBO footprint; development badge and steering help are hidden during Turbo Hunt
+- distinct RAID, damage, counter, escape, and field-event message palettes
+- smaller off-center damage burst and Face Editor cut-ins
+- five large directional landmarks plus eight muted far-depth pylons
+- macro sector ground markers for field scale/orientation
+- fixed 16-streak ground-speed layer, automatically reduced under frame pressure
+- hero rear-wing/turbine signature and stronger blocker/chaser/heavy/boss silhouettes
+- four fixed AOE vertical cage slots layered over the authoritative Phase104 ground footprint
