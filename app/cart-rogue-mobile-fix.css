@@ -38,29 +38,29 @@ section[aria-label="Cart Rogue game"] canvas.cart-rogue-canvas {
   top: max(5px, env(safe-area-inset-top)) !important;
   left: 50% !important;
   right: auto !important;
-  width: min(calc(100% - 24px), 720px) !important;
+  width: min(calc(100% - 32px), 680px) !important;
   transform: translateX(-50%) !important;
-  grid-template-columns: minmax(108px, .72fr) minmax(260px, 1.6fr) minmax(114px, .74fr) !important;
-  gap: 6px !important;
+  grid-template-columns: minmax(104px, .68fr) minmax(250px, 1.75fr) minmax(108px, .7fr) !important;
+  gap: 5px !important;
   align-items: start !important;
 }
 
 [aria-label="Turbo Hunt status"] > div {
   min-height: 0 !important;
-  border-radius: 8px !important;
-  background: linear-gradient(180deg, rgba(20, 42, 54, .72), rgba(14, 28, 39, .62)) !important;
+  border-radius: 7px !important;
+  background: linear-gradient(180deg, rgba(20, 42, 54, .7), rgba(14, 28, 39, .58)) !important;
   backdrop-filter: blur(4px) !important;
   -webkit-backdrop-filter: blur(4px) !important;
 }
 
 [aria-label="Turbo Hunt status"] > div:first-child,
 [aria-label="Turbo Hunt status"] > div:last-child {
-  padding: 5px 8px 6px !important;
+  padding: 4px 7px 5px !important;
 }
 
 [aria-label="Turbo Hunt status"] > div:nth-child(2) {
-  padding: 5px 8px 6px !important;
-  gap: 2px !important;
+  padding: 4px 7px 5px !important;
+  gap: 1px !important;
 }
 
 [aria-label="Turbo Hunt status"] > div:first-child > span:first-child {
@@ -69,13 +69,13 @@ section[aria-label="Cart Rogue game"] canvas.cart-rogue-canvas {
 
 [aria-label="Turbo Hunt status"] > div:first-child > strong {
   margin-top: 0 !important;
-  font-size: clamp(13px, 1.7vw, 18px) !important;
+  font-size: clamp(12px, 1.55vw, 17px) !important;
 }
 
 [aria-label="Turbo Hunt status"] > div:first-child > span:last-child {
-  margin-top: 2px !important;
+  margin-top: 1px !important;
   overflow: hidden !important;
-  font-size: 8px !important;
+  font-size: 7px !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
 }
@@ -84,15 +84,15 @@ section[aria-label="Cart Rogue game"] canvas.cart-rogue-canvas {
 [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:first-child strong,
 [aria-label="Turbo Hunt status"] > div:last-child span,
 [aria-label="Turbo Hunt status"] > div:last-child strong {
-  font-size: 8px !important;
+  font-size: 7px !important;
 }
 
 [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:nth-child(n+2):not(:last-child) {
-  min-height: 12px !important;
+  min-height: 11px !important;
   padding-top: 1px !important;
   padding-bottom: 1px !important;
-  font-size: 7px !important;
-  line-height: 1.1 !important;
+  font-size: 6.5px !important;
+  line-height: 1.05 !important;
 }
 
 [aria-label="Turbo Hunt status"] > div:nth-child(2):has(> div:nth-child(5)) > div:nth-child(3) {
@@ -105,33 +105,33 @@ section[aria-label="Cart Rogue game"] canvas.cart-rogue-canvas {
 }
 
 [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:last-child > div:last-child {
-  font-size: 7px !important;
+  font-size: 6.5px !important;
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
   [aria-label="Turbo Hunt status"] {
     top: max(3px, env(safe-area-inset-top)) !important;
-    width: min(calc(100% - 48px), 650px) !important;
-    grid-template-columns: 96px minmax(238px, 1fr) 104px !important;
+    width: min(calc(100% - 64px), 580px) !important;
+    grid-template-columns: 82px minmax(220px, 1fr) 88px !important;
     gap: 4px !important;
   }
 
   [aria-label="Turbo Hunt status"] > div:first-child,
   [aria-label="Turbo Hunt status"] > div:last-child {
-    padding: 4px 6px !important;
+    padding: 3px 5px 4px !important;
   }
 
   [aria-label="Turbo Hunt status"] > div:first-child > strong {
-    font-size: 12px !important;
+    font-size: 11px !important;
   }
 
   [aria-label="Turbo Hunt status"] > div:first-child > span:last-child {
     margin-top: 1px !important;
-    font-size: 6.5px !important;
+    font-size: 6px !important;
   }
 
   [aria-label="Turbo Hunt status"] > div:nth-child(2) {
-    padding: 3px 6px 4px !important;
+    padding: 3px 5px 3px !important;
     gap: 1px !important;
   }
 
@@ -144,14 +144,14 @@ section[aria-label="Cart Rogue game"] canvas.cart-rogue-canvas {
   [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:first-child strong,
   [aria-label="Turbo Hunt status"] > div:last-child span,
   [aria-label="Turbo Hunt status"] > div:last-child strong {
-    font-size: 6.5px !important;
+    font-size: 6px !important;
   }
 
   [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:nth-child(n+3):not(:last-child) {
-    min-height: 11px !important;
+    min-height: 10px !important;
     padding-top: 1px !important;
     padding-bottom: 1px !important;
-    font-size: 6.5px !important;
+    font-size: 6px !important;
   }
 
   [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:last-child > div:first-child,
