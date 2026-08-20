@@ -55,6 +55,8 @@ jobs:
         run: npm run test:fx
       - name: Enemy intelligence and balance regression
         run: npm run test:ai
+      - name: Visual hierarchy and arcade presentation regression
+        run: npm run test:presentation
       - name: iPhone landscape UI regression
         run: node --import tsx --test tests/cart-iphone-landscape-ui.test.ts
       - name: Test
