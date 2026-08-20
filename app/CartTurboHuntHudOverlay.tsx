@@ -177,7 +177,7 @@ export default function CartTurboHuntHudOverlay() {
     : "";
 
   let dangerText: string | null = null;
-  let dangerMode: "danger" | "counter" | "raid" | "hit" = "danger";
+  let dangerMode: "danger" | "counter" | "raid" | "hit" | "escape" = "danger";
   if (damageFeedback?.active && damageFeedback.flashSeconds > 0) {
     dangerText = `DIRECT HIT · LIFE/GAS -${damageFeedback.gasLossPercent}% · SPEED -${damageFeedback.speedLossPercent}%`;
     dangerMode = "hit";
@@ -202,6 +202,7 @@ export default function CartTurboHuntHudOverlay() {
     dangerText = `SURVIVE TITAN · ${predator.secondsRemaining.toFixed(1)}s${predator.perfectDodges > 0 ? ` · PERFECT ×${predator.perfectDodges}` : ""}`;
   } else if (pursuit?.active) {
     dangerText = `${pursuit.label} · ${pursuit.secondsRemaining.toFixed(1)}s`;
+    if (pursuit.kind === "BREAKOUT" || /ESCAPE|BREAK AWAY|CLEAR/i.test(pursuit.label)) dangerMode = "escape";
   } else if ((threat?.dodgeFlashSeconds ?? 0) > 0 && threat?.lastDodgeGrade === "PERFECT") {
     dangerText = `PERFECT DODGE · COUNTER ${Math.max(0, threat.counterSeconds).toFixed(1)}s`;
     dangerMode = "counter";
@@ -212,7 +213,37 @@ export default function CartTurboHuntHudOverlay() {
   return (
     <>
       <style>{`
-        .${legacyStyles.topHud}, .${legacyStyles.gateOpen}, .${routeStyles.panel} { display: none !important; }
+        .${legacyStyles.topHud}, .${legacyStyles.gateOpen}, .${routeStyles.panel}, .${legacyStyles.rendererBadge} { display: none !important; }
+        .${legacyStyles.bottomHud} {
+          left: max(8px, env(safe-area-inset-left)) !important;
+          right: max(8px, env(safe-area-inset-right)) !important;
+          bottom: max(6px, env(safe-area-inset-bottom)) !important;
+          grid-template-columns: minmax(138px, .82fr) auto minmax(138px, .82fr) !important;
+          gap: 8px !important;
+        }
+        .${legacyStyles.meterCard} { padding: 6px 8px 7px !important; max-width: 205px !important; border-radius: 10px !important; }
+        .${legacyStyles.turboCard} { width: min(190px, 100%) !important; }
+        .${legacyStyles.meterHead} strong { font-size: 14px !important; }
+        .${legacyStyles.meterHead} span { font-size: 7px !important; letter-spacing: .1em !important; }
+        .${legacyStyles.meterTrack} { height: 8px !important; margin-top: 4px !important; }
+        .${legacyStyles.chargeRow} { gap: 3px !important; margin-top: 4px !important; }
+        .${legacyStyles.chargeRow} i { height: 8px !important; }
+        .${legacyStyles.itemStrip} { gap: 5px !important; padding-bottom: 1px !important; }
+        .${legacyStyles.itemStrip} span { width: 34px !important; height: 34px !important; border-radius: 8px !important; font-size: 7px !important; }
+        .${legacyStyles.steerZone} span { display: none !important; }
+        .${legacyStyles.actions} { right: max(10px, env(safe-area-inset-right)) !important; bottom: max(52px, calc(env(safe-area-inset-bottom) + 45px)) !important; gap: 8px !important; }
+        .${legacyStyles.brakeButton} { width: 50px !important; height: 50px !important; border-radius: 14px !important; font-size: 8px !important; }
+        .${legacyStyles.boostButton} { width: 76px !important; height: 76px !important; border-radius: 20px !important; }
+        .${legacyStyles.boostButton} strong { font-size: 14px !important; }
+        .${legacyStyles.boostButton} small { margin-top: 3px !important; font-size: 7px !important; }
+        @media(max-height:360px) {
+          .${legacyStyles.bottomHud} { bottom: max(4px, env(safe-area-inset-bottom)) !important; gap: 6px !important; }
+          .${legacyStyles.meterCard} { padding: 5px 7px 6px !important; max-width: 184px !important; }
+          .${legacyStyles.itemStrip} span { width: 31px !important; height: 31px !important; }
+          .${legacyStyles.actions} { bottom: max(46px, calc(env(safe-area-inset-bottom) + 40px)) !important; }
+          .${legacyStyles.brakeButton} { width: 46px !important; height: 46px !important; }
+          .${legacyStyles.boostButton} { width: 70px !important; height: 70px !important; }
+        }
       `}</style>
       {damageFeedback?.active && damageFeedback.flashSeconds > 0 && (
         <div className={styles.damageOverlay} aria-live="assertive" aria-label="Damage taken">
@@ -223,7 +254,7 @@ export default function CartTurboHuntHudOverlay() {
           </div>
         </div>
       )}
-      <div className={styles.hud} aria-label="Turbo Hunt status">
+      <div className={styles.hud} aria-label="Turbo Hunt status" data-phase107-hierarchy="true">
         <div className={styles.card}>
           <span className={styles.kicker}>CART ROGUE</span>
           <strong className={styles.title}>TURBO HUNT</strong>
@@ -245,7 +276,7 @@ export default function CartTurboHuntHudOverlay() {
             </div>
           )}
           {dangerText && (
-            <div className={`${styles.threatLine} ${dangerMode === "counter" ? styles.counterHot : dangerMode === "raid" ? styles.raidHot : dangerMode === "hit" ? styles.damageHit : styles.threatHot}`}>
+            <div className={`${styles.threatLine} ${dangerMode === "counter" ? styles.counterHot : dangerMode === "raid" ? styles.raidHot : dangerMode === "hit" ? styles.damageHit : dangerMode === "escape" ? styles.escapeHot : styles.threatHot}`}>
               {dangerText}
             </div>
           )}
