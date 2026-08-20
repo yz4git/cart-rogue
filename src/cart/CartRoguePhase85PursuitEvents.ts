@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
+import { cartEncounterAllowsChaseStart } from "./CartEncounterDirectorGate";
 import type { CartEnemyState } from "./CartCombat";
 import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
 import { isCartTurboHuntEnabled } from "./CartRoguePhase67TurboHunt";
@@ -405,7 +406,7 @@ export function installCartRoguePhase85PursuitEvents(): void {
       updateActiveEvent(this, state, delta);
     } else {
       state.cooldownSeconds = Math.max(0, state.cooldownSeconds - delta);
-      if (state.cooldownSeconds <= 0) startEvent(this, state);
+      if (state.cooldownSeconds <= 0 && cartEncounterAllowsChaseStart(session)) startEvent(this, state);
     }
 
     state.broadcastClock += delta;

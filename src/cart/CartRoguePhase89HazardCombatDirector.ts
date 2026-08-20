@@ -1,5 +1,6 @@
 import type { RallyInputState } from "../rally/RallyTypes";
 import { CartArenaSession } from "./CartArenaSession";
+import { cartEncounterAllowsFieldRaid } from "./CartEncounterDirectorGate";
 import { cartRaidDonutInterceptLead, cartRaidInterceptLead } from "./CartRaidHazardIntercept";
 import { isCartTurboHuntEnabled } from "./CartRoguePhase67TurboHunt";
 import { getCartTitanBossState } from "./CartRoguePhase83Boss2";
@@ -216,7 +217,11 @@ export function installCartRoguePhase89HazardCombatDirector(): void {
       state.cooldownSeconds = Math.min(Math.max(state.cooldownSeconds, 0), 1.2);
     } else {
       state.cooldownSeconds = Math.max(0, state.cooldownSeconds - delta);
-      if (state.fieldHazards === 0 && state.cooldownSeconds <= 0) scheduleNext(session, state);
+      if (
+        state.fieldHazards === 0
+        && state.cooldownSeconds <= 0
+        && cartEncounterAllowsFieldRaid(session)
+      ) scheduleNext(session, state);
     }
 
     state.broadcastClock += delta;

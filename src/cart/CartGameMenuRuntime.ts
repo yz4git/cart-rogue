@@ -1,6 +1,7 @@
 import "./CartRoguePhase103ConfigBalance";
 import "./CartRoguePhase104ImpactAoeOverhaul";
 import "./CartRoguePhase105EnemyIntelligenceBalance";
+import "./CartRoguePhase106EncounterDirector2";
 import { CartRogueCanvasPreview } from "./CartRogueCanvasPreview";
 import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
 
