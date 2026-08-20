@@ -3,6 +3,7 @@ import "./CartRoguePhase104ImpactAoeOverhaul";
 import "./CartRoguePhase105EnemyIntelligenceBalance";
 import "./CartRoguePhase106EncounterDirector2";
 import "./CartRoguePhase107VisualHierarchyArcade";
+import "./CartRoguePhase108CoreLoopRebuild";
 import { CartRogueCanvasPreview } from "./CartRogueCanvasPreview";
 import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
 

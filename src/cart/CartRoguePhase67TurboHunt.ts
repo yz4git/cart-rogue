@@ -152,6 +152,16 @@ const FIELD_MARGIN = 5.2;
 const HUNT_MAX_SPEED = 22.5;
 const HUNT_BOSS_MIN_SECONDS = 105;
 const HUNT_BOSS_FALLBACK_SECONDS = 150;
+let externalProgressionEnabled = false;
+
+export function setCartTurboHuntExternalProgressionEnabled(enabled: boolean): void {
+  externalProgressionEnabled = enabled;
+}
+
+export function setCartTurboHuntExternalOrdersCompleted(session: CartArenaSession, completed: number): void {
+  const state = stateFor(session);
+  state.ordersCompleted = Math.max(0, Math.floor(completed));
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -655,6 +665,13 @@ function spawnBoss(session: MutableHuntSession, state: TurboHuntState): void {
   setReward(session, "RAM TITAN INBOUND · KEEP THE FLOW ALIVE", 3.2);
 }
 
+export function forceCartTurboHuntBoss(session: CartArenaSession): void {
+  const raw = session as unknown as MutableHuntSession;
+  const state = stateFor(raw);
+  if (!state.enabled) return;
+  spawnBoss(raw, state);
+}
+
 function updateDirector(session: MutableHuntSession, state: TurboHuntState, delta: number): void {
   state.elapsed += delta;
   state.heatIdle += delta;
@@ -664,9 +681,15 @@ function updateDirector(session: MutableHuntSession, state: TurboHuntState, delt
   handleObstacleTransitions(session, state);
   handleCombatSignals(session, state);
 
-  if (state.objective.progress >= state.objective.target) completeObjective(session, state);
+  if (!externalProgressionEnabled && state.objective.progress >= state.objective.target) {
+    completeObjective(session, state);
+  }
 
-  if (!state.bossSpawned && cartTurboHuntShouldSpawnBoss(state.elapsed, state.kills, state.ordersCompleted, state.heat)) {
+  if (
+    !externalProgressionEnabled
+    && !state.bossSpawned
+    && cartTurboHuntShouldSpawnBoss(state.elapsed, state.kills, state.ordersCompleted, state.heat)
+  ) {
     spawnBoss(session, state);
   }
   const boss = session.enemies.find((enemy) => enemy.kind === "boss");

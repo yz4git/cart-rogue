@@ -56,6 +56,13 @@ export function cartTurboStrikeLaneHalfWidth(charge: number): number {
   return 1.45 + clamp(charge, 0, 1) * 1.15;
 }
 
+export function cartTurboStrikeKnockbackDistance(charge: number, destroyed: boolean): number {
+  const normalized = clamp(charge, 0, 1);
+  return destroyed
+    ? 8.5 + normalized * 6.5
+    : 2.6 + normalized * 3.4;
+}
+
 export function cartTurboStrikeCanReach(
   playerX: number,
   playerZ: number,
@@ -166,11 +173,14 @@ export function installCartRoguePhase55TurboStrike(): void {
 
     const forwardX = Math.sin(this.car.heading);
     const forwardZ = Math.cos(this.car.heading);
-    const knock = result.destroyed ? 2.35 : 1.05 + attack.charge * 0.85;
+    const knock = cartTurboStrikeKnockbackDistance(attack.charge, result.destroyed);
     target.x += forwardX * knock;
     target.z += forwardZ * knock;
 
-    this.car.collisionImpact = Math.max(this.car.collisionImpact, 0.62 + attack.charge * 0.28);
+    this.car.collisionImpact = Math.max(
+      this.car.collisionImpact,
+      result.destroyed ? 1.0 + attack.charge * 0.26 : 0.74 + attack.charge * 0.3,
+    );
     this.car.boostTimeRemaining = Math.min(3.2, this.car.boostTimeRemaining + 0.04 + attack.charge * 0.055);
     if (result.destroyed) this.car.ramCount += 1;
 
