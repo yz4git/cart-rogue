@@ -266,11 +266,11 @@ export default function CartTurboHuntHudOverlay() {
 
         <div className={styles.orderCard}>
           <div className={styles.orderHead}>
-            <span className={styles.orderType}>HUNT ORDER · {snapshot.huntObjectiveKind}</span>
+            <span className={styles.orderType}>CONTRACT · {snapshot.huntObjectiveKind}</span>
             <strong>{Math.floor(snapshot.huntObjectiveProgress)} / {snapshot.huntObjectiveTarget}</strong>
           </div>
           <div className={styles.orderLabel}>{snapshot.huntObjectiveLabel}</div>
-          {fieldEvent && (
+          {eventActive && fieldEvent && (
             <div className={`${styles.eventLine} ${eventActive ? styles.eventActive : ""}`}>
               <span>{eventActive ? `FIELD EVENT · ${eventName(fieldEvent.eventKind)}` : "FIELD EVENT · SHIFTING"}</span>
               <strong>{eventActive ? `${Math.floor(fieldEvent.eventProgress)} / ${fieldEvent.eventTarget}` : "..."}</strong>
@@ -284,7 +284,7 @@ export default function CartTurboHuntHudOverlay() {
           <div>
             <div className={styles.progressTrack}><i style={{ width: `${objectivePercent}%` }} /></div>
             <div className={styles.orderFoot}>
-              <span>ORDERS {snapshot.huntOrdersCompleted}</span>
+              <span>CONTRACTS {snapshot.huntOrdersCompleted}</span>
               <span className={chain >= 12 ? styles.flowHot : undefined}>FLOW ×{chain}</span>
               <span>TARGET {target}</span>
             </div>

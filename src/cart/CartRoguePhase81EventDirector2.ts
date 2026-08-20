@@ -69,6 +69,11 @@ export const CART_TURBO_HUNT_EVENT_CHAIN_CAP = 16;
 export const CART_TURBO_HUNT_EVENT_CHAIN_WINDOW = 3.1;
 export const CART_TURBO_HUNT_OVERDRIVE_MAX_SPEED = 25.6;
 export const CART_TURBO_HUNT_OVERDRIVE_HANDLING_MULTIPLIER = 1.025;
+let fieldEventAutostartEnabled = true;
+
+export function setCartTurboHuntFieldEventAutostartEnabled(enabled: boolean): void {
+  fieldEventAutostartEnabled = enabled;
+}
 
 const REGION_EVENT_ROTATION: Readonly<Record<CartTurboHuntRegion, readonly CartTurboHuntEventKind[]>> = {
   "DROP YARD": ["SMASH_ZONE", "CONVOY", "TURBO_RUSH"],
@@ -456,7 +461,7 @@ export function installCartRoguePhase81EventDirector2(): void {
       if (state.eventSecondsRemaining <= 0) finishEvent(this, state, false);
     } else {
       state.cooldownSeconds = Math.max(0, state.cooldownSeconds - delta);
-      if (state.cooldownSeconds <= 0) startEvent(this, state);
+      if (state.cooldownSeconds <= 0 && fieldEventAutostartEnabled) startEvent(this, state);
     }
 
     state.broadcastClock += delta;
