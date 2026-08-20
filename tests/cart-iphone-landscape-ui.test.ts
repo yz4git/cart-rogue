@@ -8,6 +8,7 @@ const mobileFix = readFileSync(new URL("../app/cart-rogue-mobile-fix.css", impor
 const legacyGameCss = readFileSync(new URL("../app/CartRogueGame.module.css", import.meta.url), "utf8");
 const gameMenu = readFileSync(new URL("../app/CartGameMenu.tsx", import.meta.url), "utf8");
 const menuConfigCss = readFileSync(new URL("../app/CartGameMenuConfig.module.css", import.meta.url), "utf8");
+const phase107 = readFileSync(new URL("../src/cart/CartRoguePhase107VisualHierarchyArcade.ts", import.meta.url), "utf8");
 
 test("iPhone landscape shell follows the measured visual viewport without the iOS fixed-bottom path", () => {
   assert.match(layout, /import "\.\/cart-rogue-mobile-fix\.css"/);
@@ -31,11 +32,11 @@ test("iPhone landscape shell follows the measured visual viewport without the iO
   assert.match(legacyGameCss, /min-height:100vh/);
 });
 
-test("Turbo Hunt HUD has a compact iPhone-landscape contract", () => {
+test("Turbo Hunt HUD has the Phase107 compact iPhone-landscape contract", () => {
   assert.match(mobileFix, /\[aria-label="Turbo Hunt status"\]/);
   assert.match(mobileFix, /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*500px\)/);
-  assert.match(mobileFix, /width:\s*min\(calc\(100% - 48px\),\s*650px\)\s*!important/);
-  assert.match(mobileFix, /grid-template-columns:\s*96px\s+minmax\(238px,\s*1fr\)\s+104px\s*!important/);
+  assert.match(mobileFix, /width:\s*min\(calc\(100% - 64px\),\s*580px\)\s*!important/);
+  assert.match(mobileFix, /grid-template-columns:\s*82px\s+minmax\(220px,\s*1fr\)\s+88px\s*!important/);
   assert.match(mobileFix, /div:nth-child\(2\)\s*>\s*div:nth-child\(2\)[\s\S]*display:\s*none\s*!important/);
   assert.match(mobileFix, /div:last-child\s*>\s*div:last-child[\s\S]*display:\s*none\s*!important/);
 });
@@ -58,11 +59,11 @@ test("pause screen exposes config and title return while config remains compact 
   assert.match(menuConfigCss, /@media\(max-height:460px\)/);
 });
 
-test("anime cut-ins use a slightly smaller presentation footprint on iPhone landscape", () => {
+test("anime cut-ins retain the Phase103 fallback and Phase107 adds a smaller final override", () => {
   assert.match(menuConfigCss, /#cart-anime-cutin-v1/);
   assert.match(menuConfigCss, /width:min\(39vw,390px\)!important/);
   assert.match(menuConfigCss, /height:clamp\(98px,36vh,142px\)!important/);
-  assert.match(menuConfigCss, /orientation:landscape/);
-  assert.match(menuConfigCss, /max-height:500px/);
-  assert.match(menuConfigCss, /width:min\(37vw,360px\)!important/);
+  assert.match(phase107, /width:min\(34vw,318px\)!important/);
+  assert.match(phase107, /height:clamp\(92px,31vh,126px\)!important/);
+  assert.match(phase107, /width:min\(32vw,278px\)!important/);
 });
