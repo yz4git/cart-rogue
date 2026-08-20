@@ -22,6 +22,7 @@ import {
 } from "../src/cart/CartRoguePhase91DamageFeedback2";
 import { getLatestCartHardModeState } from "../src/cart/CartRoguePhase98HardMode";
 import legacyStyles from "./CartRogueGame.module.css";
+import phaseStyles from "./CartRoguePhase3.module.css";
 import routeStyles from "./CartRunRouteMap.module.css";
 import styles from "./CartTurboHuntHudOverlay.module.css";
 
@@ -213,7 +214,7 @@ export default function CartTurboHuntHudOverlay() {
   return (
     <>
       <style>{`
-        .${legacyStyles.topHud}, .${legacyStyles.gateOpen}, .${routeStyles.panel}, .${legacyStyles.rendererBadge} { display: none !important; }
+        .${legacyStyles.topHud}, .${legacyStyles.gateOpen}, .${routeStyles.panel}, .${legacyStyles.rendererBadge}, .${phaseStyles.rewardBanner} { display: none !important; }
         .${legacyStyles.bottomHud} {
           left: max(8px, env(safe-area-inset-left)) !important;
           right: max(8px, env(safe-area-inset-right)) !important;
