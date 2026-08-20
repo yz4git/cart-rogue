@@ -62,11 +62,21 @@ test("Phase107 adds macro landmarks, hero/enemy silhouettes, speed streaks and v
 test("Phase107 compresses persistent HUD while preserving touch targets", () => {
   assert.match(overlaySource, /rendererBadge/);
   assert.match(overlaySource, /steerZone/);
+  assert.match(overlaySource, /phaseStyles\.rewardBanner/);
   assert.match(overlaySource, /width: 46px !important/);
   assert.match(overlaySource, /width: 70px !important/);
   assert.match(mobileCss, /width:\s*min\(calc\(100% - 64px\),\s*580px\)\s*!important/);
   assert.match(mobileCss, /grid-template-columns:\s*82px\s+minmax\(220px,\s*1fr\)\s+88px\s*!important/);
   assert.match(overlayCss, /min-height:\s*36px/);
+});
+
+test("Phase107 removes duplicate center reward banners and uses compact typed messages instead", () => {
+  assert.match(overlaySource, /import phaseStyles from "\.\/CartRoguePhase3\.module\.css"/);
+  assert.match(overlaySource, /\.\$\{phaseStyles\.rewardBanner\}\s*\{ display: none !important; \}/);
+  assert.match(overlaySource, /FIELD EVENT/);
+  assert.match(overlaySource, /DIRECT HIT/);
+  assert.match(overlaySource, /PERFECT AOE DODGE/);
+  assert.match(overlaySource, /ESCAPE\|BREAK AWAY\|CLEAR/);
 });
 
 test("Phase107 gives damage, counter, RAID, escape and field events different arcade languages", () => {
