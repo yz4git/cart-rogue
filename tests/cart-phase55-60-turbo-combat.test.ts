@@ -106,7 +106,7 @@ test("Phases 55-60 turn one charged release into enemy strike, rock smash, Flow 
 test("Phase 60 safety helpers recover non-finite combat state and cap final envelopes", () => {
   assert.equal(cartTurboCombatSafeNumber(Number.NaN, 3), 3);
   assert.equal(cartTurboCombatSafeNumber(Number.POSITIVE_INFINITY, 2), 2);
-  assert.equal(cartTurboCombatSafeNumber(x4.5, 2), 4.5);
+  assert.equal(cartTurboCombatSafeNumber(4.5, 2), 4.5);
   assert.ok(cartTurboCombatSpeedCap(20, 1) > cartTurboCombatSpeedCap(20, 0));
   assert.ok(cartTurboCombatLateralCap(18, 1) >= cartTurboCombatLateralCap(18, 0));
 });
@@ -129,7 +129,7 @@ test("Phase 59 presentation remains procedural and the Phase 55-60 stack stays o
   let previousIndex = runtimeSource.indexOf("CartRoguePhase54TurboAttack");
   for (const phase of phaseNames) {
     const index = runtimeSource.indexOf(phase);
-    assert.ok(index > previousIndex,  `${phase} must follow the previous Gameplay 2.0 phase`);
+    assert.ok(index > previousIndex, `${phase} must follow the previous Gameplay 2.0 phase`);
     previousIndex = index;
   }
 });
