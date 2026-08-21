@@ -21,14 +21,15 @@ test("Audio Overdrive raises engine/turbo energy with speed, boost and HEAT", ()
   assert.ok(turbo.pulseSeconds < fast.pulseSeconds);
 });
 
-test("Phase111.1 keeps continuous engine and Turbo below the transient headroom ceiling", () => {
+test("Phase111.2 keeps continuous engine and Turbo far below gameplay transient headroom", () => {
   const fast = cartPhase111AudioMix(26, false, 5);
   const turbo = cartPhase111AudioMix(26, true, 5);
-  assert.ok(fast.engineGain <= 0.018);
-  assert.ok(turbo.engineGain <= 0.02);
-  assert.ok(turbo.turboGain <= 0.01);
-  assert.ok(turbo.engineFilterFrequency <= 1100);
-  assert.ok(turbo.musicGain > turbo.turboGain);
+  assert.ok(fast.engineGain <= 0.0051);
+  assert.ok(turbo.engineGain <= 0.0058);
+  assert.ok(turbo.turboGain <= 0.0017);
+  assert.ok(turbo.engineFilterFrequency <= 720);
+  assert.ok(turbo.musicGain > turbo.engineGain);
+  assert.ok(turbo.musicGain > turbo.turboGain * 5);
 });
 
 test("Paused audio mix silences continuous channels", () => {
@@ -42,6 +43,14 @@ test("Chain pitch climbs while transient voice count stays bounded", () => {
   assert.ok(cartPhase111ChainPitch(6) > cartPhase111ChainPitch(2));
   assert.ok(cartPhase111ChainPitch(99) <= cartPhase111ChainPitch(10));
   assert.ok(CART_PHASE111_MAX_TRANSIENT_VOICES <= 16);
+});
+
+test("Phase111.2 ducks continuous vehicle beds whenever transient gameplay cues fire", () => {
+  assert.match(phase111Source, /duckUntil/);
+  assert.match(phase111Source, /const duck = now < this\.duckUntil \? 0\.22 : 1/);
+  assert.match(phase111Source, /mix\.engineGain \* duck/);
+  assert.match(phase111Source, /mix\.turboGain \* duck/);
+  assert.match(phase111Source, /this\.duckUntil = Math\.max\(this\.duckUntil, end \+ 0\.06\)/);
 });
 
 test("Phase111 unlocks iPhone audio from interaction and reacts to core combat states", () => {
