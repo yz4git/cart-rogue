@@ -21,6 +21,16 @@ test("Audio Overdrive raises engine/turbo energy with speed, boost and HEAT", ()
   assert.ok(turbo.pulseSeconds < fast.pulseSeconds);
 });
 
+test("Phase111.1 keeps continuous engine and Turbo below the transient headroom ceiling", () => {
+  const fast = cartPhase111AudioMix(26, false, 5);
+  const turbo = cartPhase111AudioMix(26, true, 5);
+  assert.ok(fast.engineGain <= 0.018);
+  assert.ok(turbo.engineGain <= 0.02);
+  assert.ok(turbo.turboGain <= 0.01);
+  assert.ok(turbo.engineFilterFrequency <= 1100);
+  assert.ok(turbo.musicGain > turbo.turboGain);
+});
+
 test("Paused audio mix silences continuous channels", () => {
   const paused = cartPhase111AudioMix(24, true, 5, true);
   assert.equal(paused.engineGain, 0);
@@ -45,6 +55,8 @@ test("Phase111 unlocks iPhone audio from interaction and reacts to core combat s
   assert.match(phase111Source, /cueRam/);
   assert.match(phase111Source, /cueSmash/);
   assert.match(phase111Source, /cueDamage/);
+  assert.match(phase111Source, /createBiquadFilter/);
+  assert.match(phase111Source, /engineFilter/);
 });
 
 test("Audio Overdrive covers both WebGL and Canvas fallback and composes after Phase110", () => {
