@@ -5,7 +5,7 @@ import { getCartPlayerDamageFeedbackState } from "./CartRoguePhase91DamageFeedba
 import { getCartTurboDominoState, type CartTurboDominoSnapshot, type CartTurboDominoStage } from "./CartRoguePhase110TurboDominoCoreLoop";
 
 type AudioContextConstructor = new () => AudioContext;
-export const CART_PHASE111_AUDIO_OVERDRIVE_ID = "phase111-cart-rogue-audio-overdrive-v1.1-balanced";
+export const CART_PHASE111_AUDIO_OVERDRIVE_ID = "phase111-cart-rogue-audio-overdrive-v1.2-quieter-beds";
 export const CART_PHASE111_MAX_TRANSIENT_VOICES = 12;
 
 export interface CartPhase111AudioMix {
@@ -17,14 +17,14 @@ export interface CartPhase111AudioMix {
 export function cartPhase111AudioMix(speed: number, boostActive: boolean, heatLevel: number, paused = false): CartPhase111AudioMix {
   const absoluteSpeed = Math.max(0, Math.abs(speed));
   const heat = Math.max(1, Math.min(5, Math.floor(heatLevel)));
-  if (paused) return { engineFrequency: 72, engineGain: 0, engineFilterFrequency: 520, turboFrequency: 180, turboGain: 0, musicFrequency: 92, musicGain: 0, pulseSeconds: 0.55 };
+  if (paused) return { engineFrequency: 70, engineGain: 0, engineFilterFrequency: 420, turboFrequency: 150, turboGain: 0, musicFrequency: 92, musicGain: 0, pulseSeconds: 0.55 };
   const speedRatio = Math.min(1, absoluteSpeed / 26);
   return {
-    engineFrequency: 72 + absoluteSpeed * 6.2 + (boostActive ? 34 : 0) + (heat - 1) * 2.2,
-    engineGain: 0.006 + speedRatio * 0.011 + (boostActive ? 0.0025 : 0),
-    engineFilterFrequency: 560 + speedRatio * 360 + (boostActive ? 90 : 0),
-    turboFrequency: 170 + absoluteSpeed * 8.5 + heat * 12,
-    turboGain: boostActive ? 0.0055 + heat * 0.0008 : 0.0001,
+    engineFrequency: 70 + absoluteSpeed * 5.5 + (boostActive ? 18 : 0) + (heat - 1) * 1.6,
+    engineGain: 0.0018 + speedRatio * 0.0032 + (boostActive ? 0.0007 : 0),
+    engineFilterFrequency: 420 + speedRatio * 220 + (boostActive ? 60 : 0),
+    turboFrequency: 150 + absoluteSpeed * 6.5 + heat * 8,
+    turboGain: boostActive ? 0.0009 + heat * 0.00015 : 0.0001,
     musicFrequency: 92 + (heat - 1) * 9.5,
     musicGain: 0.0075 + (heat - 1) * 0.00125,
     pulseSeconds: Math.max(0.2, 0.58 - (heat - 1) * 0.075),
@@ -56,6 +56,7 @@ class CartRogueAudioOverdrive {
   private initialized = false;
   private activationCuePlayed = false;
   private transientVoices = 0;
+  private duckUntil = 0;
   private previousBoost = false;
   private previousRam = "";
   private previousHeat = 1;
@@ -141,10 +142,10 @@ class CartRogueAudioOverdrive {
     const context = new AudioContextClass();
     const master = context.createGain(); master.gain.value = 0.0001; master.connect(context.destination);
     const engineGain = context.createGain(); engineGain.gain.value = 0.0001;
-    const engineFilter = context.createBiquadFilter(); engineFilter.type = "lowpass"; engineFilter.frequency.value = 560; engineFilter.Q.value = 0.5; engineFilter.connect(engineGain).connect(master);
-    const engine = context.createOscillator(); engine.type = "sawtooth"; engine.frequency.value = 72; engine.connect(engineFilter); engine.start();
+    const engineFilter = context.createBiquadFilter(); engineFilter.type = "lowpass"; engineFilter.frequency.value = 420; engineFilter.Q.value = 0.5; engineFilter.connect(engineGain).connect(master);
+    const engine = context.createOscillator(); engine.type = "sawtooth"; engine.frequency.value = 70; engine.connect(engineFilter); engine.start();
     const turboGain = context.createGain(); turboGain.gain.value = 0.0001; turboGain.connect(master);
-    const turbo = context.createOscillator(); turbo.type = "triangle"; turbo.frequency.value = 170; turbo.connect(turboGain); turbo.start();
+    const turbo = context.createOscillator(); turbo.type = "triangle"; turbo.frequency.value = 150; turbo.connect(turboGain); turbo.start();
     const musicGain = context.createGain(); musicGain.gain.value = 0.0001; musicGain.connect(master);
     const music = context.createOscillator(); music.type = "triangle"; music.frequency.value = 92; music.connect(musicGain); music.start();
     this.context = context; this.master = master; this.engine = engine; this.engineFilter = engineFilter; this.engineGain = engineGain; this.turbo = turbo; this.turboGain = turboGain; this.music = music; this.musicGain = musicGain; this.noiseBuffer = this.makeNoise(context);
@@ -153,16 +154,17 @@ class CartRogueAudioOverdrive {
   private updateContinuous(mix: CartPhase111AudioMix, domino: CartTurboDominoSnapshot): void {
     if (!this.context || !this.engine || !this.engineFilter || !this.engineGain || !this.turbo || !this.turboGain || !this.music || !this.musicGain) return;
     const now = this.context.currentTime;
-    this.engine.frequency.setTargetAtTime(mix.engineFrequency, now, 0.04); this.engineFilter.frequency.setTargetAtTime(mix.engineFilterFrequency, now, 0.06); this.engineGain.gain.setTargetAtTime(mix.engineGain, now, 0.07);
-    this.turbo.frequency.setTargetAtTime(mix.turboFrequency, now, 0.035); this.turboGain.gain.setTargetAtTime(mix.turboGain, now, 0.055);
+    const duck = now < this.duckUntil ? 0.22 : 1;
+    this.engine.frequency.setTargetAtTime(mix.engineFrequency, now, 0.05); this.engineFilter.frequency.setTargetAtTime(mix.engineFilterFrequency, now, 0.07); this.engineGain.gain.setTargetAtTime(mix.engineGain * duck, now, duck < 1 ? 0.018 : 0.09);
+    this.turbo.frequency.setTargetAtTime(mix.turboFrequency, now, 0.045); this.turboGain.gain.setTargetAtTime(mix.turboGain * duck, now, duck < 1 ? 0.018 : 0.085);
     const urgent = domino.stage === "HUNTED" || domino.stage === "COUNTERATTACK" || domino.stage === "TITAN";
     const pulse = urgent ? ((now % mix.pulseSeconds) / mix.pulseSeconds < 0.22 ? 1.48 : 0.74) : 0.86 + Math.sin(now * 4.2) * 0.1;
     const frequency = domino.stage === "TITAN" ? mix.musicFrequency * 0.72 : domino.stage === "COUNTERATTACK" ? mix.musicFrequency * 1.45 : mix.musicFrequency;
     this.music.frequency.setTargetAtTime(frequency, now, 0.055); this.musicGain.gain.setTargetAtTime(Math.max(0.0001, mix.musicGain * pulse), now, 0.05);
   }
 
-  private cueTurboStart(heat: number): void { const h = Math.max(1, Math.min(5, heat)); this.tone({ frequency: 180 + h * 13, duration: 0.15, gain: 0.08, type: "triangle", sweepTo: 620 + h * 34 }); this.noise(0.1, 0.052, 1600 + h * 170); }
-  private cueTurboEnd(): void { this.tone({ frequency: 280, duration: 0.12, gain: 0.058, type: "triangle", sweepTo: 130 }); }
+  private cueTurboStart(heat: number): void { const h = Math.max(1, Math.min(5, heat)); this.tone({ frequency: 180 + h * 13, duration: 0.15, gain: 0.064, type: "triangle", sweepTo: 620 + h * 34 }); this.noise(0.1, 0.04, 1600 + h * 170); }
+  private cueTurboEnd(): void { this.tone({ frequency: 280, duration: 0.12, gain: 0.05, type: "triangle", sweepTo: 130 }); }
   private cueRam(damage: number, combo: number): void { const s = Math.max(0, Math.min(1, damage / 160)); const base = 92 + s * 36; this.tone({ frequency: base, duration: 0.115, gain: 0.12, type: "square", sweepTo: base * 0.56 }); this.noise(0.095, 0.086, 820 + s * 760); if (combo >= 2) this.tone({ frequency: cartPhase111ChainPitch(combo), duration: 0.085, gain: 0.064, type: "triangle", delay: 0.035 }); }
   private cueEnemyDestroyed(kind: CartArenaSessionSnapshot["enemies"][number]["kind"]): void { if (kind === "boss") { this.tone({ frequency: 82, duration: 0.36, gain: 0.13, type: "sawtooth", sweepTo: 42 }); this.noise(0.22, 0.105, 650); return; } const frequency = kind === "heavy" ? 112 : kind === "chaser" ? 150 : 134; this.tone({ frequency, duration: 0.14, gain: 0.086, type: "square", sweepTo: frequency * 0.7 }); this.noise(0.07, 0.052, kind === "heavy" ? 680 : 880); }
   private cueSmash(): void { this.tone({ frequency: 190, duration: 0.11, gain: 0.088, type: "square", sweepTo: 88 }); this.noise(0.12, 0.084, 1100); }
@@ -180,6 +182,7 @@ class CartRogueAudioOverdrive {
   private tone(options: Tone): void {
     if (!this.context || !this.master || this.transientVoices >= CART_PHASE111_MAX_TRANSIENT_VOICES) return;
     const oscillator = this.context.createOscillator(); const gain = this.context.createGain(); const start = this.context.currentTime + Math.max(0, options.delay ?? 0); const end = start + Math.max(0.025, options.duration);
+    this.duckUntil = Math.max(this.duckUntil, end + 0.06);
     oscillator.type = options.type ?? "triangle"; oscillator.frequency.setValueAtTime(Math.max(30, options.frequency), start); if (options.sweepTo !== undefined) oscillator.frequency.exponentialRampToValueAtTime(Math.max(30, options.sweepTo), end);
     gain.gain.setValueAtTime(Math.max(0.0001, options.gain), start); gain.gain.exponentialRampToValueAtTime(0.0001, end); oscillator.connect(gain).connect(this.master); this.transientVoices += 1; oscillator.onended = () => { this.transientVoices = Math.max(0, this.transientVoices - 1); }; oscillator.start(start); oscillator.stop(end + 0.015);
   }
@@ -187,6 +190,7 @@ class CartRogueAudioOverdrive {
   private noise(duration: number, gainValue: number, filterFrequency: number, delay = 0): void {
     if (!this.context || !this.master || !this.noiseBuffer || this.transientVoices >= CART_PHASE111_MAX_TRANSIENT_VOICES) return;
     const source = this.context.createBufferSource(); const filter = this.context.createBiquadFilter(); const gain = this.context.createGain(); const start = this.context.currentTime + Math.max(0, delay); const end = start + Math.max(0.03, duration);
+    this.duckUntil = Math.max(this.duckUntil, end + 0.06);
     source.buffer = this.noiseBuffer; filter.type = "lowpass"; filter.frequency.setValueAtTime(Math.max(120, filterFrequency), start); gain.gain.setValueAtTime(Math.max(0.0001, gainValue), start); gain.gain.exponentialRampToValueAtTime(0.0001, end); source.connect(filter).connect(gain).connect(this.master); this.transientVoices += 1; source.onended = () => { this.transientVoices = Math.max(0, this.transientVoices - 1); }; source.start(start); source.stop(end + 0.01);
   }
 
