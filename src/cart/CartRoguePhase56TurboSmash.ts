@@ -63,7 +63,10 @@ export function cartTurboSmashCanReach(
   const dx = obstacle.x - playerX;
   const dz = obstacle.z - playerZ;
   const distance = Math.hypot(dx, dz);
-  if (distance <= obstacle.radius + 1.52) return false;
+  // A release can happen on the same frame that the base collision solver has
+  // already nudged the cart around a rock. Treat close contact/overlap as a
+  // valid smash instead of dropping the target for being "too close".
+  if (distance <= obstacle.radius + 1.95) return true;
 
   const forwardX = Math.sin(heading);
   const forwardZ = Math.cos(heading);

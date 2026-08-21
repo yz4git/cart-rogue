@@ -92,6 +92,10 @@ export function installCartRoguePhase102OperatorMix(): void {
   window.addEventListener(CART_ANIME_CUTIN_EVENT, (event) => {
     const detail = (event as CustomEvent<CartCutinInstance>).detail;
     if (!detail?.id) return;
+    // Later phases may register presentation events without widening the Phase102
+    // compile-time union. Leave those events to their owning phase instead of
+    // indexing the deterministic speaker table with an unknown runtime id.
+    if (!(detail.id in CART_CUTIN_SPEAKER_CYCLES)) return;
     rotateCartCutinSpeaker(detail.id);
   });
 }
