@@ -7,6 +7,7 @@ import "./CartRoguePhase108CoreLoopBridge";
 import "./CartRoguePhase108CoreLoopRebuild";
 import "./CartRoguePhase109HandlingSmashDamage";
 import "./CartRoguePhase110TurboDominoCoreLoop";
+import "./CartRoguePhase111AudioOverdrive";
 import { CartRogueCanvasPreview } from "./CartRogueCanvasPreview";
 import { CartRogueWebGLDemo } from "./CartRogueWebGLDemo";
 
