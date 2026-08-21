@@ -25,6 +25,8 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+      - name: Five full playthrough review
+        run: node --import tsx --test tests/cart-five-full-playthrough-review.test.ts
       - name: Turbo Hunt regression
         run: node --import tsx --test tests/cart-phase67-78-turbo-hunt.test.ts
       - name: Battery performance regression
