@@ -32,7 +32,7 @@ These rules apply to all ChatGPT/agent work in this repository.
 
 ## Validation
 
-- Every meaningful checkpoint should run build, gameplay/rules tests, PWA/startup-safety tests, rendered HTML checks, and lint.
+- At meaningful checkpoints, run checks relevant to the changed area. Run the full build, gameplay/rules tests, PWA/startup-safety tests, rendered HTML checks, and lint suite before deployment or after cross-cutting changes.
 - Visual changes are not considered validated by generated concept images. Use the real production game runtime.
 - Maintain a real Chrome/WebGL audit that starts the production build, verifies a WebGL canvas, captures at least one deterministic gameplay frame, and uploads the screenshot artifact.
 - Never claim a workflow, screenshot, deployment, or test passed unless the corresponding GitHub/tool result confirms it.
